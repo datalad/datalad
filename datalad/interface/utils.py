@@ -28,6 +28,10 @@ from typing import TypeVar
 import datalad.support.ansi_colors as ac
 from datalad import cfg as dlcfg
 from datalad.dochelpers import single_or_plural
+from datalad.interface.results import (
+    StatusRecord,
+    as_status_record,
+)
 from datalad.support.exceptions import CapturedException
 from datalad.support.gitrepo import GitRepo
 from datalad.ui import ui
@@ -227,11 +231,14 @@ def eval_results(wrapped):
 
 
 def generic_result_renderer(res):
-    if res.get('status', None) != 'notneeded':
+    # Tolerate plain dicts here: this is a public, extension-callable
+    # entry point. Coerce so downstream attribute access is safe.
+    res = as_status_record(res)
+    if res.status != 'notneeded':
         path = res.get('path', None)
         if path and res.get('refds'):
             try:
-                path = relpath(path, res['refds'])
+                path = relpath(path, res.refds)
             except ValueError:
                 # can happen, e.g., on windows with paths from different
                 # drives. just go with the original path in this case
@@ -243,18 +250,17 @@ def generic_result_renderer(res):
             status=ac.color_status(res.get('status', '<status-unspecified>')),
             path=' {}'.format(path) if path else '',
             type=' ({})'.format(
-                ac.color_word(res['type'], ac.MAGENTA)
+                ac.color_word(res.type, ac.MAGENTA)
             ) if 'type' in res else '',
             msg=' [{}]'.format(
-                res['message'][0] % res['message'][1:]
-                if isinstance(res['message'], tuple) else res[
-                    'message'])
+                res.message[0] % res.message[1:]
+                if isinstance(res.message, tuple) else res.message)
             if res.get('message', None) else '',
             err=ac.color_word(' [{}]'.format(
-                res['error_message'][0] % res['error_message'][1:]
-                if isinstance(res['error_message'], tuple) else res[
-                    'error_message']), ac.RED)
-            if res.get('error_message', None) and res.get('status', None) != 'ok' else ''))
+                res.error_message[0] % res.error_message[1:]
+                if isinstance(res.error_message, tuple)
+                else res.error_message), ac.RED)
+            if res.get('error_message', None) and res.status != 'ok' else ''))
 
 
 # keep for legacy compatibility
@@ -324,10 +330,16 @@ def _process_results(
             lgr.debug('Drop result record without "action": %s', res)
             continue
 
-        actsum = action_summary.get(res['action'], {})
-        if res['status']:
-            actsum[res['status']] = actsum.get(res['status'], 0) + 1
-            action_summary[res['action']] = actsum
+        # coerce-at-boundary: downstream code can rely on attribute access
+        # for typed fields. This also makes plain-dict results from
+        # extension code (or pre-migration call sites) typed as they flow
+        # through the pipeline.
+        res = as_status_record(res)
+
+        actsum = action_summary.get(res.action, {})
+        if res.status:
+            actsum[res.status] = actsum.get(res.status, 0) + 1
+            action_summary[res.action] = actsum
         ## log message, if there is one and a logger was given
         msg = res.get('message', None)
         # remove logger instance from results, as it is no longer useful
@@ -339,22 +351,22 @@ def _process_results(
                 # didn't get a particular log function, go with default
                 res_lgr = getattr(
                     res_lgr,
-                    default_logchannels[res['status']]
+                    default_logchannels[res.status]
                     if result_log_level == 'match-status'
                     else result_log_level)
-            msg = res['message']
+            msg = res.message
             msgargs = None
             if isinstance(msg, tuple):
                 msgargs = msg[1:]
                 msg = msg[0]
             if 'path' in res:
                 # result path could be a path instance
-                path = str(res['path'])
+                path = str(res.path)
                 if msgargs:
                     # we will pass the msg for %-polation, so % should be doubled
                     path = path.replace('%', '%%')
                 msg = '{} [{}({})]'.format(
-                    msg, res['action'], path)
+                    msg, res.action, path)
             if msgargs:
                 # support string expansion of logging to avoid runtime cost
                 try:
@@ -388,7 +400,7 @@ def _process_results(
         # looks for error status, and report at the end via
         # an exception
         if on_failure in ('continue', 'stop') \
-                and res['status'] in ('impossible', 'error'):
+                and res.status in ('impossible', 'error'):
             incomplete_results.append(res)
             if on_failure == 'stop':
                 # first fail -> that's it
@@ -409,7 +421,7 @@ def _render_result_generic(
     repetition_keys = set(('action', 'status', 'type', 'refds'))
 
     trimmed_result = {k: v for k, v in res.items() if k in repetition_keys}
-    if res.get('status', None) != 'notneeded' \
+    if res.status != 'notneeded' \
             and trimmed_result == last_result:
         # this is a similar report, suppress if too many, but count it
         last_result_reps += 1

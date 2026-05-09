@@ -18,6 +18,7 @@ import logging
 from collections.abc import (
     Iterable,
     Iterator,
+    Mapping,
     MutableMapping,
 )
 from dataclasses import (
@@ -293,6 +294,23 @@ StatusRecord._DECLARED_FIELDS = tuple(
 StatusRecord._DECLARED_FIELDS_SET = frozenset(StatusRecord._DECLARED_FIELDS)
 
 
+def as_status_record(res: Any) -> 'StatusRecord':
+    """Coerce a result record to a :class:`StatusRecord`.
+
+    Returns ``res`` unchanged if it is already a ``StatusRecord``;
+    otherwise wraps the mapping in a fresh ``StatusRecord`` so downstream
+    code can rely on typed attribute access. Used at the central pipeline
+    entry (``_process_results``) so the in-pipeline result type is
+    guaranteed regardless of what a producer yielded.
+
+    The wrapping is shallow: keys flow through ``from_kwargs``, so unknown
+    keys land in ``_extras``. The original mapping is not mutated.
+    """
+    if isinstance(res, StatusRecord):
+        return res
+    return StatusRecord.from_kwargs(res)
+
+
 def get_status_dict(
     action: Optional[str] = None,
     ds: Optional[Dataset] = None,
@@ -407,16 +425,24 @@ def results_from_paths(
         )
 
 
-def is_ok_dataset(r: dict) -> bool:
-    """Convenience test for a non-failure dataset-related result dict"""
+def is_ok_dataset(r: Mapping) -> bool:
+    """Convenience test for a non-failure dataset-related result record.
+
+    Accepts both :class:`StatusRecord` and plain ``dict`` (e.g. results
+    yielded from extensions that have not migrated yet).
+    """
     return r.get('status', None) == 'ok' and r.get('type', None) == 'dataset'
 
 
 class ResultXFM:
     """Abstract definition of the result transformer API"""
 
-    def __call__(self, res: dict[str, Any]) -> Any:
-        """This is called with one result dict at a time"""
+    def __call__(self, res: Mapping) -> Any:
+        """This is called with one result record at a time.
+
+        ``res`` is a :class:`Mapping` — ``StatusRecord`` is supported as
+        the typed common case, but plain ``dict`` is also valid.
+        """
         raise NotImplementedError
 
 
@@ -431,7 +457,7 @@ class YieldDatasets(ResultXFM):
     def __init__(self, success_only: bool = False) -> None:
         self.success_only = success_only
 
-    def __call__(self, res: dict[str, Any]) -> Optional[Dataset]:
+    def __call__(self, res: Mapping) -> Optional[Dataset]:
         if res.get('type', None) == 'dataset':
             if not self.success_only or \
                     res.get('status', None) in ('ok', 'notneeded'):
@@ -449,7 +475,7 @@ class YieldRelativePaths(ResultXFM):
     Relative paths are determined from the 'refds' value in the result. If
     no such value is found, `None` is returned.
     """
-    def __call__(self, res: dict[str, Any]) -> Optional[str]:
+    def __call__(self, res: Mapping) -> Optional[str]:
         refpath = res.get('refds', None)
         if refpath:
             return relpath(res['path'], start=refpath)
@@ -468,7 +494,7 @@ class YieldField(ResultXFM):
         """
         self.field = field
 
-    def __call__(self, res: dict[str, Any]) -> Any:
+    def __call__(self, res: Mapping) -> Any:
         if self.field in res:
             return res[self.field]
         else:
@@ -545,13 +571,13 @@ def annexjson2result(d: dict[str, Any], ds: Dataset, **kwargs: Any) -> dict[str,
     return res
 
 
-def count_results(res: Iterable[dict[str, Any]], **kwargs: Any) -> int:
+def count_results(res: Iterable[Mapping], **kwargs: Any) -> int:
     """Return number of results that match all property values in kwargs"""
     return sum(
         all(k in r and r[k] == v for k, v in kwargs.items()) for r in res)
 
 
-def only_matching_paths(res: dict[str, Any], **kwargs: Any) -> bool:
+def only_matching_paths(res: Mapping, **kwargs: Any) -> bool:
     # TODO handle relative paths by using a contained 'refds' value
     paths = ensure_list(kwargs.get('path', []))
     respath = res.get('path', None)
@@ -560,7 +586,7 @@ def only_matching_paths(res: dict[str, Any], **kwargs: Any) -> bool:
 
 # needs decorator, as it will otherwise bind to the command classes that use it
 @staticmethod  # type: ignore[misc]
-def is_result_matching_pathsource_argument(res: dict[str, Any], **kwargs: Any) -> bool:
+def is_result_matching_pathsource_argument(res: Mapping, **kwargs: Any) -> bool:
     # we either have any non-zero number of "paths" (that could be anything), or
     # we have one path and one source
     # we don't do any error checking here, done by the command itself
