@@ -412,6 +412,14 @@ Exit criterion (met): the four in-the-wild fields are now typed attributes;
 the subclass set is documented as parked with reasons; no new tests
 regressed.
 
+> **Caveat — these decisions were taken on a static grep audit.** A
+> static survey misses dynamic key construction (`addurls` building
+> keys from CSV columns, helpers spreading `**res_kwargs` from
+> closures, results yielded from extensions, etc.). The base-class
+> field set above and the subclass-park decisions should be treated
+> as a *working hypothesis*. The honest version of v2.3 needs runtime
+> evidence — see **v2.6** below.
+
 #### v2.4 — opt-in strictness and validation
 
 Once v2.1–v2.3 have shaken out the field set, add:
@@ -487,6 +495,133 @@ annotation passes (Phase 3 in this doc) build on.
 
 Exit criterion: annotations land; mypy/pyright run is clean for
 `datalad/interface/`.
+
+#### v2.6 — runtime extras-key telemetry; redo v2.3 with real data
+
+The v1 base-class field set (`bytesize`, `gitshasum`, `prev_gitshasum`,
+`key`) and the v2.3 subclass-park decisions were taken on the basis of
+a static grep over `res[k] = v`, `dict(res_kwargs, k=v, ...)`, and
+explicit `get_status_dict(..., k=v, ...)` call sites. **A static survey
+is structurally incomplete** — it misses dynamic key construction
+(`addurls` building keys from CSV column names, helpers that spread
+`**res_kwargs` originally constructed in callers up the stack, results
+yielded from extensions, results converted by `annexjson2result` whose
+field set varies with the upstream `git annex` JSON shape, etc.).
+
+The result-record contract is genuinely dynamic; the actual field
+shape can only be observed at runtime by exercising the codepaths.
+
+##### Mechanism
+
+Add a debug-only trace mode to `StatusRecord`, gated by
+`DATALAD_STATUSRECORD_TRACE=1` (independent of `_STRICT`). When on,
+every write to `_extras` (i.e. every `__setitem__` / `__init__` of a
+key not in `_DECLARED_FIELDS_SET`) records:
+
+- the key name,
+- the producer's stack frame, truncated to the topmost in-tree call
+  site (skip `get_status_dict` / `from_kwargs` / pytest frames),
+- the producing `action` and `type` if known on the record at that
+  point (so we can correlate `key` with `type='file'`, etc.),
+- the value's Python type (so e.g. `bytesize: int` vs `bytesize: str`
+  divergence is visible).
+
+Records accumulate in a module-global structure. On process exit (via
+`atexit`) or on explicit `dump_extras_telemetry(path)`, the structure
+serializes to a JSONL report — one line per `(key, frame)` cluster
+with counts and a few representative values.
+
+The collector is intentionally cheap when off (the env-var read can be
+cached at module import) and best-effort when on; it does not need to
+be thread-safe or production-grade. Its only job is to feed an
+offline analysis.
+
+##### Sweep procedure
+
+1. `DATALAD_STATUSRECORD_TRACE=1 pytest datalad/` — full local suite.
+2. Optionally also run integration / network tests (un-set
+   `DATALAD_TESTS_NONETWORK`) and the long-running parallel
+   `get` / `clone` paths to exercise multiprocessing-yielded results.
+3. Aggregate the JSONL by key. For each key bucket by:
+   - **frequency** — how many distinct call sites emit it;
+   - **co-occurrence** — which other extras-keys appear in the same
+     record;
+   - **action / type distribution** — does the key concentrate around
+     one action or entity type, or does it span?
+   - **value-type stability** — is it always `int`, or sometimes
+     `str`?
+
+Output the aggregated report as part of the v2.6 PR so reviewers can
+see the data.
+
+##### How the analysis drives decisions
+
+A key earns a typed slot somewhere — base or subclass — when:
+
+- it appears at ≥2 distinct in-tree call sites, *and*
+- its co-occurrence pattern is stable (same companion keys appear
+  together with high frequency), *and*
+- it can be expressed as a Python identifier (otherwise it must stay
+  in `_extras`; e.g. `annex-ignore`, `error-messages`).
+
+Where the slot lives is decided by the action / type distribution:
+
+- spans many actions and both `type='dataset'` and `type='file'` →
+  base class;
+- concentrated on one entity type (e.g. `key` only ever fires when
+  `type='file'`) → subclass for that entity type;
+- concentrated on one command (e.g. `run_info` only fires for
+  `run`/`rerun`) → either a small subclass for that command, or stays
+  in `_extras` if the cluster is too small to justify a class.
+
+##### Re-examining the v1 / v2.3 base-class fields
+
+The v1+v2.3 promotions to base — `bytesize`, `gitshasum`,
+`prev_gitshasum`, `key` — are all file-specific *in practice*
+(`type='file'` or `type='symlink'`). They were placed on the base on
+the strength of `result_records.rst` listing them as commonly-observed
+in-the-wild fields. A runtime audit is likely to show they cluster
+tightly with `state` and `parentds` for file results and never appear
+on dataset / sibling records.
+
+If that hypothesis holds, v2.6 should:
+
+- introduce `FileStatusRecord(StatusRecord)` and *move*
+  `bytesize`, `gitshasum`, `prev_gitshasum`, `key` (and possibly
+  `state`, `annexkey`) from the base onto it;
+- introduce `DatasetStatusRecord(StatusRecord)` for any
+  dataset-specific cluster (e.g. `gitshasum` for the dataset's commit
+  hexsha if that is observed cross-command — could overlap with
+  `FileStatusRecord` if the *name* is reused);
+- introduce `SiblingStatusRecord(StatusRecord)` for `name`/`url`/
+  `ssh_url` if the cluster shows ≥2 callers (likely true);
+- introduce a `RunStatusRecord` or similar for `run_info` /
+  `run_message` / `rerun_*` / `diff` / `author` / `date` if those
+  cluster as the static grep suggests.
+
+Moving fields *off* the base is mildly disruptive — code paths that
+expect them on the base would need to be re-typed — but it is a
+better long-term shape. The cost is bounded because v1+v2.3 only
+landed four fields and they are not yet relied on by any consumer
+that accesses them via attribute (they remain accessible via the
+Mapping API in any case).
+
+##### Status
+
+Not yet executed. v2.6 is the next planned phase, consuming the work
+already in v1–v2.5. Until v2.6 lands, the v1+v2.3 base-class field
+set should be treated as a working hypothesis, not the final shape.
+
+##### Exit criterion
+
+- Telemetry instrumentation lands behind the env var (no behavior
+  change when off).
+- The JSONL output of a full test sweep is included in the PR for
+  reviewer scrutiny.
+- The aggregate analysis is summarized in this design doc.
+- Subclasses are introduced (or definitively parked) per the data —
+  not the grep — and any base-class fields that fail the data test
+  are moved onto the appropriate subclass.
 
 ### Phase 3 — opportunistic, no fixed timeline
 
