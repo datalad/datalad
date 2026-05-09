@@ -15,6 +15,7 @@ from __future__ import annotations
 __docformat__ = 'restructuredtext'
 
 import logging
+import os
 from collections.abc import (
     Iterable,
     Iterator,
@@ -64,6 +65,21 @@ success_status_map = {
     'impossible': 'failure',
     'error': 'failure',
 }
+
+# Canonical status values per docs/source/design/result_records.rst.
+# Used by StatusRecord to validate status assignments in v2.4 strict mode.
+_VALID_STATUSES = frozenset(success_status_map)
+
+
+def _strict_mode_enabled() -> bool:
+    """Whether StatusRecord runs in strict mode.
+
+    Controlled by ``DATALAD_STATUSRECORD_STRICT`` environment variable
+    (truthy values: ``1``, ``true``, ``yes`` — case-insensitive). Off by
+    default so existing producers and extensions are unaffected.
+    """
+    v = os.environ.get('DATALAD_STATUSRECORD_STRICT', '').strip().lower()
+    return v in ('1', 'true', 'yes')
 
 
 # ---------------------------------------------------------------------------
@@ -213,10 +229,34 @@ class StatusRecord(MutableMapping):
             except KeyError:
                 pass
             return
+        # v2.4 opt-in unknown-key warning. Off by default so existing
+        # producers and extensions are unaffected. Enable via
+        # DATALAD_STATUSRECORD_STRICT=1. Status-value validation is in
+        # __setattr__ so it catches both dict-style and dataclass-init
+        # paths.
+        if key not in self._DECLARED_FIELDS_SET and _strict_mode_enabled():
+            lgr.warning(
+                "StatusRecord: unknown key %r assigned to extras "
+                "(strict mode is on)", key)
         if key in self._DECLARED_FIELDS_SET:
             setattr(self, key, value)
         else:
             self._extras[key] = value
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        # v2.4 opt-in status-value validation. Catches both
+        # ``StatusRecord(status=v)`` (auto-generated dataclass __init__
+        # routes through __setattr__) and ``r.status = v`` and
+        # ``r['status'] = v`` (which calls setattr on declared fields).
+        if name == 'status' \
+                and value is not _UNSET \
+                and value is not None \
+                and value not in _VALID_STATUSES \
+                and _strict_mode_enabled():
+            raise ValueError(
+                f"invalid status value {value!r}; "
+                f"expected one of {sorted(_VALID_STATUSES)}")
+        super().__setattr__(name, value)
 
     def __delitem__(self, key: str) -> None:
         if key in self._DECLARED_FIELDS_SET:

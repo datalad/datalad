@@ -425,6 +425,35 @@ Once v2.1–v2.3 have shaken out the field set, add:
 - Optional `slots=True` if microbenchmarks show measurable overhead
   (Python 3.10+). Only if numbers warrant it.
 
+##### Outcome (v2.4 landed)
+
+The full set is gated behind a single `DATALAD_STATUSRECORD_STRICT` env
+variable (truthy values: `1`, `true`, `yes`); off by default so existing
+producers and extensions are unaffected.
+
+When strict mode is on:
+
+- **Status-value validation** — implemented in `__setattr__` (not
+  `__setitem__`) so it catches all three set paths:
+  `StatusRecord(status=v)` (dataclass `__init__`), `r['status'] = v`
+  (`__setitem__`), and `r.status = v` (direct attribute assignment).
+  Raises `ValueError` for non-canonical values; `None` is still
+  accepted as the legacy "absent" marker.
+- **Unknown-key warning** — `__setitem__` of a key not in the declared
+  set (i.e. routed to `_extras`) logs at WARNING. Does not raise — too
+  disruptive for extension-yielded results that may use ad-hoc keys.
+
+A grep across the codebase before landing v2.4 found every in-tree
+producer uses a canonical status value (`ok` / `error` / `impossible`
+/ `notneeded`); the only non-canonical hits were both in test fixtures
+that explicitly exercise the unknown-status path. So default-off
+strict mode is the right call: production is silent, but anyone
+turning the flag on in a development or CI run gets immediate signal.
+
+`slots=True` deferred — no benchmark data yet showing measurable
+overhead. Can be added cheaply in a future PR if profiling motivates
+it.
+
 Exit criterion: validation either lands cleanly (no producer changes needed)
 or this doc records the offending sites and defers to a v3 cleanup pass.
 

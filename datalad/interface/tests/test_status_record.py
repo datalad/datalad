@@ -505,6 +505,77 @@ def test_repr_shows_dict_view():
 # Sentinel hygiene
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# v2.4: opt-in strict-mode validation
+# ---------------------------------------------------------------------------
+
+def test_strict_mode_disabled_by_default(monkeypatch):
+    """Strict mode is opt-in: unset env => no validation, anything goes."""
+    monkeypatch.delenv('DATALAD_STATUSRECORD_STRICT', raising=False)
+    # invalid status accepted via every path
+    r = StatusRecord(status='funky')
+    assert r.status == 'funky'
+    r['status'] = 'wat'
+    assert r.status == 'wat'
+    # unknown extras key accepted silently
+    r['unknown_key'] = 1
+    assert r['unknown_key'] == 1
+
+
+@pytest.mark.parametrize('truthy', ['1', 'true', 'yes', 'TRUE', 'Yes'])
+def test_strict_mode_status_validation_via_init(monkeypatch, truthy):
+    """Strict mode rejects invalid status values at construction time
+    (catches the dataclass __init__ path that __setitem__ does not see)."""
+    monkeypatch.setenv('DATALAD_STATUSRECORD_STRICT', truthy)
+    with pytest.raises(ValueError, match='invalid status value'):
+        StatusRecord(status='funky')
+    # canonical statuses still accepted
+    for s in ('ok', 'notneeded', 'impossible', 'error'):
+        r = StatusRecord(status=s)
+        assert r.status == s
+
+
+def test_strict_mode_status_validation_via_setitem(monkeypatch):
+    monkeypatch.setenv('DATALAD_STATUSRECORD_STRICT', '1')
+    r = StatusRecord(status='ok')
+    with pytest.raises(ValueError, match='invalid status value'):
+        r['status'] = 'broken'
+    # original value preserved
+    assert r.status == 'ok'
+
+
+def test_strict_mode_status_validation_via_attribute_assign(monkeypatch):
+    monkeypatch.setenv('DATALAD_STATUSRECORD_STRICT', '1')
+    r = StatusRecord(status='ok')
+    with pytest.raises(ValueError, match='invalid status value'):
+        r.status = 'oh-no'
+    assert r.status == 'ok'
+
+
+def test_strict_mode_unknown_key_warns(monkeypatch, caplog):
+    """Unknown keys still go to _extras in strict mode, but emit a
+    WARNING so CI / development surfaces typos.
+    """
+    import logging as _log
+    monkeypatch.setenv('DATALAD_STATUSRECORD_STRICT', '1')
+    r = StatusRecord(action='get')
+    with caplog.at_level(_log.WARNING, logger='datalad.interface.results'):
+        r['typo_key'] = 1
+    assert 'typo_key' in r
+    assert any('unknown key' in m.message for m in caplog.records), \
+        f'expected warning, got: {[m.message for m in caplog.records]}'
+
+
+def test_strict_mode_status_none_allowed(monkeypatch):
+    """``None`` is the legacy "absent" marker (e.g. r['status'] = None
+    used to silently drop the key). Strict mode must not treat it as an
+    invalid status value.
+    """
+    monkeypatch.setenv('DATALAD_STATUSRECORD_STRICT', '1')
+    r = StatusRecord(status=None)        # accepted
+    assert r.status is None
+
+
 def test_in_the_wild_fields_are_typed_attributes():
     """v2.3 promotion: fields explicitly listed in
     ``docs/source/design/result_records.rst`` as commonly-observed across
