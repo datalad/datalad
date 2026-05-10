@@ -23,6 +23,7 @@ from datalad.api import (
 )
 from datalad.cmd import StdOutErrCapture
 from datalad.cmd import WitlessRunner as Runner
+from datalad.config import _clean_env_from_gitconfig_items
 from datalad.interface.base import get_interface_groups
 from datalad.tests.utils_pytest import (
     SkipTest,
@@ -376,9 +377,11 @@ def test_librarymode(path=None):
                   '-d', path, '--dry-run'])
         ok_(datalad.in_librarymode())
     finally:
-        # restore pre-test behavior
+        # restore pre-test behavior; see #4119 for the env-based propagation
         datalad.__runtime_mode = was_mode
-        datalad.cfg.overrides.pop('datalad.runtime.librarymode')
+        _clean_env_from_gitconfig_items()
+        datalad.cfg.overrides.pop('datalad.runtime.librarymode', None)
+        datalad.cfg.reload(force=True)
 
 
 @with_tempfile
