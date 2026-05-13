@@ -385,6 +385,22 @@ def test_librarymode(path=None):
 
 
 @with_tempfile
+def test_cli_configoverrides(path=None):
+    # See https://github.com/datalad/datalad/issues/4119
+    Dataset(path).create()
+    try:
+        run_main([
+            '-c', 'bogusdataladtestsec.subsec=unique',
+            'run', '-d', path,
+            'git config bogusdataladtestsec.subsec',
+        ])
+    finally:
+        _clean_env_from_gitconfig_items()
+        datalad.cfg.overrides.pop('bogusdataladtestsec.subsec', None)
+        datalad.cfg.reload(force=True)
+
+
+@with_tempfile
 def test_completion(out_fn=None):
     skip_if_no_module('argcomplete')
 
