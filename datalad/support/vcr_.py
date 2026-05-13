@@ -10,6 +10,7 @@
 """
 
 import logging
+import sys
 from contextlib import contextmanager
 from functools import wraps
 from os.path import isabs
@@ -20,11 +21,47 @@ from datalad.utils import Path
 lgr = logging.getLogger("datalad.support.vcr")
 
 
+def _caller_cassette_path(name):
+    """Look for ``vcr_cassettes/<name>.yaml`` next to the test that called us.
+
+    `use_cassette` is typically applied as a decorator at module import time,
+    so the first frame outside this module is the test module that wants
+    the cassette.  When used as a context manager from inside a test
+    function the same logic still resolves to that test's module file.
+    Returns the absolute path on hit, or None if no such cassette exists.
+    """
+    frame = sys._getframe(1)
+    here = __file__
+    while frame is not None:
+        caller = frame.f_code.co_filename
+        if caller and caller != here:
+            candidate = Path(caller).parent / "vcr_cassettes" / f"{name}.yaml"
+            if candidate.is_file():
+                return str(candidate)
+            return None
+        frame = frame.f_back
+    return None
+
+
 def _get_cassette_path(path):
-    """Return a path to the cassette within our unified 'storage'"""
-    if not isabs(path):  # so it was given as a name
-        return "fixtures/vcr_cassettes/%s.yaml" % path
-    return path
+    """Return a path to the cassette within our 'storage'.
+
+    An absolute path is used verbatim.  A bare name is resolved against:
+
+    1. ``<caller-module-dir>/vcr_cassettes/<name>.yaml`` (versioned, shipped
+       alongside the test that requested it), if such a file exists.
+    2. otherwise ``fixtures/vcr_cassettes/<name>.yaml`` relative to the
+       current working directory -- the legacy gitignored scratch location
+       where VCR's ``record_mode='once'`` writes a fresh cassette on the
+       first run.  Useful for local recording before promoting the cassette
+       into the versioned per-test directory.
+    """
+    if isabs(path):
+        return path
+    versioned = _caller_cassette_path(path)
+    if versioned is not None:
+        return versioned
+    return "fixtures/vcr_cassettes/%s.yaml" % path
 
 try:
     # TEMP: Just to overcome problem with testing on jessie with older requests

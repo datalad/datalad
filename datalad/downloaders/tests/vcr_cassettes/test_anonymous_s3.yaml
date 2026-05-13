@@ -1,0 +1,143 @@
+interactions:
+- request:
+    body: null
+    headers:
+      User-Agent:
+      - !!binary |
+        Qm90bzMvMS40Mi45NiBtZC9Cb3RvY29yZSMxLjQyLjk2IHVhLzIuMSBvcy9saW51eCM2LjE5LjEw
+        K2RlYjE0LWFtZDY0IG1kL2FyY2gjeDg2XzY0IGxhbmcvcHl0aG9uIzMuMTMuMTIgbWQvcHlpbXBs
+        I0NQeXRob24gbS9iLEUsWiBjZmcvcmV0cnktbW9kZSNzdGFuZGFyZCBCb3RvY29yZS8xLjQyLjk2
+      amz-sdk-invocation-id:
+      - !!binary |
+        MjJhODJjZmQtMTc1Mi00MWNmLTg1YWItZWQ2NzVhYWU1ZWU3
+      amz-sdk-request:
+      - !!binary |
+        YXR0ZW1wdD0x
+    method: HEAD
+    uri: https://s3.amazonaws.com/openneuro.org/ds000001/dataset_description.json
+  response:
+    body:
+      string: ''
+    headers:
+      Accept-Ranges:
+      - bytes
+      Content-Length:
+      - '615'
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 27 Apr 2026 16:10:23 GMT
+      ETag:
+      - '"37ece861232d68015825eb6799eda7bd"'
+      Last-Modified:
+      - Fri, 21 Aug 2020 20:27:29 GMT
+      Server:
+      - AmazonS3
+      x-amz-id-2:
+      - SusCrhcG9ZDDN8YmKImz5LJ/AbPfM8nIYbPJ2bnXGHoY32CIaF/P6RAuPjYX+X8Yq5fr5sPepY6vH9qRvJ0F++IkAQASk9+v
+      x-amz-request-id:
+      - RHQ4ZTRSXAV2HBJD
+      x-amz-version-id:
+      - AMAF3YGQWWY3X7hTRlJCY396l5oeVVRv
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      User-Agent:
+      - !!binary |
+        Qm90bzMvMS40Mi45NiBtZC9Cb3RvY29yZSMxLjQyLjk2IHVhLzIuMSBvcy9saW51eCM2LjE5LjEw
+        K2RlYjE0LWFtZDY0IG1kL2FyY2gjeDg2XzY0IGxhbmcvcHl0aG9uIzMuMTMuMTIgbWQvcHlpbXBs
+        I0NQeXRob24gbS9iLEUsRyxaIGNmZy9yZXRyeS1tb2RlI3N0YW5kYXJkIEJvdG9jb3JlLzEuNDIu
+        OTY=
+      amz-sdk-invocation-id:
+      - !!binary |
+        NzMyNjgzNDctNzg5MS00ZTM0LWJjZWMtMWNjNjM0OTQ2OGU0
+      amz-sdk-request:
+      - !!binary |
+        YXR0ZW1wdD0x
+    method: HEAD
+    uri: https://s3.amazonaws.com/openneuro.org/ds000001/dataset_description.json
+  response:
+    body:
+      string: ''
+    headers:
+      Accept-Ranges:
+      - bytes
+      Content-Length:
+      - '615'
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 27 Apr 2026 16:10:23 GMT
+      ETag:
+      - '"37ece861232d68015825eb6799eda7bd"'
+      Last-Modified:
+      - Fri, 21 Aug 2020 20:27:29 GMT
+      Server:
+      - AmazonS3
+      x-amz-id-2:
+      - +MD0bi8j3uaOuR3KhwL82wsGaTd6S3kBtm3f3F+SkLCR4W4FytBXv2UZA+nm0hsr3hPBwdDplAs=
+      x-amz-request-id:
+      - RHQF4K4M2RE4TE4N
+      x-amz-version-id:
+      - AMAF3YGQWWY3X7hTRlJCY396l5oeVVRv
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      User-Agent:
+      - !!binary |
+        Qm90bzMvMS40Mi45NiBtZC9Cb3RvY29yZSMxLjQyLjk2IHVhLzIuMSBvcy9saW51eCM2LjE5LjEw
+        K2RlYjE0LWFtZDY0IG1kL2FyY2gjeDg2XzY0IGxhbmcvcHl0aG9uIzMuMTMuMTIgbWQvcHlpbXBs
+        I0NQeXRob24gbS9iLEUsRyxaIGNmZy9yZXRyeS1tb2RlI3N0YW5kYXJkIEJvdG9jb3JlLzEuNDIu
+        OTY=
+      amz-sdk-invocation-id:
+      - !!binary |
+        NTRiNDc0MTMtYTNhZS00ODQzLWEyZDItYTI3OGMzMWRmN2Zl
+      amz-sdk-request:
+      - !!binary |
+        YXR0ZW1wdD0x
+      x-amz-checksum-mode:
+      - !!binary |
+        RU5BQkxFRA==
+    method: GET
+    uri: https://s3.amazonaws.com/openneuro.org/ds000001/dataset_description.json
+  response:
+    body:
+      string: "{\n    \"BIDSVersion\": \"1.0.0\",\n    \"License\": \"CC0\",\n    \"Name\":
+        \"Balloon Analog Risk-taking Task\",\n    \"ReferencesAndLinks\": [\n        \"Schonberg
+        TS, Fox CR, Mumford JA, Congdon E, Trepel C, Poldrack RA (2012). Decreasing
+        ventromedial prefrontal cortex activity during sequential risk-taking: An
+        fMRI investigation of the Balloon Analogue Risk Task. Frontiers in Decision
+        Neuroscience, 6:80 doi: 10.3389/fnins.2012.00080\"\n    ],\n    \"Authors\":
+        [\n        \"Tom Schonberg\",\n        \"Christopher Trepel\",\n        \"Craig
+        Fox\",\n        \"Russell A. Poldrack\"\n    ],\n    \"DatasetDOI\": \"10.18112/openneuro.ds000001.v1.0.0\"\n}"
+    headers:
+      Accept-Ranges:
+      - bytes
+      Content-Length:
+      - '615'
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 27 Apr 2026 16:10:23 GMT
+      ETag:
+      - '"37ece861232d68015825eb6799eda7bd"'
+      Last-Modified:
+      - Fri, 21 Aug 2020 20:27:29 GMT
+      Server:
+      - AmazonS3
+      x-amz-id-2:
+      - IHA6kREtt7zSEE00C/h5yDgz4SpcPTX1KJNCwQ8UsrgN0TvJgbrCDcHqstv0PNySbukpCoaymWwQ7QCE3Prou9bFFhcqh40X
+      x-amz-request-id:
+      - RHQ28JS9XPMFMAHP
+      x-amz-version-id:
+      - AMAF3YGQWWY3X7hTRlJCY396l5oeVVRv
+    status:
+      code: 200
+      message: OK
+version: 1
