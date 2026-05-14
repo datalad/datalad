@@ -10,6 +10,7 @@ import logging
 import xml.etree.ElementTree as etree
 from urllib import request as urllib_request
 
+
 class NDATokenGenerator(object):
     __schemas = {
         'soap': 'http://schemas.xmlsoap.org/soap/envelope/',

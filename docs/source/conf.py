@@ -14,13 +14,13 @@
 
 import datetime
 import os
+import subprocess
 import sys
 from glob import glob
 from os import pardir
 from os.path import exists
 from os.path import join as opj
 from pathlib import Path
-import subprocess
 
 
 def setup(sphinx):
