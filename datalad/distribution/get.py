@@ -239,8 +239,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                         remote_url,
                         alternate_suffix=False)
                 )
-                rewriten_url = rewrite_match_scheme(remote_url, sm_url)
-                if rewriten_url:
+                if (rewriten_url := rewrite_match_scheme(remote_url, sm_url)):
                     clone_urls.append(dict(cost=610, name=remote, url=rewriten_url))
 
     candcfg_prefix = 'datalad.get.subdataset-source-candidate-'
