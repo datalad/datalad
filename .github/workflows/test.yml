@@ -218,7 +218,7 @@ jobs:
       # so the partial dump up to the last completed test is parseable.
       - name: Upload pytest report log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pytest-report-${{ github.run_id }}-${{ strategy.job-index }}
           path: __testhome__/pytest-report.jsonl
