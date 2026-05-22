@@ -82,6 +82,18 @@ class ProgressBarBase(object):
     def set_desc(self, value):
         pass  # to override in subclass on how to handle description
 
+    def set_initial(self, value):
+        """Adjust the "initial" anchor used for rate / ETA computation.
+
+        Backends compute the displayed rate as roughly
+        ``(n - initial) / elapsed`` (this is tqdm's fallback when
+        ``smoothing == 0``). Callers that credit bytes to ``n`` that were
+        never transferred during this session -- e.g. a partially-on-disk
+        file resumed by ``git annex`` -- can advance ``initial`` in
+        lockstep so those bytes do not pollute the rate display. No-op
+        for backends that do not separately track an initial anchor.
+        """
+
 
 class SilentProgressBar(ProgressBarBase):
     def __init__(self, label='', fill_text=None, total=None, unit='B', out=sys.stdout):
@@ -264,19 +276,15 @@ try:
 
         def update(self, size, increment=False, total=None):
             self._create()
-            if total is not None:
-                # only a reset can change the total of an existing pbar
-                self._pbar.reset(total)
-                # we need to (re-)advance the pbar back to the old state
-                self._pbar.update(self.current)
-                # an update() does not (reliably) trigger a refresh, hence
-                # without the next, the pbar may still show zero progress
+            if total is not None and total != self._pbar.total:
+                # adjust the total without going through tqdm.reset(), which
+                # zeroes the iteration count and start time and produces
+                # bogus rates (e.g. "[00:00<00:00, 16.0T Bytes/s]") on the
+                # next paint
+                self._pbar.total = total
                 if not size:
-                    # whenever a total is changed, we need a refresh. If there is
-                    # no progress update, we do it here, else we'll do it after
-                    # the progress update
+                    # no follow-up update to trigger a redraw
                     self._pbar.refresh()
-                # if we set a new total and also advance the progress bar:
             if not size:
                 return
             inc = size - self.current
@@ -343,6 +351,15 @@ try:
 
         def set_desc(self, value):
             self._pbar.desc = value
+
+        def set_initial(self, value):
+            # tqdm uses `(n - initial) / elapsed` as the fallback rate when
+            # smoothing == 0 (the mode used for "Total" bars). Updating
+            # `initial` in sync with already-on-disk bytes credited to n
+            # keeps the rate display centred on session work rather than
+            # the warm-start jump.
+            if self._pbar is not None:
+                self._pbar.initial = value
 
 
     progressbars['tqdm'] = tqdmProgressBar
