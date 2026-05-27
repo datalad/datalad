@@ -318,6 +318,13 @@ class ProgressHandler(logging.Handler):
             label = getattr(record, 'dlm_progress_label', None)
             if label is not None:
                 self.pbars[pid].set_desc(label)
+            # Adjust the "initial" anchor used for rate / ETA computation:
+            # callers (e.g. AnnexJsonProtocol's Total bar) advance this in
+            # sync with already-on-disk bytes so resumed transfers do not
+            # bias the displayed rate.
+            initial = getattr(record, 'dlm_progress_initial', None)
+            if initial is not None:
+                self.pbars[pid].set_initial(initial)
             # an update
             self.pbars[pid].update(
                 update,
