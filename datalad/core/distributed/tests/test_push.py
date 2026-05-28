@@ -240,7 +240,11 @@ def check_push(annex, src_path, dst_path):
     # we could say since='HEAD~2' to make things fast, or we are lazy
     # and say since='^' to indicate the state of the tracking remote
     # which is the same, because we made to commits since the last push.
-    res = src.push(to='target', since="^", jobs=2)
+    # Use jobs='auto' to exercise the auto-resolution code path -- this
+    # is a regression test for gh-7867 where push was passing the
+    # literal string 'auto' through to git-annex copy, which fails with
+    # "option --jobs: cannot parse value `auto'".
+    res = src.push(to='target', since="^", jobs='auto')
     assert_in_results(
         res,
         action='publish', status='ok', target='target',

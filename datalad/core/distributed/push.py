@@ -859,9 +859,6 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
 
     cmd = ['copy', '--batch', '-z', '--to', target]
 
-    if jobs:
-        cmd.extend(['--jobs', str(jobs)])
-
     # Since we got here - we already have some  data != "nothing"
     if (data == 'auto') or \
         (
@@ -908,6 +905,7 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
     # and go
     res = ds_repo._call_annex_records(
         cmd,
+        jobs=jobs,
         git_options=[
             "-c",
             "annex.retry={}".format(
