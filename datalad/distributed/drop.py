@@ -757,11 +757,9 @@ def _drop_allkeys(ds, repo, force=False, jobs=None):
     cmd = ['drop', '--all']
     if force:
         cmd.append('--force')
-    if jobs:
-        cmd.extend(['--jobs', str(jobs)])
 
     try:
-        yield from repo._call_annex_records_items_(cmd)
+        yield from repo._call_annex_records_items_(cmd, jobs=jobs)
     except CommandError as e:
         # pick up the results captured so far and yield them
         # the error will be amongst them
@@ -789,14 +787,12 @@ def _drop_files(ds, repo, paths, force=False, jobs=None):
     cmd = ['drop']
     if force:
         cmd.append('--force')
-    if jobs:
-        cmd.extend(['--jobs', str(jobs)])
 
     respath_by_status = {}
     try:
         yield from (
             _postproc_annexdrop_result(res, respath_by_status, ds)
-            for res in repo._call_annex_records_items_(cmd, files=paths)
+            for res in repo._call_annex_records_items_(cmd, files=paths, jobs=jobs)
         )
     except CommandError as e:
         # pick up the results captured so far and yield them
