@@ -72,6 +72,7 @@ def test_process_timeout_does_not_sigpipe_child() -> None:
         timeout=0.1,
         exception_on_error=False,
     )
+    assert isinstance(result, dict)
     rc = result["code"]
     # Anything is fine *except* SIGPIPE.  After the fix we expect SIGKILL
     # (rc == -9) since the child traps SIGTERM; on a non-trapping child
