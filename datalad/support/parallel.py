@@ -28,7 +28,10 @@ from threading import Thread
 from datalad.support.exceptions import CapturedException
 
 from ..log import log_progress
-from ..utils import path_is_subpath
+from ..utils import (
+    available_cpu_count,
+    path_is_subpath,
+)
 from . import ansi_colors as colors
 
 lgr = logging.getLogger('datalad.parallel')
@@ -248,7 +251,13 @@ class ProducerConsumer:
         It will account for configuration variable ('datalad.runtime.max-jobs') and possible
         other requirements (such as version of Python).
         """
-        if jobs in (None, "auto"):
+        if jobs == "cpus":
+            jobs = available_cpu_count()
+            if jobs == 1:
+                lgr.warning(
+                    "'-J cpus' resolved to a single CPU available to this "
+                    "process; proceeding without parallelism")
+        elif jobs in (None, "auto"):
             from datalad import cfg
 
             # ATM there is no "auto" for this operation, so in both auto and None

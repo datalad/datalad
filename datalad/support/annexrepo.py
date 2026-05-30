@@ -19,7 +19,6 @@ import re
 import time
 import warnings
 from itertools import chain
-from multiprocessing import cpu_count
 from os import linesep
 from os.path import (
     curdir,
@@ -70,6 +69,7 @@ from datalad.utils import (
     Path,
     PurePosixPath,
     auto_repr,
+    available_cpu_count,
     bytes2human,
     ensure_list,
     on_windows,
@@ -957,13 +957,19 @@ class AnnexRepo(GitRepo, RepoInterface):
         if self._annex_common_options:
             cmd += self._annex_common_options
 
-        if jobs == 'auto':
+        if jobs == 'cpus':
+            jobs = available_cpu_count()
+            if jobs == 1:
+                lgr.warning(
+                    "'-J cpus' resolved to a single CPU available to this "
+                    "process; proceeding without parallelism")
+        elif jobs == 'auto':
             # Limit to # of CPUs (but at least 3 to start with)
             # and also an additional config constraint (by default 1
             # due to https://github.com/datalad/datalad/issues/4404)
             jobs = self._n_auto_jobs or min(
                 self.config.obtain('datalad.runtime.max-annex-jobs'),
-                max(3, cpu_count()))
+                max(3, available_cpu_count()))
             # cache result to avoid repeated calls to cpu_count()
             self._n_auto_jobs = jobs
         if jobs and jobs != 1:

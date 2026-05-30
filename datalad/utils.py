@@ -2858,3 +2858,33 @@ def ensure_write_permission(path: Path) -> Iterator[None]:
                 # nothing to do. Don't test exists(), though - asking for
                 # forgiveness to save a call.
                 pass
+
+
+_n_available_cpus = None
+
+
+def available_cpu_count():
+    """Return the number of CPUs available to this process.
+
+    On Linux, uses ``os.sched_getaffinity`` to count only the CPUs this
+    process is actually allowed to run on, respecting CPU affinity and
+    cpuset restrictions (e.g. ``taskset``, ``--cpuset-cpus``, and many HPC
+    job schedulers).  Note that this does not account for cgroup CPU
+    *quota* limits (e.g. Docker ``--cpus``), which throttle CPU time
+    rather than restrict which cores are available.  On macOS/Windows,
+    falls back to ``os.cpu_count``.  Returns 1 if the count cannot be
+    determined.  The result is computed once and cached for the lifetime
+    of the process.
+    """
+    global _n_available_cpus
+    if _n_available_cpus is None:
+        try:
+            _n_available_cpus = len(os.sched_getaffinity(0))
+        except (AttributeError, NotImplementedError):
+            # no sched_getaffinity (macOS/Windows or exotic platforms):
+            # fall back to the total CPU count, or 1 if undeterminable
+            _n_available_cpus = os.cpu_count() or 1
+            lgr.debug(
+                "os.sched_getaffinity unavailable; falling back to "
+                "os.cpu_count() = %d available CPU(s)", _n_available_cpus)
+    return _n_available_cpus
