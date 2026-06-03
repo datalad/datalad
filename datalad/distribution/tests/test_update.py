@@ -1002,9 +1002,9 @@ def test_update_how_subds_different(path=None, *, follow, action):
 
 
 @slow  # ~15s
-@skip_if_adjusted_branch
+@pytest.mark.parametrize("on_adjusted", [False, True])
 @with_tempfile(mkdir=True)
-def test_update_reset_dirty(path=None):
+def test_update_reset_dirty(path=None, *, on_adjusted):
     path = Path(path)
     ds_src = Dataset(path / "source").create()
     ds_src_s1 = ds_src.create("s1")
@@ -1013,30 +1013,51 @@ def test_update_reset_dirty(path=None):
 
     ds_clone = install(source=ds_src.path, path=path / "clone",
                        recursive=True, result_xfm="datasets")
+    ds_clone_s1 = Dataset(ds_clone.pathobj / "s1")
+    ds_clone_s2 = Dataset(ds_clone.pathobj / "s2")
+
+    if on_adjusted:
+        # Exercise the adjusted-branch reset path (_annex_reset_target) for both
+        # the parent and the subdatasets. Adjust subdatasets before the parent
+        # to dodge the git-annex submodule/adjust crash fixed in 7.20191024.
+        for d in (ds_clone_s1, ds_clone_s2, ds_clone):
+            maybe_adjust_repo(d.repo)
+        if not ds_clone.repo.is_managed_branch():
+            pytest.skip("test requires adjusted branch support")
+    elif ds_clone.repo.is_managed_branch():
+        # A crippled filesystem forces adjusted branches, so the non-adjusted
+        # leg is impossible here; the adjusted leg still runs natively. (Skip
+        # per-leg rather than the whole function with @skip_if_adjusted_branch,
+        # so this adjusted-branch fix is also exercised on crippled-fs CI.)
+        pytest.skip("filesystem forces adjusted branches; non-adjusted leg N/A")
 
     (ds_src_s1.pathobj / "foo").write_text("foo")
     (ds_src_s2.pathobj / "bar").write_text("bar")
     ds_src.save(recursive=True)
 
-    ds_clone_s1 = Dataset(ds_clone.pathobj / "s1")
-    ds_clone_s2 = Dataset(ds_clone.pathobj / "s2")
     (ds_clone_s1.pathobj / "dirt").write_text("")
 
     res = ds_clone.update(follow="sibling", how="reset", recursive=True,
                           on_failure="ignore")
 
     assert_result_count(res, 1, path=ds_clone.path,
-                        action=f"update.reset", status="error")
+                        action="update.reset", status="error")
     assert_result_count(res, 1, path=ds_clone_s1.path,
-                        action=f"update.reset", status="error")
+                        action="update.reset", status="error")
     assert_result_count(res, 1, path=ds_clone_s2.path,
-                        action=f"update.reset", status="ok")
+                        action="update.reset", status="ok")
 
-    # s2 was reset...
-    eq_(ds_src_s2.repo.get_hexsha(), ds_clone_s2.repo.get_hexsha())
+    # Compare real histories with corresponding_hexsha: it reads each repo's
+    # corresponding branch when adjusted, so neither the (adjusted) clone nor
+    # the (crippled-fs) sibling needs unadjusting just to be observed.
+    # s2 was reset to the sibling ...
+    eq_(corresponding_hexsha(ds_src_s2.repo),
+        corresponding_hexsha(ds_clone_s2.repo))
     # ... but s1 and the top-level dataset stayed behind due to the dirty tree.
-    eq_(ds_src.repo.get_hexsha("HEAD~"), ds_clone.repo.get_hexsha())
-    eq_(ds_src_s1.repo.get_hexsha("HEAD~"), ds_clone_s1.repo.get_hexsha())
+    eq_(corresponding_hexsha(ds_src.repo, "HEAD~"),
+        corresponding_hexsha(ds_clone.repo))
+    eq_(corresponding_hexsha(ds_src_s1.repo, "HEAD~"),
+        corresponding_hexsha(ds_clone_s1.repo))
 
     assert_repo_status(ds_clone.path,
                        modified=[ds_clone_s1.repo.path,
