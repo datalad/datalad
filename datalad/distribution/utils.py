@@ -20,6 +20,10 @@ from giturlparse import parse as parse_git_url
 
 from datalad.log import log_progress
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import (
+    CapturedException,
+    CommandError,
+)
 from datalad.support.network import (
     RI,
     URL,
@@ -174,3 +178,41 @@ def _yield_ds_w_matching_siblings(
         lgr.info, pbar_id,
         'Finished checking pre-existing sibling configuration %s', ds,
     )
+
+
+def _try_command(record, fn, *args, **kwargs):
+    """Call `fn`, catching a `CommandError`.
+
+    Parameters
+    ----------
+    record : dict
+        A partial result record. It should at least have 'action' and 'message'
+        fields. A 'status' value of 'ok' or 'error' will be added based on
+        whether calling `fn` raises a `CommandError`.
+
+    Returns
+    -------
+    A new record with a 'status' field.
+    """
+    try:
+        fn(*args, **kwargs)
+    except CommandError as exc:
+        ce = CapturedException(exc)
+        return dict(record, status="error", message=str(ce))
+    else:
+        return dict(record, status="ok")
+
+
+def corresponding_hexsha(repo, ref="HEAD"):
+    """Hexsha of ``ref``, read from the corresponding branch when adjusted.
+
+    On a git-annex adjusted branch the literal HEAD carries an extra "adjusting"
+    commit on top of the real history, so a plain ``get_hexsha("HEAD")`` is off
+    by that commit. This resolves HEAD-relative refs (``HEAD``, ``HEAD~N``)
+    against the corresponding branch instead, while leaving absolute refs/SHAs
+    untouched. On a normal branch it is a plain ``get_hexsha(ref)``.
+    """
+    corr = repo.get_corresponding_branch()
+    if not corr:
+        return repo.get_hexsha(ref)
+    return repo.get_hexsha(ref.replace("HEAD", corr))
