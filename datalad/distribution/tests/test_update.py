@@ -1110,6 +1110,210 @@ def test_update_reset_adjusted(path=None, *, divergence):
     ok_(ds_clone.repo.is_managed_branch())
 
 
+@slow  # ~12s
+@with_tempfile(mkdir=True)
+def test_update_reset_adjusted_resets_synced(path=None):
+    """Reset on an adjusted branch must STICK across a later git-annex-sync.
+
+    On crippled filesystems (Windows), DataLad uses adjusted branches, and
+    git-annex keeps ``synced/<branch>`` refs tracking the corresponding branch.
+    If ``_annex_reset_target`` reset the corresponding branch but left
+    ``synced/<branch>`` at the old (newer) state, the next ``git annex sync``
+    would merge it back in, resurrecting the intentionally-discarded commits.
+
+    We check both halves: right after the reset *and* after a real sync, BOTH
+    the corresponding branch and ``synced/<branch>`` sit at the target -- so the
+    discard holds, and the following sync stays safe too.
+    See https://github.com/datalad/datalad/issues/7772
+    """
+    path = Path(path)
+    ds_src = Dataset(path / "source").create()
+    (ds_src.pathobj / "file1.txt").write_text("initial")
+    ds_src.save()
+
+    ds_clone = install(
+        source=ds_src.path, path=path / "clone",
+        result_xfm="datasets")
+    maybe_adjust_repo(ds_clone.repo)
+
+    if not ds_clone.repo.is_managed_branch():
+        pytest.skip("test requires adjusted branch support")
+
+    corr_branch = ds_clone.repo.get_corresponding_branch()
+    target_hexsha = corresponding_hexsha(ds_clone.repo)
+
+    # Advance source.
+    (ds_src.pathobj / "file2.txt").write_text("new")
+    ds_src.save()
+
+    # Merge into the adjusted clone, advancing the corresponding branch.
+    ds_clone.update(sibling=DEFAULT_REMOTE, how="merge")
+
+    post_update_hexsha = corresponding_hexsha(ds_clone.repo)
+    neq_(post_update_hexsha, target_hexsha)
+
+    # Simulate a synced/ branch left behind by git-annex (as happens on
+    # Windows) by creating synced/<branch> at the post-merge state.
+    synced_branch = f"synced/{corr_branch}"
+    ds_clone.repo.call_git(
+        ["branch", "-f", synced_branch, post_update_hexsha])
+    ok_(synced_branch in ds_clone.repo.get_branches())
+
+    # Reset to the old state via _annex_reset_target.
+    from datalad.distribution.update import _annex_reset_target
+    for r in _annex_reset_target(ds_clone.repo, None, target_hexsha):
+        eq_(r["status"], "ok")
+
+    # PRE-SYNC: _annex_reset_target's direct contract -- BOTH the corresponding
+    # branch AND synced/<branch> must now sit at the reset target.
+    eq_(ds_clone.repo.get_hexsha(corr_branch), target_hexsha)
+    eq_(ds_clone.repo.get_hexsha(synced_branch), target_hexsha)
+
+    # ACID + DURABILITY: a real git-annex-sync must NOT resurrect the discarded
+    # commit, AND must leave BOTH refs at the target -- so the *next* sync is
+    # safe too (no re-armed synced/ left to merge back in).
+    ds_clone.repo.call_annex(
+        ["sync", "--no-push", "--no-pull", "--no-commit",
+         "--no-content", "--no-resolvemerge"])
+    eq_(ds_clone.repo.get_hexsha(corr_branch), target_hexsha)
+    eq_(ds_clone.repo.get_hexsha(synced_branch), target_hexsha)
+
+
+@slow  # ~15s
+@with_tempfile(mkdir=True)
+def test_update_reset_adjusted_no_resurrection_on_save(path=None):
+    """local_discard: a `save` after reset must not resurrect a discarded commit.
+
+    Realistic adjusted-branch flow (public API only, no raw git-annex commands):
+    ``update --how=merge`` leaves a local ``synced/<branch>`` behind; a later
+    ``update --how=reset`` discards a local commit; if ``synced/<branch>`` is
+    not reconciled, the next ``save`` (which runs git-annex-sync internally)
+    merges it back, resurrecting the discarded commit.  Requires BOTH fixes:
+    target determination on adjusted branches (so reset runs at all) and the
+    synced/ reset inside ``_annex_reset_target``.
+    """
+    path = Path(path)
+
+    # Set up a remote as sibling with a base commit
+    ds_src = Dataset(path / "source").create()
+    (ds_src.pathobj / "base.txt").write_text("base commit")
+    ds_src.save(message="add a base commit")
+
+    # Set up a local clone that has updated with `--how=merge` at least once
+    # (this is important to have the `synced/<branch>` created by `update`
+    # to catch the resurrection bug)
+    ds_clone = install(source=ds_src.path, path=path / "clone",
+                       result_xfm="datasets")
+
+    # Flip to adjusted mode
+    maybe_adjust_repo(ds_clone.repo)
+    if not ds_clone.repo.is_managed_branch():
+        pytest.skip("test requires adjusted branch support")
+    corr_branch = ds_clone.repo.get_corresponding_branch()
+
+    # `update --how merge` to create the underlying `synced/<branch>`
+    ds_clone.update(how="merge")
+
+    # Store sibling's state as the reset target -- a corr-aware read, so the
+    # sibling can stay adjusted (we never rewrite it); no unadjust needed.
+    target_hexsha = corresponding_hexsha(ds_src.repo)
+
+    # A local commit that the reset will discard.
+    (ds_clone.pathobj / "local.txt").write_text("discard me")
+    ds_clone.save(message="local commit to be discarded")
+    discard = ds_clone.repo.get_hexsha(corr_branch)
+
+    # local clone is ahead of the sibling
+    neq_(discard, target_hexsha)
+
+    # Reset to the sibling, discarding the local commit.
+    assert_in_results(ds_clone.update(how="reset"),
+                      action="update.reset", status="ok")
+    eq_(ds_clone.repo.get_hexsha(corr_branch), target_hexsha)
+
+    # The reckoning: a normal save must NOT resurrect the discarded commit,
+    # and must NOT lose the fresh work added on top. `save` runs git-annex-sync
+    # internally, which is where a zombie synced/<branch> would merge the
+    # discarded commit back in.
+    (ds_clone.pathobj / "fresh.txt").write_text("fresh work")
+    ds_clone.save(message="fresh work after reset")
+    # the discarded commit did not come back ...
+    assert_false(ds_clone.repo.is_ancestor(discard, corr_branch))
+    ok_(not (ds_clone.pathobj / "local.txt").exists())
+    # ... and the fresh work survived.
+    ok_((ds_clone.pathobj / "fresh.txt").exists())
+
+
+@slow  # ~15s
+@with_tempfile(mkdir=True)
+def test_update_reset_adjusted_no_resurrection_on_push(path=None):
+    """remote_discard: a `push` after reset must not resurrect a discarded commit.
+
+    The sibling grows a commit, the clone pulls it via ``update --how=merge``
+    (seeding the zombie ``synced/<branch>``), then the sibling rewinds it (as a
+    history rewrite / --force push would).  The clone resets to match the
+    rewound sibling, discarding the commit -- but if ``synced/<branch>`` is not
+    reconciled, the next ``push`` (which runs the same git-annex-sync via
+    ``push``'s internal ``localsync``) merges it back and resurrects the
+    discarded commit *on the sibling*.
+    """
+    path = Path(path)
+    ds_src = Dataset(path / "source").create()
+    (ds_src.pathobj / "base.txt").write_text("base commit")
+    ds_src.save()
+
+    # allow pushing back into the (non-bare) source's checked-out branch
+    ds_src.repo.config.set("receive.denyCurrentBranch", "updateInstead",
+                           scope="local")
+
+    ds_clone = install(source=ds_src.path, path=path / "clone",
+                       result_xfm="datasets")
+    maybe_adjust_repo(ds_clone.repo)
+    if not ds_clone.repo.is_managed_branch():
+        pytest.skip("test requires adjusted branch support")
+    corr_branch = ds_clone.repo.get_corresponding_branch()
+    src_branch = ds_src.repo.get_corresponding_branch() or DEFAULT_BRANCH
+
+    # The sibling grows a "bad" commit; the clone pulls it via merge (which
+    # also seeds the zombie synced/<branch> carrying that commit). A faithful
+    # datalad save -- the sibling is still adjusted here, which is fine; we only
+    # need it on a normal branch at the rewind below.
+    (ds_src.pathobj / "bad.txt").write_text("bad upstream commit")
+    ds_src.save(message="bad commit")
+
+    ds_clone.update(how="merge")
+    discard = ds_clone.repo.get_hexsha(corr_branch)
+    ok_((ds_clone.pathobj / "bad.txt").exists())
+
+    # Upstream rewinds the bad commit (history rewrite / --force push). A raw
+    # `git reset --hard` must move the sibling's corresponding branch, not its
+    # adjusted view -- the one rewrite that needs an unadjust here. Nothing
+    # re-adjusts it after (the push below reaches it via git receive-pack, not
+    # annex-sync). See maybe_unadjust_repo.
+    maybe_unadjust_repo(ds_src.repo)
+    ds_src.repo.call_git(["reset", "--hard", "HEAD~"])
+    target_hexsha = corresponding_hexsha(ds_src.repo)
+    neq_(discard, target_hexsha)
+
+    # The clone resets to match the rewound sibling, discarding the bad commit.
+    assert_in_results(ds_clone.update(how="reset"),
+                      action="update.reset", status="ok")
+    eq_(ds_clone.repo.get_hexsha(corr_branch), target_hexsha)
+
+    # The reckoning: pushing back must NOT resurrect the bad commit. We push
+    # directly after the reset (no intervening local save) so that push's own
+    # internal localsync -- not a save -- is what would merge a zombie
+    # synced/<branch> back in. That makes this the *push* vector specifically.
+    ds_clone.push(to=DEFAULT_REMOTE)
+    # the discarded commit did not come back, on either side ...
+    assert_false(ds_src.repo.is_ancestor(discard, src_branch))
+    assert_false(ds_clone.repo.is_ancestor(discard, corr_branch))
+    # ... and both sides agree at the rewound target (good state preserved,
+    # nothing extra resurrected).
+    eq_(ds_src.repo.get_hexsha(src_branch), target_hexsha)
+    eq_(ds_clone.repo.get_hexsha(corr_branch), target_hexsha)
+
+
 def test_process_how_args():
     # --merge maps onto --how values. It has no equivalent of --how-subds,
     # --which just gets set to --how's value when unspecified.
