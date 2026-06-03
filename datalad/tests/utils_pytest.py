@@ -1952,6 +1952,57 @@ def maybe_adjust_repo(repo):
         repo.adjust()
 
 
+def maybe_unadjust_repo(repo):
+    """Put repo back on its normal (corresponding) branch, the inverse of
+    `maybe_adjust_repo`.
+
+    On crippled filesystems (e.g. Windows CI) `create()`/`clone()` force every
+    dataset onto an adjusted branch. A test that needs a *normal-branch* repo
+    there -- typically a sibling whose plain-git history it manipulates and
+    reads directly, while the behavior under test lives on the adjusted *clone*
+    -- can call this to check out the corresponding branch and drop the now
+    unused adjusted branch. On a repo that is not on an adjusted branch (the
+    usual case on a normal filesystem) it is a no-op.
+
+    Caveat: only plain ``git`` operations keep the repo unadjusted. DataLad's``save``,
+    ``update`` and ``push`` run ``git annex sync`` internally, which re-adjusts
+    the branch on a crippled filesystem.
+
+    Read vs. rewrite principle (how to use this in fixtures)
+    --------------------------------------------------------
+    Build and grow a sibling *faithfully* with DataLad (``create``/``save``). Let the
+    sibling stay adjusted (its native crippled-fs mode); the clone fetches its
+    *corresponding* branch regardless. To **read** the sibling's real history,
+    use `corresponding_hexsha` -- it observes without touching the fixture, so
+    no unadjust is needed. Call this helper **only to rewrite** the sibling's
+    branch -- a raw ``git reset --hard``, which must land on the corresponding
+    branch, not the adjusted view -- and only if no later step re-adjusts it.
+    """
+    if repo.is_managed_branch():
+        corr_branch = repo.get_corresponding_branch()
+        adjusted = repo.get_active_branch()
+        repo.call_git(["checkout", corr_branch])
+        repo.call_git(["branch", "-D", adjusted])
+
+
+def corresponding_hexsha(repo, ref="HEAD"):
+    """Hexsha of ``ref``, read from the corresponding branch when adjusted, otherwise from the active branch.
+
+    The *read* half of the adjusted-branch fixture principle (see
+    `maybe_unadjust_repo` for the *rewrite* half). On a crippled filesystem
+    (e.g. Windows CI) `create()`/`clone()` put a repo on an adjusted branch
+    whose HEAD carries an extra git-annex "adjusting" commit on top of the real
+    history, so a plain ``get_hexsha("HEAD")`` there is off by that commit. This
+    resolves HEAD-relative refs against the corresponding branch instead -- so a
+    test can *observe* a repo's real history without mutating the fixture. On a
+    normal branch it is a plain ``get_hexsha(ref)``.
+    """
+    corr = repo.get_corresponding_branch()
+    if not corr:
+        return repo.get_hexsha(ref)
+    return repo.get_hexsha(ref.replace("HEAD", corr))
+
+
 @lru_cache()
 @with_tempfile
 @with_tempfile
