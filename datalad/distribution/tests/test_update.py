@@ -1292,6 +1292,44 @@ def test_update_reset_adjusted_no_resurrection_on_push(path=None):
     eq_(ds_clone.repo.get_hexsha(corr_branch), target_hexsha)
 
 
+@slow  # ~10s
+@with_tempfile(mkdir=True)
+def test_update_merge_adjusted_no_leftover_synced(path=None):
+    """`update --how=merge` on an adjusted branch must not leave a zombie synced/.
+
+    On adjusted branches `update --how=merge` runs `git annex sync`, which
+    creates a `synced/<branch>` ref. Left behind, that ref is a "zombie": a
+    later sync (run internally by save/push) can merge it back and resurrect
+    discarded commits (gh-7772). Mirror `AnnexRepo.localsync`'s delete-if-created
+    hygiene -- if this sync created `synced/<branch>`, remove it again.
+    """
+    path = Path(path)
+    ds_src = Dataset(path / "source").create()
+    (ds_src.pathobj / "base.txt").write_text("base")
+    ds_src.save()
+
+    ds_clone = install(source=ds_src.path, path=path / "clone",
+                       result_xfm="datasets")
+    maybe_adjust_repo(ds_clone.repo)
+    if not ds_clone.repo.is_managed_branch():
+        pytest.skip("test requires adjusted branch support")
+    corr_branch = ds_clone.repo.get_corresponding_branch()
+    synced_branch = f"synced/{corr_branch}"
+
+    # Start from a clean slate so we only judge the synced/ this merge creates.
+    if synced_branch in ds_clone.repo.get_branches():
+        ds_clone.repo.call_git(["branch", "-D", synced_branch])
+
+    # Advance the sibling so the merge has something to pull. 
+    (ds_src.pathobj / "new.txt").write_text("new")
+    ds_src.save(message="new commit")
+
+    # The merge runs git-annex-sync, which creates synced/<branch> ...
+    ds_clone.update(how="merge")
+    # ... and must clean up the synced/ it created (delete-if-created).
+    assert_not_in(synced_branch, ds_clone.repo.get_branches())
+
+
 def test_process_how_args():
     # --merge maps onto --how values. It has no equivalent of --how-subds,
     # --which just gets set to --how's value when unspecified.
