@@ -25,6 +25,7 @@ from datalad.api import (
     update,
 )
 from datalad.distribution.update import _process_how_args
+from datalad.distribution.utils import corresponding_hexsha
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.external_versions import external_versions
 from datalad.support.gitrepo import GitRepo
@@ -41,7 +42,6 @@ from datalad.tests.utils_pytest import (
     assert_repo_status,
     assert_result_count,
     assert_status,
-    corresponding_hexsha,
     create_tree,
     eq_,
     known_failure_windows,
