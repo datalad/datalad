@@ -578,10 +578,27 @@ def _annex_plain_merge(repo, _, target, opts=None):
 
 
 def _annex_sync(repo, remote, _target, opts=None):
-    yield _try_command(
+    # git-annex-sync creates a synced/<branch> ref. Mirror
+    # AnnexRepo.localsync's delete-if-created hygiene: if this sync created it,
+    # remove it again, so a later git-annex-sync (run internally by save/push)
+    # cannot merge the zombie back and resurrect discarded commits (gh-7772).
+    branch = repo.get_active_branch()
+    branch = repo.get_corresponding_branch(branch) or branch
+    synced_branch = 'synced/{}'.format(branch)
+    had_synced_branch = synced_branch in repo.get_branches()
+    res = _try_command(
         {"action": "update.annex_sync", "message": "Ran git-annex-sync"},
         repo.call_annex,
         ['sync', '--no-push', '--pull', '--no-commit', '--no-content', remote])
+    yield res
+    # Use -D (force): after a --pull sync, synced/<branch> may hold commits not
+    # reachable from the *adjusted* HEAD (they live on the corresponding branch
+    # and remote-tracking ref), so -d would refuse. Force-deleting the ref we
+    # just created loses nothing.
+    if res.get("status") != "error" \
+            and not had_synced_branch \
+            and synced_branch in repo.get_branches():
+        repo.call_git(['branch', '-D', synced_branch])
 
 
 def _annex_merge_target(repo, _remote, target, opts=None):
