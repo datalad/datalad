@@ -622,8 +622,10 @@ def _annex_reset_target(repo, _remote, target, opts=None):
     """Reset an adjusted branch to a specific target revision.
 
     This performs a hard reset on the corresponding branch, then re-adjusts
-    the branch to maintain the adjusted state. This is useful for
-    `how_subds='reset'` on adjusted branches.
+    the branch to maintain the adjusted state. It also resets any
+    ``synced/<branch>`` ref so that a subsequent ``git annex sync`` does not
+    merge the old (pre-reset) state back in — which is the root cause of
+    "zombie commits" on Windows / crippled filesystems (see #7772).
     """
     if repo.dirty:
         yield {"action": "update.reset",
@@ -641,6 +643,12 @@ def _annex_reset_target(repo, _remote, target, opts=None):
         try:
             # Reset to target
             repo.call_git(['reset', '--hard', target])
+            # Also reset synced/<branch> so git-annex-sync won't
+            # resurrect the discarded commits (#7772).
+            synced_branch = 'synced/{}'.format(corr_branch)
+            if synced_branch in repo.get_branches():
+                repo.call_git(
+                    ['branch', '-f', synced_branch, target])
             # Re-adjust with --force to overwrite existing adjusted branch
             repo.call_annex(['adjust', adjust_mode, '--force'])
         except Exception:
