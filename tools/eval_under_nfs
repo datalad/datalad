@@ -5,7 +5,18 @@
 set -e
 
 fs=nfs
-# TODO: nfs and mount options?
+# NFS export + mount options (must be set on BOTH ends to take effect).
+# Default to `async` (the NFS server replies before changes hit stable
+# storage) since this script is for transient testing and `sync` adds tens
+# of ms to every fsync -- which git/git-annex issue thousands of during
+# clone/save/get and which pushed CI jobs into 6h timeouts (see a6fd7add6).
+# Set DATALAD_TESTS_NFS_SYNC=1 (or any non-empty value) to use `sync`
+# instead, e.g. to reproduce that slowdown locally.
+if [ -n "${DATALAD_TESTS_NFS_SYNC:-}" ]; then
+    nfs_opts="rw,sync"
+else
+    nfs_opts="rw,async"
+fi
 
 set -u
 tmp=$(mktemp -u "${TMPDIR:-/tmp}/datalad-nfs-XXXXX")
@@ -26,8 +37,8 @@ if ! dpkg -l nfs-kernel-server | grep '^ii.*nfs-kernel-server'; then
     sudo apt-get install -y nfs-kernel-server
 fi
 
-sudo exportfs -o rw "localhost:$mntorig"
-sudo mount -t "$fs" "localhost:$mntorig" "$mntpoint"
+sudo exportfs -o "$nfs_opts" "localhost:$mntorig"
+sudo mount -t "$fs" -o "$nfs_opts" "localhost:$mntorig" "$mntpoint"
 
 # should how it was mounted
 sudo mount | grep "$mntpoint" | sed -e 's,^,I: ,g'

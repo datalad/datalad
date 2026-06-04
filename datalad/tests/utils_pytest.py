@@ -12,6 +12,7 @@ import base64
 import lzma
 import multiprocessing
 import multiprocessing.queues
+import signal
 import ssl
 import textwrap
 from difflib import unified_diff
@@ -1487,6 +1488,43 @@ if not (FILESYSTEM_SUPPORTS_UTF8 := (sys.getfilesystemencoding().lower() == 'utf
 OBSCURE_FILENAME_PARTS += [' ', '.datc', ' ']
 
 
+def fs_supports_filename(tdir, name):
+    """Return True iff `name` can be created as a directory under `tdir`.
+
+    Probes actual filesystem capability rather than relying on a
+    process-level encoding announcement. CrippledFS variants (vfat,
+    exfat, etc.) reject characters and trailing spaces even when the
+    process advertises UTF-8 via ``sys.getfilesystemencoding()``, so a
+    real ``mkdir`` is the only reliable check. The created directory is
+    removed before return.
+
+    Parameters
+    ----------
+    tdir : str
+      Existing directory under which to attempt creation.
+    name : str
+      Candidate basename to probe.
+
+    Returns
+    -------
+    bool
+      True if the filesystem accepted the name (and it was cleaned up),
+      False otherwise.
+    """
+    target = opj(tdir, name)
+    try:
+        os.mkdir(target)
+    except (OSError, ValueError):
+        return False
+    try:
+        os.rmdir(target)
+    except OSError:
+        # Created but couldn't clean up -- still counts as supported,
+        # leftover lives under the caller's tempdir which is its problem.
+        pass
+    return True
+
+
 @with_tempfile(mkdir=True)
 def get_most_obscure_supported_name(tdir, return_candidates=False):
     """Return the most obscure filename that the filesystem would support under TEMPDIR
@@ -2097,3 +2135,58 @@ def usecase(f):
     Should be used in combination with @slow and @turtle if slow.
     """
     return attr('usecase')(f)
+
+
+@contextmanager
+def signal_timeout(seconds):
+    """Bound the enclosed block to ``seconds`` wall-clock seconds via SIGALRM.
+
+    Raise :class:`TimeoutError` from inside whatever syscall the block is
+    currently blocked in once the budget is exceeded. Sub-second budgets
+    are supported via :func:`signal.setitimer`. No-op on platforms that
+    lack ``SIGALRM`` (notably Windows).
+
+    This sits alongside the @slow/@turtle/@integration *selection* tags
+    and the per-test ``@pytest.mark.fail_slow`` *budget reporter*: it is
+    the only one of the three that can actually interrupt a running
+    test. It is intended to be paired with ``@pytest.mark.flaky``
+    (``pytest-retry``), with :class:`TimeoutError` listed in
+    ``only_on=`` so an environmental hiccup gets retried, e.g.::
+
+        @pytest.mark.flaky(retries=3, delay=5,
+                           only_on=[IncompleteResultsError, TimeoutError])
+        def test_foo(...):
+            with signal_timeout(50):
+                ...  # network-bound work that should normally finish well under 50s
+
+    Why a local helper instead of ``pytest-timeout``: as of pytest-timeout
+    2.4.0, a triggered timeout in the SIGALRM handler is signalled by
+    calling ``pytest.fail(...)`` [1]_ which raises the generic
+    ``_pytest.outcomes.Failed`` -- there is no dedicated exception class
+    to filter on. On non-Unix platforms it instead calls ``os._exit(1)``
+    [2]_, which leaves nothing for retry plugins to catch. No upstream
+    issue has been opened requesting a distinct exception type (search
+    of `pytest-dev/pytest-timeout` issues/PRs as of 2026-05; the closest
+    is gh-56 [3]_, about retry interaction, closed without a custom-exc
+    proposal). Until that gap closes, this helper raises a plain
+    :class:`TimeoutError` so ``pytest-retry``'s ``only_on=[...]`` can
+    match it cleanly.
+
+    .. [1] https://github.com/pytest-dev/pytest-timeout/blob/ddabc934535081a5bf9ba7c9ca5b494aeaf8f665/pytest_timeout.py#L502
+    .. [2] https://github.com/pytest-dev/pytest-timeout/blob/ddabc934535081a5bf9ba7c9ca5b494aeaf8f665/pytest_timeout.py#L542
+    .. [3] https://github.com/pytest-dev/pytest-timeout/issues/56
+    """
+    if not hasattr(signal, "SIGALRM"):
+        yield
+        return
+
+    def _handler(signum, frame):
+        raise TimeoutError(f"signal_timeout: exceeded {seconds}s")
+
+    prev = signal.signal(signal.SIGALRM, _handler)
+    signal.setitimer(signal.ITIMER_REAL, float(seconds))
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, prev)

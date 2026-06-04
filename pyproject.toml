@@ -78,6 +78,7 @@ tests = [
     "mypy",
     "pytest>=7.0",           # https://github.com/datalad/datalad/issues/7555
     "pytest-cov",
+    "pytest-reportlog",      # write per-test JSONL so timings survive job cancellation in CI
     "pytest-retry",
     "pytest-fail-slow~=0.2",
     "types-python-dateutil",

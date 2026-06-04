@@ -108,7 +108,14 @@ jobs:
           if [[ "${_DL_TMPDIR:-}" =~ .*/nfsmount ]]
           then echo "mkdir $_DL_TMPDIR"
                mkdir -p "$_DL_TMPDIR" "${_DL_TMPDIR}_"
-               echo "/tmp/nfsmount_ localhost(rw)" | sudo bash -c 'cat - > /etc/exports'
+               # `(rw)` alone defaults to `sync` on the NFS server side, which
+               # round-trips every git/git-annex fsync through nfsd and pushes
+               # the chunk-1 / chunk-2 NFS test jobs into the GH Actions 6h
+               # job timeout (cron 25434940670 / PR #7852).  `async` lets the
+               # server ack writes once they are in cache instead of after
+               # they reach disk; we are testing on an ephemeral runner so
+               # the durability tradeoff is irrelevant.  See PR #7852.
+               echo "/tmp/nfsmount_ localhost(rw,async)" | sudo bash -c 'cat - > /etc/exports'
                sudo apt-get install -y nfs-kernel-server
                sudo exportfs -a
                sudo mount -t nfs localhost:/tmp/nfsmount_ /tmp/nfsmount
@@ -157,13 +164,6 @@ jobs:
         # location
         run: sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
 
-      # TODO: remove - should not be needed
-      - name: Git-annex workaround for NFS mounts
-        run: |
-          if [[ "${_DL_TMPDIR:-}" =~ .*/nfsmount ]]
-          then sudo git config --system annex.pidlock true
-          fi
-
       # Now it should be safe to point TMPDIR to a "tricky" setup just for the
       # purpose of testing
       - name: Point TMPDIR to "tricky" setup
@@ -208,7 +208,22 @@ jobs:
             --doctest-modules \
             --cov=datalad \
             --cov-report=xml \
+            --report-log=pytest-report.jsonl \
             --pyargs ${TESTS_TO_PERFORM:-datalad}
+
+      # pytest-reportlog writes one JSON object per test event (collect, call,
+      # teardown, ...).  Uploading on `always()` means timings survive even
+      # when the job is cancelled by the GH Actions 6h job timeout (which is
+      # what happens to the heavier NFS chunks); the file is line-delimited
+      # so the partial dump up to the last completed test is parseable.
+      - name: Upload pytest report log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pytest-report-${{ github.run_id }}-${{ strategy.job-index }}
+          path: __testhome__/pytest-report.jsonl
+          if-no-files-found: ignore
+          retention-days: 7
 
       # Makes it only more difficult to comprehend the failing output.  Enable
       # only when necessary for a particular debugging.

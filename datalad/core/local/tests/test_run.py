@@ -60,6 +60,7 @@ from datalad.tests.utils_pytest import (
     cat_command,
     create_tree,
     eq_,
+    fs_supports_filename,
     known_failure_windows,
     neq_,
     ok_,
@@ -187,6 +188,13 @@ def test_basics(path=None, nodspath=None):
 def test_py2_unicode_command(path=None):
     if not FILESYSTEM_SUPPORTS_UTF8:
         pytest.skip("requires UTF-8 filesystem encoding for unicode args")
+    # FILESYSTEM_SUPPORTS_UTF8 is a process-level encoding announcement
+    # (sys.getfilesystemencoding()), not a per-mount capability check.
+    # CrippledFS variants like vfat advertise UTF-8 (because the OS-level
+    # locale is UTF-8) yet still reject non-ASCII or trailing-space names.
+    # Probe the actual tempdir before proceeding.
+    if not fs_supports_filename(path, u"bβ0.dat"):
+        pytest.skip("filesystem under %s rejects non-ASCII names" % path)
     # Avoid OBSCURE_FILENAME to avoid windows-breakage (gh-2929).
     ds = Dataset(path).create()
     touch_cmd = "import sys; open(sys.argv[1], 'w').write('')"
@@ -197,11 +205,12 @@ def test_py2_unicode_command(path=None):
     assert_repo_status(ds.path)
     ok_exists(op.join(path, u"bβ0.dat"))
 
-    # somewhat desperate attempt to detect our own Github CI tests on a
-    # crippled filesystem (VFAT) that is so crippled that it doesn't handle
-    # what is needed here. It just goes mad with encoded bytestrings:
-    # CommandError: ''python -c '"'"'import sys; open(sys.argv[1], '"'"'"'"'"'"'"'"'w'"'"'"'"'"'"'"'"').write('"'"'"'"'"'"'"'"''"'"'"'"'"'"'"'"')'"'"' '"'"' β1 '"'"''' failed with exitcode 1 under /crippledfs/
-    if not on_windows and os.environ.get('TMPDIR', None) != '/crippledfs':  # FIXME
+    # Some CrippledFS mounts (notably vfat) accept "bβ0.dat" but still
+    # reject leading/trailing-space names like " β1 ". Probe for the
+    # worst-case name actually used below to decide whether to run this
+    # block. Subsumes the previous hardcoded TMPDIR == '/crippledfs'
+    # workaround.
+    if not on_windows and fs_supports_filename(path, u" β1 "):
         ds.run([sys.executable, "-c", touch_cmd, u"bβ1.dat"])
         assert_repo_status(ds.path)
         ok_exists(op.join(path, u"bβ1.dat"))

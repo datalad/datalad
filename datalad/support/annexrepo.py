@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import re
+import time
 import warnings
 from itertools import chain
 from multiprocessing import cpu_count
@@ -69,6 +70,7 @@ from datalad.utils import (
     Path,
     PurePosixPath,
     auto_repr,
+    bytes2human,
     ensure_list,
     on_windows,
     split_cmdline,
@@ -3705,6 +3707,9 @@ class AnnexJsonProtocol(WitlessProtocol):
     proc_out = True
     proc_err = True
 
+    # throttle for byte-progress-driven Total-bar updates
+    _total_pbar_min_interval = 0.5
+
     def __init__(self, done_future=None, total_nbytes=None):
         if done_future is not None:
             warnings.warn("`done_future` argument is ignored "
@@ -3720,18 +3725,50 @@ class AnnexJsonProtocol(WitlessProtocol):
     def add_to_output(self, json_object):
         self.json_out.append(json_object)
 
+    def _init_total_pbar_state(self):
+        # progress-tracking state for the dataset-level "Total" bar.
+        # Factored out so tests can mirror it without running connection_made.
+        self._pbars = set()
+        # cumulative on-disk bytes for non-errored files in this run.
+        # Grows by byte-progress deltas (incl. the resume offset on the
+        # first emission of each file) and the residual at completion;
+        # is rolled back if a file later errors out.
+        self._byte_count = 0
+        # last byte-progress credited to _byte_count per active file --
+        # the base for computing the next delta
+        self._inflight_credited = {}
+        # per-active-file resume offset (first observed byte-progress);
+        # these bytes were on disk before this session, so the rate /
+        # ETA computation must exclude them. The invariant is
+        # `_resumed_bytes == sum(_file_resume_offset.values())` plus
+        # contributions from files that have since completed successfully
+        # (still on disk).
+        self._file_resume_offset = {}
+        self._resumed_bytes = 0
+        self._last_total_emit_ts = 0.0
+        # bytes from records with success=false; shrink effective total
+        # and feed the bar label
+        self._error_count = 0
+        self._error_bytes = 0
+        # last `total=` we forwarded; only forward changes (each write
+        # would otherwise repaint the bar)
+        self._last_effective_total = self.total_nbytes
+        # `_total_pbar_finished` prevents a late stray emit from re-emitting
+        # against a bar we have already taken down
+        self._total_pbar_finished = False
+
     def connection_made(self, transport):
         super().connection_made(transport)
-        self._pbars = set()
-        # overall counter of processed bytes (computed from key reports)
-        self._byte_count = 0
+        self._init_total_pbar_state()
         if self.total_nbytes:
-            # init global pbar, do here to be on top of first file
+            # create the Total pbar eagerly so it sits ABOVE per-file bars
+            # (tqdm orders bars by creation time). The rate spike from
+            # resume offsets is suppressed by `set_initial` on subsequent
+            # emits (see `_emit_total_pbar_update`).
             log_progress(
                 lgr.info,
                 self._global_pbar_id,
                 'Start annex operation',
-                # do not crash if no command is reported
                 unit=' Bytes',
                 label='Total',
                 total=self.total_nbytes,
@@ -3784,6 +3821,55 @@ class AnnexJsonProtocol(WitlessProtocol):
             hash(frozenset((k, info.get(k))
                            for k in ["command", "key", "file"])))
 
+    def _effective_total(self):
+        # exclude full key-sizes for errored files; the bar's target is
+        # bytes on disk at end-of-run for non-errored files
+        return max(0, self.total_nbytes - self._error_bytes)
+
+    def _credit_byte_progress(self, pbar_id, byte_progress):
+        # apply a per-file byte-progress event to the Total bar's
+        # bookkeeping: the very first event records a resume offset (those
+        # bytes were already on disk), subsequent events credit only the
+        # delta. Paired with `_inflight_credited.pop` / `_file_resume_offset
+        # .pop` in the non-progress branch on completion or error.
+        if pbar_id not in self._inflight_credited:
+            self._file_resume_offset[pbar_id] = byte_progress
+            self._resumed_bytes += byte_progress
+        self._byte_count += byte_progress - self._inflight_credited.get(pbar_id, 0)
+        self._inflight_credited[pbar_id] = byte_progress
+
+    def _emit_total_pbar_update(self, file_msg, byte_count):
+        """Update the dataset-level "Total" pbar with current effective state.
+
+        Forwards ``initial=_resumed_bytes`` on every emit so tqdm's rate
+        fallback ``(n - initial) / elapsed`` excludes resumed-from-disk
+        bytes credited to ``n``. Forwards ``total=`` only when the
+        effective total has changed (each write otherwise repaints the
+        bar). Adds an ``[errored: N / <human-size>]`` suffix to the label
+        while there are errors.
+
+        Single-threaded: called from the asyncio reader callback only.
+        """
+        if not self.total_nbytes or self._total_pbar_finished:
+            return
+        effective_total = self._effective_total()
+        label = (
+            'Total [errored: {} / {}]'.format(
+                self._error_count, bytes2human(self._error_bytes))
+            if self._error_count
+            else 'Total'
+        )
+        kwargs = dict(
+            label=label,
+            update=byte_count,
+            initial=self._resumed_bytes,
+            noninteractive_level=5,
+        )
+        if effective_total != self._last_effective_total:
+            kwargs['total'] = effective_total
+            self._last_effective_total = effective_total
+        log_progress(lgr.info, self._global_pbar_id, file_msg, **kwargs)
+
     def _get_pbar_label(self, action):
         # do not crash if no command is reported
         label = action.get('command', '').capitalize()
@@ -3835,9 +3921,12 @@ class AnnexJsonProtocol(WitlessProtocol):
                 return
 
         if is_progress:
+            byte_progress = float(j.get('byte-progress', 0))
             if not known_pbar:
-                # init the pbar, the is some progress left to be made
-                # worth it
+                # first byte-progress for this file. Pass byte_progress as
+                # `initial=` so tqdm's per-file rate/ETA start from the
+                # resume offset rather than jumping 0 -> byte_progress in
+                # zero elapsed.
                 log_progress(
                     lgr.info,
                     pbar_id,
@@ -3845,6 +3934,7 @@ class AnnexJsonProtocol(WitlessProtocol):
                     label=self._get_pbar_label(action),
                     unit=' Bytes',
                     total=float(j.get('total-size', 0)),
+                    initial=byte_progress,
                     noninteractive_level=5,
                 )
                 self._pbars.add(pbar_id)
@@ -3852,40 +3942,67 @@ class AnnexJsonProtocol(WitlessProtocol):
                 lgr.info,
                 pbar_id,
                 j.get('percent-progress', 0),
-                update=float(j.get('byte-progress', 0)),
+                update=byte_progress,
                 noninteractive_level=5,
             )
+            if self.total_nbytes and not self._total_pbar_finished:
+                self._credit_byte_progress(pbar_id, byte_progress)
+                now = time.monotonic()
+                if now - self._last_total_emit_ts >= self._total_pbar_min_interval:
+                    self._last_total_emit_ts = now
+                    self._emit_total_pbar_update(
+                        file_msg=j.get('file', ''),
+                        byte_count=self._byte_count,
+                    )
             # do not let progress reports leak into the return value
             return
         # update overall progress, do not crash when there is no key property
         # in the report (although there should be one)
         key_bytes = AnnexRepo.get_size_from_key(j.get('key', None))
-        if key_bytes:
-            self._byte_count += key_bytes
+        # non-progress records carry 'success'; default True matches the
+        # historical behaviour (every non-progress record credited the bar)
+        # and avoids silently rolling back a real transfer's bytes if a
+        # future annex JSON omits the field.
+        succeeded = bool(j.get('success', True))
+        last_credited = self._inflight_credited.pop(pbar_id, 0)
+        resume_offset = self._file_resume_offset.pop(pbar_id, 0)
+        if key_bytes and succeeded:
+            # credit the residual that arrived without a final byte-progress
+            # tick (e.g. the last MB or a file too small to ever emit one)
+            self._byte_count += max(0, key_bytes - last_credited)
+        elif key_bytes and not succeeded:
+            # roll back any provisional credit -- those bytes are still on
+            # disk but no longer count toward the (now-shrunk) target. Also
+            # remove the file's resume contribution so tqdm's rate anchor
+            # follows along.
+            self._byte_count -= last_credited
+            self._resumed_bytes -= resume_offset
+            self._error_count += 1
+            self._error_bytes += key_bytes
         # don't do anything to the results for now in terms of normalization
         # TODO the protocol could be made aware of the runner's CWD and
         # also any dataset the annex command is operating on. This would
         # enable 'file' property conversion to absolute paths
         self.add_to_output(j)
 
-        if self.total_nbytes:
-            if self.total_nbytes <= self._byte_count:
-                # discard global pbar
-                log_progress(
-                    lgr.info,
-                    self._global_pbar_id,
-                    'Finished annex {}'.format(j.get('command', '')),
-                    noninteractive_level=5,
-                )
-                self._pbars.discard(self._global_pbar_id)
+        if self.total_nbytes and not self._total_pbar_finished:
+            if self._effective_total() <= self._byte_count:
+                # take the global pbar down if it was ever created; skip the
+                # emit when it was not, so the handler does not lazily spawn
+                # an empty pbar at the very end of a no-progress run
+                if self._global_pbar_id in self._pbars:
+                    log_progress(
+                        lgr.info,
+                        self._global_pbar_id,
+                        'Finished annex {}'.format(j.get('command', '')),
+                        noninteractive_level=5,
+                    )
+                    self._pbars.discard(self._global_pbar_id)
+                self._total_pbar_finished = True
             else:
-                # log actual progress
-                log_progress(
-                    lgr.info,
-                    self._global_pbar_id,
-                    j.get('file', ''),
-                    update=self._byte_count,
-                    noninteractive_level=5,
+                self._emit_total_pbar_update(
+                    file_msg=j.get('file', ''),
+                    byte_count=self._byte_count,
                 )
 
     def _prepare_result(self):

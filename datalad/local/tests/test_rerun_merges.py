@@ -13,7 +13,10 @@ __docformat__ = 'restructuredtext'
 
 import os.path as op
 
+import pytest
+
 from datalad.distribution.dataset import Dataset
+from datalad.support.exceptions import IncompleteResultsError
 from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
     assert_false,
@@ -38,6 +41,28 @@ from datalad.tests.utils_pytest import (
 # - x_C: cherry picked
 # - x_M: merge commit
 # - x_R: run commit
+
+
+def _setup_run_left_run_right(path):
+    """Create a dataset with a run on each branch merged together.
+
+    Produces the graph::
+
+        o                 d_n    (merge commit)
+        |\\
+        o |               c_r    (run on DEFAULT_BRANCH)
+        | o               b_r    (run on side)
+        |/
+        o                 a_n    (initial)
+    """
+    ds = Dataset(path).create()
+    ds_repo = ds.repo
+    ds_repo.checkout(DEFAULT_BRANCH, options=["-b", "side"])
+    ds.run("echo foo >foo")
+    ds_repo.checkout(DEFAULT_BRANCH)
+    ds.run("echo bar >bar")
+    ds_repo.merge("side", options=["-m", "Merge side"])
+    return ds, ds_repo
 
 
 @slow
@@ -129,14 +154,7 @@ def test_rerun_fastforwardable_mutator(path=None):
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_left_right_runs(path=None):
-    ds = Dataset(path).create()
-    # keep direct repo accessor to speed things up
-    ds_repo = ds.repo
-    ds_repo.checkout(DEFAULT_BRANCH, options=["-b", "side"])
-    ds.run("echo foo >foo")
-    ds_repo.checkout(DEFAULT_BRANCH)
-    ds.run("echo bar >bar")
-    ds_repo.merge("side", options=["-m", "Merge side"])
+    ds, ds_repo = _setup_run_left_run_right(path)
     # o                 d_n
     # |\
     # o |               c_r
@@ -437,14 +455,7 @@ def test_rerun_mutator_stem_nonrun_merges(path=None):
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_exclude_side(path=None):
-    ds = Dataset(path).create()
-    # keep direct repo accessor to speed things up
-    ds_repo = ds.repo
-    ds_repo.checkout(DEFAULT_BRANCH, options=["-b", "side"])
-    ds.run("echo foo >foo")
-    ds_repo.checkout(DEFAULT_BRANCH)
-    ds.run("echo bar >bar")
-    ds_repo.merge("side", options=["-m", "Merge side"])
+    ds, ds_repo = _setup_run_left_run_right(path)
     # o                 d_n
     # |\
     # o |               c_r
@@ -521,6 +532,12 @@ def test_rerun_unrelated_run_left_nonrun_right(path=None):
 # @slow  # ~3.5sec on Yarik's laptop
 # test implementation requires checkout of non-adjusted branch
 @skip_if_adjusted_branch
+# Intermittently fails on CI with git-annex 10.20230126 (standalone): unlock
+# reports "notneeded" for `foo` after the unrelated-histories merge, but the
+# file is still read-only, so the rerun of `echo foo >>foo` errors with
+# "Permission denied". Could not reproduce locally in 100 runs with
+# git-annex 10.20260316.
+@pytest.mark.flaky(retries=2, only_on=[IncompleteResultsError])
 @with_tempfile(mkdir=True)
 def test_rerun_unrelated_mutator_left_nonrun_right(path=None):
     ds = Dataset(path).create()

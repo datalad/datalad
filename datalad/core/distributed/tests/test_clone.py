@@ -70,6 +70,7 @@ from datalad.tests.utils_pytest import (
     patch_config,
     serve_path_via_http,
     set_date,
+    signal_timeout,
     skip_if_adjusted_branch,
     skip_if_no_network,
     skip_if_on_windows,
@@ -1557,21 +1558,47 @@ def test_clone_unborn_head_sub(path=None):
 
 
 @skip_if_no_network
+# A 50s signal_timeout bounds slow-but-responsive gin (observed at 417s) so
+# the global --fail-slow=60 from .github/workflows/test.yml is never tripped
+# on a successful run; on expiry the resulting TimeoutError is retried by
+# @flaky, falling through to a hard fail only if the slowness persists.
+@pytest.mark.flaky(retries=3, delay=5,
+                   only_on=[IncompleteResultsError, TimeoutError])
 @with_tempfile
 def test_gin_cloning(path=None):
-    # can we clone a public ds anoynmously from gin and retrieve content
-    ds = clone('https://gin.g-node.org/datalad/datalad-ci-target', path)
-    ok_(ds.is_installed())
-    annex_path = op.join('annex', 'two')
-    git_path = op.join('git', 'one')
-    eq_(ds.repo.file_has_content(annex_path), False)
-    eq_(ds.repo.is_under_annex(git_path), False)
-    result = ds.get(annex_path)
-    assert_result_count(result, 1)
-    assert_status('ok', result)
-    eq_(result[0]['path'], op.join(ds.path, annex_path))
-    ok_file_has_content(op.join(ds.path, annex_path), 'two\n')
-    ok_file_has_content(op.join(ds.path, git_path), 'one\n')
+    # can we clone a public ds anonymously from gin and retrieve content
+    try:
+        with signal_timeout(50):
+            ds = clone('https://gin.g-node.org/datalad/datalad-ci-target', path)
+            ok_(ds.is_installed())
+            annex_path = op.join('annex', 'two')
+            git_path = op.join('git', 'one')
+            eq_(ds.repo.file_has_content(annex_path), False)
+            eq_(ds.repo.is_under_annex(git_path), False)
+            result = ds.get(annex_path)
+            assert_result_count(result, 1)
+            assert_status('ok', result)
+            eq_(result[0]['path'], op.join(ds.path, annex_path))
+            ok_file_has_content(op.join(ds.path, annex_path), 'two\n')
+            ok_file_has_content(op.join(ds.path, git_path), 'one\n')
+    except IncompleteResultsError as e:
+        # gin.g-node.org is occasionally unavailable to CI runners: it has
+        # been seen returning HTTP 403 to GitHub-hosted Azure ranges, and
+        # also outright TCP-connect-timeouts. Both are environment-side
+        # issues, not a problem with datalad/git-annex. Retries above cover
+        # short blips; if the condition persists, skip rather than fail CI.
+        msg = str(e)
+        if any(s in msg for s in (
+                "error: 403",
+                "Could not connect to server",
+                "Failed to connect to gin.g-node.org",
+        )):
+            pytest.skip(
+                "gin.g-node.org unreachable from this runner "
+                "(IP-block, rate-limit, or outage): "
+                + msg.split('\n', 1)[0][:200]
+            )
+        raise
 
 
 # TODO: git-annex-init fails in the second clone call below when this is

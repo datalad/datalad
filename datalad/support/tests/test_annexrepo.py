@@ -2674,6 +2674,266 @@ def test_done_deprecation():
         warn_mock.assert_not_called()
 
 
+def _make_annex_json_protocol(total_nbytes):
+    # Construct an AnnexJsonProtocol with state equivalent to a finished
+    # connection_made(), but without going through WitlessProtocol plumbing
+    # (avoids needing a real transport). Shares `_init_total_pbar_state`
+    # with the real connection_made so new fields stay in sync.
+    proto = AnnexJsonProtocol(total_nbytes=total_nbytes)
+    proto._init_total_pbar_state()
+    if total_nbytes:
+        proto._pbars.add(proto._global_pbar_id)
+    proto._unprocessed = None
+    proto.json_out = []
+    # disable throttle so the test can assert on every emit deterministically
+    proto._total_pbar_min_interval = 0.0
+    return proto
+
+
+@pytest.mark.ai_generated
+def test_annex_json_protocol_total_progress_inflight():
+    # The Total bar advances on per-file byte-progress events (not only at
+    # completion). It tracks cumulative on-disk bytes, so the first event
+    # contributes its full byte_progress (resume offset, or just bytes
+    # streamed before annex's first emission), subsequent events contribute
+    # deltas, and completion credits any residual to key_bytes.
+    from datalad.support import annexrepo as ar_mod
+
+    proto = _make_annex_json_protocol(total_nbytes=20_000)
+
+    action = {"command": "get", "key": "MD5E-s10000--abc.dat", "file": "big.dat"}
+    with patch.object(ar_mod, "log_progress") as mock_lp:
+        for bp in (1_000, 3_000, 6_000):
+            proto._proc_json_record({
+                "action": action,
+                "byte-progress": bp,
+                "total-size": 10_000,
+                "percent-progress": "{}%".format(bp // 100),
+            })
+        proto._proc_json_record({
+            "command": "get",
+            "key": "MD5E-s10000--abc.dat",
+            "file": "big.dat",
+            "success": True,
+        })
+
+    pid = proto._global_pbar_id
+    pbar_calls = [c for c in mock_lp.call_args_list if c.args[1] == pid]
+    total_updates = [c.kwargs.get("update")
+                     for c in pbar_calls if "update" in c.kwargs]
+    # cumulative on-disk: first event credits 1_000, then 3_000, 6_000,
+    # completion adds the 4_000 residual to reach 10_000
+    assert_equal(total_updates, [1_000, 3_000, 6_000, 10_000])
+    # every update carries initial=warm_start (1_000 -- only one file's
+    # first bp) so tqdm's rate excludes already-on-disk bytes
+    initials = [c.kwargs.get("initial")
+                for c in pbar_calls if "update" in c.kwargs]
+    assert_equal(initials, [1_000, 1_000, 1_000, 1_000])
+    assert_equal(proto._inflight_credited, {})
+    assert_equal(proto._file_resume_offset, {})
+    assert_equal(proto._byte_count, 10_000)
+    assert_equal(proto._resumed_bytes, 1_000)
+
+
+@pytest.mark.ai_generated
+def test_annex_json_protocol_total_progress_skips_failures():
+    # A failed transfer (e.g. `get` from a remote that does not have the key)
+    # must not advance the dataset-level "Total" bar by the missing file's
+    # size, and its key-size should be tracked as errored so the effective
+    # total / bar label reflect reality.
+    from datalad.support import annexrepo as ar_mod
+
+    proto = _make_annex_json_protocol(total_nbytes=20_000)
+
+    with patch.object(ar_mod, "log_progress") as mock_lp:
+        # failed final record: no preceding byte-progress, success is False
+        proto._proc_json_record({
+            "command": "get",
+            "key": "MD5E-s10000--missing.dat",
+            "file": "missing.dat",
+            "success": False,
+            "note": "not found",
+        })
+
+    # _byte_count must not advance for an unsuccessful transfer
+    assert_equal(proto._byte_count, 0)
+    # error accounting picked up the missing file's key-size
+    assert_equal(proto._error_count, 1)
+    assert_equal(proto._error_bytes, 10_000)
+    assert_equal(proto._inflight_credited, {})
+    pid = proto._global_pbar_id
+    pbar_calls = [c for c in mock_lp.call_args_list if c.args[1] == pid]
+    assert len(pbar_calls) == 1
+    call = pbar_calls[0]
+    # single update emit: byte_count still 0, effective total shrunk by
+    # the errored key-size, label carries the errored summary
+    assert_equal(call.kwargs.get("update"), 0)
+    assert_equal(call.kwargs.get("initial"), 0)
+    assert_equal(call.kwargs.get("total"), 10_000)
+    assert "errored: 1" in call.kwargs.get("label", "")
+
+
+@pytest.mark.ai_generated
+def test_annex_json_protocol_total_progress_completion_includes_inflight():
+    # With -J>1, file B's per-file completion arrives while file A is still
+    # streaming. The completion emit must include A's in-flight contribution,
+    # else the Total bar visibly dips on every per-file completion.
+    from datalad.support import annexrepo as ar_mod
+
+    proto = _make_annex_json_protocol(total_nbytes=30_000)
+
+    action_a = {"command": "get", "key": "MD5E-s10000--a.dat", "file": "a.dat"}
+    action_b = {"command": "get", "key": "MD5E-s10000--b.dat", "file": "b.dat"}
+    with patch.object(ar_mod, "log_progress") as mock_lp:
+        # both files start streaming
+        proto._proc_json_record({"action": action_a, "byte-progress": 4_000,
+                                 "total-size": 10_000, "percent-progress": "40%"})
+        proto._proc_json_record({"action": action_b, "byte-progress": 2_000,
+                                 "total-size": 10_000, "percent-progress": "20%"})
+        # B completes; A is still mid-transfer at 4_000
+        proto._proc_json_record({"command": "get", "key": "MD5E-s10000--b.dat",
+                                 "file": "b.dat", "success": True})
+
+    pid = proto._global_pbar_id
+    total_updates = [
+        c.kwargs.get("update")
+        for c in mock_lp.call_args_list
+        if c.args[1] == pid and "update" in c.kwargs
+    ]
+    # A's first event credits 4_000 (warm-start), B's first event adds
+    # another 2_000 (warm-start) for 6_000, B-completion adds 8_000
+    # residual to reach 14_000. Strictly non-decreasing.
+    assert_equal(total_updates, [4_000, 6_000, 14_000])
+    assert total_updates == sorted(total_updates)
+    # initial= tracks warm_start_bytes (4_000 for A alone, then 6_000 once B
+    # also started). At B's completion, B's warm-start (2_000) is kept (not
+    # rolled back) so initial stays at 6_000.
+    initials = [c.kwargs.get("initial") for c in mock_lp.call_args_list
+                if c.args[1] == pid and "update" in c.kwargs]
+    assert_equal(initials, [4_000, 6_000, 6_000])
+
+
+@pytest.mark.ai_generated
+def test_annex_json_protocol_total_progress_resume_from_disk():
+    # When `git annex` resumes a previously-partial download, the first
+    # `byte-progress` event already reports the on-disk byte count (e.g.
+    # 5_000 of a 10_000 file). Those bytes were not transferred in this
+    # session and must not credit the Total bar or be included in the
+    # effective total.
+    from datalad.support import annexrepo as ar_mod
+
+    proto = _make_annex_json_protocol(total_nbytes=10_000)
+
+    action = {"command": "get", "key": "MD5E-s10000--r.dat", "file": "r.dat"}
+    with patch.object(ar_mod, "log_progress") as mock_lp:
+        # first emission already at 5_000 -- resumed from disk
+        proto._proc_json_record({"action": action, "byte-progress": 5_000,
+                                 "total-size": 10_000, "percent-progress": "50%"})
+        proto._proc_json_record({"action": action, "byte-progress": 7_500,
+                                 "total-size": 10_000, "percent-progress": "75%"})
+        proto._proc_json_record({"command": "get",
+                                 "key": "MD5E-s10000--r.dat",
+                                 "file": "r.dat", "success": True})
+
+    pid = proto._global_pbar_id
+    total_updates = [
+        c.kwargs.get("update")
+        for c in mock_lp.call_args_list
+        if c.args[1] == pid and "update" in c.kwargs
+    ]
+    # first event credits 5_000 (warm-start), next adds 2_500 (session,
+    # the bp delta 7_500-5_000), completion adds the 2_500 residual to
+    # reach 10_000 -- which equals effective_total, so the bar finishes
+    # cleanly without an extra update
+    assert_equal(total_updates, [5_000, 7_500])
+    assert_equal(proto._byte_count, 10_000)
+    assert proto._global_pbar_id not in proto._pbars
+    # every Total update carries initial=5_000 (the warm-start) so tqdm's
+    # rate fallback `(n - initial) / elapsed` excludes the resumed bytes
+    initials = [c.kwargs.get("initial") for c in mock_lp.call_args_list
+                if c.args[1] == pid and "update" in c.kwargs]
+    assert_equal(initials, [5_000, 5_000])
+    # the per-file pbar create call carried `initial=5_000` so tqdm starts
+    # from the resume point and rate/ETA are realistic
+    file_create_call = [
+        c for c in mock_lp.call_args_list
+        if c.args[1] != pid and "total" in c.kwargs and "update" not in c.kwargs
+    ]
+    assert len(file_create_call) == 1
+    assert_equal(file_create_call[0].kwargs.get("initial"), 5_000.0)
+
+
+@pytest.mark.ai_generated
+def test_annex_json_protocol_total_progress_rollback_on_partial_error():
+    # A file that streams partway then errors must roll back its provisional
+    # credit -- those bytes are still on disk but no longer count toward
+    # the (now-shrunk) target, otherwise the bar would visibly desync from
+    # `total - error_bytes`.
+    from datalad.support import annexrepo as ar_mod
+
+    proto = _make_annex_json_protocol(total_nbytes=30_000)
+
+    action = {"command": "get", "key": "MD5E-s10000--p.dat", "file": "p.dat"}
+    with patch.object(ar_mod, "log_progress") as mock_lp:
+        # streams 4_000 of 10_000 then fails
+        proto._proc_json_record({"action": action, "byte-progress": 4_000,
+                                 "total-size": 10_000, "percent-progress": "40%"})
+        proto._proc_json_record({
+            "command": "get",
+            "key": "MD5E-s10000--p.dat",
+            "file": "p.dat",
+            "success": False,
+            "note": "remote not available",
+        })
+
+    # provisional 4_000 was rolled back -> byte_count is back to 0
+    assert_equal(proto._byte_count, 0)
+    assert_equal(proto._error_count, 1)
+    assert_equal(proto._error_bytes, 10_000)
+    assert_equal(proto._inflight_credited, {})
+    pid = proto._global_pbar_id
+    total_updates = [
+        c.kwargs.get("update")
+        for c in mock_lp.call_args_list
+        if c.args[1] == pid and "update" in c.kwargs
+    ]
+    # first emit credits 4_000 (warm-start), error rolls it back to 0 and
+    # also rolls back the warm-start anchor so tqdm's rate stays sensible
+    assert_equal(total_updates, [4_000, 0])
+    initials = [c.kwargs.get("initial") for c in mock_lp.call_args_list
+                if c.args[1] == pid and "update" in c.kwargs]
+    assert_equal(initials, [4_000, 0])
+    assert_equal(proto._resumed_bytes, 0)
+
+
+@pytest.mark.ai_generated
+def test_annex_json_protocol_total_progress_finishes_on_all_errored():
+    # If every file errors out the effective total reaches the byte_count
+    # boundary (0 == 0) and the global pbar should finish cleanly without
+    # leaving a stale "Total" hanging around.
+    from datalad.support import annexrepo as ar_mod
+
+    proto = _make_annex_json_protocol(total_nbytes=10_000)
+
+    with patch.object(ar_mod, "log_progress") as mock_lp:
+        proto._proc_json_record({
+            "command": "get",
+            "key": "MD5E-s10000--missing.dat",
+            "file": "missing.dat",
+            "success": False,
+            "note": "not found",
+        })
+
+    assert_equal(proto._error_bytes, 10_000)
+    # effective_total (0) <= _byte_count (0) -> finish the eagerly-created
+    # bar; one log_progress call (no update kwarg) emitted to take it down
+    assert proto._global_pbar_id not in proto._pbars
+    pid = proto._global_pbar_id
+    pbar_calls = [c for c in mock_lp.call_args_list if c.args[1] == pid]
+    assert len(pbar_calls) == 1
+    assert "update" not in pbar_calls[0].kwargs
+
+
 def test_generator_annex_json_protocol():
 
     runner = Runner()
