@@ -2,6 +2,9 @@
 <a id='changelog-1.5.0'></a>
 # 1.5.0 (2026-06-04)
 
+This was primarily a bug fix release. But because of having 2
+enhancements/new features, automated CI assigned 1.5.0.
+
 ## 🚀 Enhancements and New Features
 
 - Add `--cfg-proc` option to `install`, `clone`, and `get` to run configuration procedures on datasets post-installation.
