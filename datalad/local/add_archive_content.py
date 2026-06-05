@@ -46,6 +46,7 @@ from datalad.log import (
     logging,
 )
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import AnnexBatchCommandError
 from datalad.support.constraints import (
     EnsureNone,
     EnsureStr,
@@ -609,10 +610,20 @@ class AddArchiveContent(Interface):
                 lgr.debug("Adding %s to annex pointing to %s and with options "
                           "%r", target_file_path, url, annex_options)
 
-                out_json = annex.add_url_to_file(
-                    target_file_path,
-                    url, options=annex_options,
-                    batch=True)
+                try:
+                    out_json = annex.add_url_to_file(
+                        target_file_path,
+                        url, options=annex_options,
+                        batch=True)
+                except AnnexBatchCommandError as exc:
+                    if '.gitignored' in str(exc):
+                        lgr.warning(
+                            "%s matches .gitignore; skipping "
+                            "(file not added to dataset)",
+                            target_file_path)
+                        stats.skipped += 1
+                        continue
+                    raise
 
                 if 'key' in out_json and out_json['key'] is not None:
                     # annex.is_under_annex(target_file, batch=True):

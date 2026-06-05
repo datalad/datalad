@@ -70,6 +70,7 @@ from datalad.tests.utils_pytest import (
     patch_config,
     serve_path_via_http,
     set_date,
+    signal_timeout,
     skip_if_adjusted_branch,
     skip_if_no_network,
     skip_if_on_windows,
@@ -1557,21 +1558,34 @@ def test_clone_unborn_head_sub(path=None):
 
 
 @skip_if_no_network
+# gin.g-node.org has become too unreliable from CI runners (HTTP 403 from
+# GitHub-hosted IPs, TCP timeouts, and slow-but-responsive serves observed at
+# 417s). signal_timeout(50) bounds the slow case so the global --fail-slow=60
+# in .github/workflows/test.yml is never tripped; the resulting TimeoutError
+# along with IncompleteResultsError from connect failures are accepted as
+# XFAIL. strict=False keeps a real pass (when gin cooperates) reported as
+# XPASS without failing the suite.
+@pytest.mark.xfail(
+    strict=False,
+    reason="gin.g-node.org too unreliable from CI (timeouts, 403s, outages)",
+    raises=(TimeoutError, IncompleteResultsError),
+)
 @with_tempfile
 def test_gin_cloning(path=None):
-    # can we clone a public ds anoynmously from gin and retrieve content
-    ds = clone('https://gin.g-node.org/datalad/datalad-ci-target', path)
-    ok_(ds.is_installed())
-    annex_path = op.join('annex', 'two')
-    git_path = op.join('git', 'one')
-    eq_(ds.repo.file_has_content(annex_path), False)
-    eq_(ds.repo.is_under_annex(git_path), False)
-    result = ds.get(annex_path)
-    assert_result_count(result, 1)
-    assert_status('ok', result)
-    eq_(result[0]['path'], op.join(ds.path, annex_path))
-    ok_file_has_content(op.join(ds.path, annex_path), 'two\n')
-    ok_file_has_content(op.join(ds.path, git_path), 'one\n')
+    # can we clone a public ds anonymously from gin and retrieve content
+    with signal_timeout(50):
+        ds = clone('https://gin.g-node.org/datalad/datalad-ci-target', path)
+        ok_(ds.is_installed())
+        annex_path = op.join('annex', 'two')
+        git_path = op.join('git', 'one')
+        eq_(ds.repo.file_has_content(annex_path), False)
+        eq_(ds.repo.is_under_annex(git_path), False)
+        result = ds.get(annex_path)
+        assert_result_count(result, 1)
+        assert_status('ok', result)
+        eq_(result[0]['path'], op.join(ds.path, annex_path))
+        ok_file_has_content(op.join(ds.path, annex_path), 'two\n')
+        ok_file_has_content(op.join(ds.path, git_path), 'one\n')
 
 
 # TODO: git-annex-init fails in the second clone call below when this is

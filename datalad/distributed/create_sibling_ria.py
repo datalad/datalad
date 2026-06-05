@@ -64,6 +64,27 @@ from datalad.utils import (
 lgr = logging.getLogger('datalad.distributed.create_sibling_ria')
 
 
+def _parse_ria_url(url, push_url, ds_config, res_kwargs):
+    """Verify a RIA URL and return parsed components or an error result.
+
+    Returns ``(ssh_host, url_base_path, rewritten_url, local_base_path)``
+    on success or ``(None, None, None, None)`` together with a single-element
+    list of error results when the URL is invalid.  Callers that are
+    generators should yield from the error list and return.
+    """
+    try:
+        ssh_host, url_base_path, rewritten_url = \
+            verify_ria_url(push_url if push_url else url, ds_config)
+    except ValueError as e:
+        return (None, None, None, None), [get_status_dict(
+            status='error',
+            message=str(e),
+            **res_kwargs
+        )]
+    local_base_path = Path(url_path2local_path(url_base_path))
+    return (ssh_host, url_base_path, rewritten_url, local_base_path), []
+
+
 @build_doc
 class CreateSiblingRia(Interface):
     """Creates a sibling to a dataset in a RIA store
@@ -338,18 +359,11 @@ class CreateSiblingRia(Interface):
         # Note: URL parsing is done twice ATM (for top-level ds). This can't be
         # reduced to single instance, since rewriting url based on config could
         # be different for subdatasets.
-        try:
-            ssh_host, url_base_path, rewritten_url = \
-                verify_ria_url(push_url if push_url else url, ds.config)
-        except ValueError as e:
-            yield get_status_dict(
-                status='error',
-                message=str(e),
-                **res_kwargs
-            )
+        (ssh_host, url_base_path, rewritten_url, local_base_path), \
+            errs = _parse_ria_url(url, push_url, ds.config, res_kwargs)
+        if errs:
+            yield from errs
             return
-
-        local_base_path = Path(url_path2local_path(url_base_path))
 
         if ds.repo.get_hexsha() is None or ds.id is None:
             raise RuntimeError(
@@ -497,18 +511,11 @@ def _create_sibling_ria(
         storage_name = None
 
     # parse target URL
-    try:
-        ssh_host, url_base_path, rewritten_url = \
-            verify_ria_url(push_url if push_url else url, ds.config)
-    except ValueError as e:
-        yield get_status_dict(
-            status='error',
-            message=str(e),
-            **res_kwargs
-        )
+    (ssh_host, url_base_path, rewritten_url, local_base_path), \
+        errs = _parse_ria_url(url, push_url, ds.config, res_kwargs)
+    if errs:
+        yield from errs
         return
-
-    local_base_path = Path(url_path2local_path(url_base_path))
 
     git_url = decode_source_spec(
         # append dataset id to url and use magic from clone-helper:

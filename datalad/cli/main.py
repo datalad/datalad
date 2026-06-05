@@ -112,9 +112,15 @@ def main(args=sys.argv):
 
     # pull config overrides from cmdline args and put in effect
     if cmdlineargs.cfg_overrides is not None:
-        from .helpers import _parse_overrides_from_cmdline
+        from .helpers import parse_overrides_from_cmdline
+
+        # parse_overrides_from_cmdline posts the overrides into the
+        # process ENV (GIT_CONFIG_*) so subprocesses inherit them, and
+        # returns {} -- the values come back into datalad.cfg via the
+        # reload below, which re-reads `git config -l` (which honors
+        # GIT_CONFIG_*) and re-runs DATALAD_* env parsing.
         datalad.cfg.overrides.update(
-            _parse_overrides_from_cmdline(cmdlineargs)
+            parse_overrides_from_cmdline(cmdlineargs)
         )
         # enable overrides
         datalad.cfg.reload(force=True)

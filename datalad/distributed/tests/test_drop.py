@@ -87,12 +87,16 @@ def test_drop_file_content(path=None, outside_path=None):
             refds=ds.path,
         )
 
-    # drop multiple files from different datasets
+    # drop multiple files from different datasets.
+    # Use jobs='auto' to also exercise the auto-resolution code path
+    # (regression test for gh-7867: 'auto' must not be passed verbatim
+    # to git-annex, which would silently swallow the resulting
+    # CommandError and leave content undropped).
     ok_(ds.repo.file_has_content(axfile_rootds))
     res = ds.drop(
         [axfile_rootds, axfile_subds],
         reckless='availability',
-        jobs=2,
+        jobs='auto',
         on_failure='ignore')
     nok_(ds.repo.file_has_content(axfile_rootds))
     assert_result_count(res, 2)
@@ -203,8 +207,9 @@ def test_drop_allkeys(origpath=None, clonepath=None):
     eq_(1, repo.call_annex_records(['info'])[0]['local annex keys'])
 
     # and now drop all keys from the clone, one is redundant and can be
-    # dropped, the other is not and must fail
-    res = dsclone.drop(what='allkeys', jobs=2, on_failure='ignore')
+    # dropped, the other is not and must fail. Use jobs='auto' for the
+    # same regression coverage as in test_drop above (gh-7867).
+    res = dsclone.drop(what='allkeys', jobs='auto', on_failure='ignore')
     # confirm one key gone, one left
     eq_(1, dsclone.repo.call_annex_records(['info'])[0]['local annex keys'])
     assert_result_count(res, 1, action='drop', status='error', type='key')

@@ -1,4 +1,81 @@
 
+<a id='changelog-1.5.0'></a>
+# 1.5.0 (2026-06-04)
+
+This was primarily a bug fix release. But because of having 2
+enhancements/new features, automated CI assigned 1.5.0.
+
+## 🚀 Enhancements and New Features
+
+- Add `--cfg-proc` option to `install`, `clone`, and `get` to run configuration procedures on datasets post-installation.
+  Fixes [#7468](https://github.com/datalad/datalad/issues/7468) via [PR #7477](https://github.com/datalad/datalad/pull/7477)
+  (by [@bpinsard](https://github.com/bpinsard))
+
+- NF+BM: extend create_test_dataset spec, add save/run benchmarks on heavy hierarchies.  [PR #7839](https://github.com/datalad/datalad/pull/7839) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🐛 Bug Fixes
+
+- Fix `AltConstraints.__or__()` and `Constraints.__and__()` mutating
+  their left-hand operand in place and returning `self`. This caused
+  silent side effects when constraint objects defined at module level
+  (e.g. `reckless_opt`) were reused across multiple `|` or `&` chains.
+  Both operators now return a new instance, preserving the original.
+  Identified via the constraint system overhaul in
+  [datalad-next](https://github.com/datalad/datalad-next).
+  Fixes [#7164](https://github.com/datalad/datalad/issues/7164)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Propagate `datalad -c key=value` CLI config overrides and `DATALAD_*`
+  environment variables to subprocesses via Git's native
+  environment-based configuration mechanism (`GIT_CONFIG_COUNT` /
+  `GIT_CONFIG_KEY_N` / `GIT_CONFIG_VALUE_N`). Previously the overrides
+  were only stored in `datalad.cfg.overrides` and were invisible to
+  subprocesses spawned by commands like `datalad run`, so e.g.
+  `datalad -c user.name=Test run git config user.name` did not return
+  the override. Adapted near-verbatim from the `cli_configoverrides`
+  patch in
+  [datalad-next](https://github.com/datalad/datalad-next/blob/904ca6e/datalad_next/patches/cli_configoverrides.py),
+  with its `get_gitconfig_items_from_env` /
+  `set_gitconfig_items_in_env` helpers also added under
+  `datalad.config`.
+  Fixes [#4119](https://github.com/datalad/datalad/issues/4119)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- ENH add --data option to get command, matching push one.  [PR #7476](https://github.com/datalad/datalad/pull/7476) (by [@bpinsard](https://github.com/bpinsard))
+
+- chore: deduplicate code across interface docs, create-sibling, s3, and benchmarks.  [PR #7841](https://github.com/datalad/datalad/pull/7841) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Do not fail `add-archive-content` when adding files ignored due to .gitignore rules.  [PR #7844](https://github.com/datalad/datalad/pull/7844) (by [@asmacdo](https://github.com/asmacdo))
+
+- Fix the dataset-level "Total" progress bar of `datalad get` (and other JSON-progress annex commands): advance it on per-file `byte-progress` deltas (throttled to 0.5s) instead of only on completion, surface errored files in the bar label (`[errored: N / <human-size>]`) and remove their key-sizes from the effective total, and roll back any provisional credit when a partially-streamed file errors.  The bar now tracks cumulative on-disk bytes for non-errored files; resumed-from-disk bytes are tracked as a separate anchor pushed to `tqdm` via `initial=` so the rate / ETA display reflects session work only.  [PR #7865](https://github.com/datalad/datalad/pull/7865) (by [@yarikoptic](https://github.com/yarikoptic))
+- Fix `tqdmProgressBar.update` so a changed `total=` is applied directly rather than via `tqdm.reset()`, which used to zero the elapsed-time and EMA state and produce momentary nonsense rates (e.g. `[00:00<00:00, 16.0T Bytes/s]`).  [PR #7865](https://github.com/datalad/datalad/pull/7865) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Resolve `--jobs auto` for `push`, `drop`, and `remove` so the literal string `auto` is no longer passed through to `git annex`.  Previously `push --jobs=auto` crashed with `option --jobs: cannot parse value 'auto'`, while `drop --jobs=auto` (and `remove --jobs=auto`, which delegates to drop) swallowed the same `CommandError` and silently left content in place.  Fixes [#7867](https://github.com/datalad/datalad/issues/7867).  [PR #7868](https://github.com/datalad/datalad/pull/7868) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🏎 Performance
+
+- `datalad push` no longer runs a pointless `git push --dry-run` and
+  refspec computation when the target is a git-annex special remote
+  (e.g. WebDAV, S3, directory) that has no git URL. This was wasteful
+  at best and could cause errors or significant slowdowns for remotes
+  like WebDAV. The `target_is_git_remote` check is now performed before
+  the dry-run block and guards the entire dry-run + refspec computation.
+  Ported from the `push_optimize` patch in
+  [datalad-next](https://github.com/datalad/datalad-next).
+  Fixes [#6657](https://github.com/datalad/datalad/issues/6657)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- Resolve `@use_cassette('name')` against `<test_module_dir>/vcr_cassettes/<name>.yaml` so cassettes can ship next to their tests.  [PR #7852](https://github.com/datalad/datalad/pull/7852) (by [@yarikoptic](https://github.com/yarikoptic))
+- Ship VCR cassette for `test_anonymous_s3` so it stops hitting live S3.  [PR #7852](https://github.com/datalad/datalad/pull/7852) (by [@yarikoptic](https://github.com/yarikoptic))
+- Drop the `annex.pidlock=true` NFS workaround.  Its v7-era polling-based locking became the dominant cost on NFS after the v8→v10 git-annex bump and was the root cause of the cron NFS-job 6h timeouts; v10 + NFSv4.2 handles fcntl natively.  [PR #7852](https://github.com/datalad/datalad/pull/7852) (by [@yarikoptic](https://github.com/yarikoptic))
+- Retry SSH-target docker setup on host port collisions in `tools/ci/prep-travis-forssh.sh`.  [PR #7852](https://github.com/datalad/datalad/pull/7852) (by [@yarikoptic](https://github.com/yarikoptic))
+- Export the cron NFS test mount with `async` for more-realistic-than-default test conditions and a small per-write speedup.  [PR #7852](https://github.com/datalad/datalad/pull/7852) (by [@yarikoptic](https://github.com/yarikoptic))
+- Capture per-test timings as a `pytest-report.jsonl` artifact via `pytest-reportlog`, preserving timing data even when a job is cancelled.  [PR #7852](https://github.com/datalad/datalad/pull/7852) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- BF(TST): add signal_timeout helper and bound test_gin_cloning.  [PR #7859](https://github.com/datalad/datalad/pull/7859) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.4.1'></a>
 # 1.4.1 (2026-04-08)
 
