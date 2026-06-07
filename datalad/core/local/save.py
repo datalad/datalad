@@ -22,6 +22,7 @@ from datalad.distribution.dataset import (
     EnsureDataset,
     datasetmethod,
     require_dataset,
+    resolve_path,
 )
 from datalad.interface.base import (
     Interface,
@@ -219,6 +220,13 @@ class Save(Interface):
 
         # use status() to do all discovery and annotation of paths
         paths_by_ds = {}
+        # When path arguments were given, track every path Status() reported
+        # (ok/clean/error/deleted/...). Used below to detect input paths that
+        # did not match anything known to git (gh-7840, gh-3844): `git
+        # ls-files` silently drops such paths, so we have to flag them here.
+        # Skip allocating/populating the set when no path was passed -- save's
+        # most common invocation -- to avoid any per-record overhead.
+        seen_status_paths = set() if path else None
         for s in Status()(
                 # ATTN: it is vital to pass the `dataset` argument as it,
                 # and not a dataset instance in order to maintain the path
@@ -236,6 +244,8 @@ class Save(Interface):
                 # below
                 #on_failure='ignore',
                 result_renderer='disabled'):
+            if seen_status_paths is not None:
+                seen_status_paths.add(ut.Path(s['path']))
             if s['status'] == 'error':
                 # Downstream code can't do anything with these. Let the caller
                 # decide their fate.
@@ -251,6 +261,44 @@ class Save(Interface):
                      'path', 'parentds', 'refds', 'status', 'action',
                      'logger')}
             paths_by_ds[s['parentds']] = ds_status
+
+        # For each input path, yield an `error` record if it matched neither a
+        # `git ls-files`-reported path (Status yielded nothing for it) nor an
+        # existing on-disk entry. Without this, `datalad save typo_path` exits
+        # 0 silently, which has bitten users in scripted contexts (gh-7840,
+        # gh-3844). Mirrors `git add` / `git commit` on `pathspec did not
+        # match any file(s)`.
+        # Performance: per-path work is O(1) (set lookup + one stat); the
+        # parents-of-seen set is built lazily, only on the rare deleted-
+        # directory case (`rm -rf d; datalad save d`).
+        ancestor_paths = None
+        for p in path:
+            resolved = resolve_path(p, dataset)
+            if resolved in seen_status_paths:
+                # Status reported this path directly (clean/modified/deleted
+                # /untracked/error/...).
+                continue
+            if resolved.exists() or resolved.is_symlink():
+                # legitimate untracked or clean tree element; not unmatched.
+                continue
+            if ancestor_paths is None:
+                ancestor_paths = set()
+                for sp in seen_status_paths:
+                    ancestor_paths.update(sp.parents)
+            if resolved in ancestor_paths:
+                # a directory whose individual contents were reported (e.g.
+                # the `rm -rf d` case above where Status sees deletions).
+                continue
+            yield dict(
+                action='save',
+                refds=ds.path,
+                type='file',
+                path=str(resolved),
+                status='error',
+                message=("path %r did not match any file(s) known to git",
+                         str(p)),
+                logger=lgr,
+            )
 
         lgr.debug('Determined %i datasets for saving from input arguments',
                   len(paths_by_ds))
