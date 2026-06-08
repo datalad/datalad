@@ -255,7 +255,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: github.event_name != 'schedule'
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           directory: __testhome__
           fail_ci_if_error: false
