@@ -1,4 +1,30 @@
 
+<a id='changelog-1.6.0'></a>
+# 1.6.0 (2026-06-09)
+
+## 🚀 Enhancements and New Features
+
+- `datalad run` now wraps command-created commits as merge commits,
+  preserving linear first-parent history while keeping the full
+  provenance record.  This works across subdataset hierarchies:
+  each dataset that gained intermediate commits gets its own merge,
+  and merge need propagates bottom-up.  A new `datalad save --since`
+  (`since=`) parameter makes this independently usable outside of `run`.
+  [PR #7821](https://github.com/datalad/datalad/pull/7821)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- add submodule URL candidates by URL-rewrite to match parent protocol.  [PR #7606](https://github.com/datalad/datalad/pull/7606) (by [@bpinsard](https://github.com/bpinsard))
+
+## 🧪 Tests
+
+- Mark `test_gin_cloning` as `xfail` (strict=False) on `TimeoutError` and
+  `IncompleteResultsError` instead of `flaky` retries. gin.g-node.org has
+  become too unreliable from CI runners (HTTP 403 from GitHub-hosted IPs,
+  TCP timeouts, slow responses). When gin cooperates the test still
+  reports XPASS; persistent gin failures no longer block CI.
+  [PR #7876](https://github.com/datalad/datalad/pull/7876)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.5.0'></a>
 # 1.5.0 (2026-06-04)
 
