@@ -36,7 +36,7 @@ jobs:
       jobs: ${{ steps.jobs.outputs.matrix }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Possibly filter out cron-only jobs
         id: jobs
@@ -60,7 +60,7 @@ jobs:
     continue-on-error: ${{ matrix.allow-failure || false }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # Do full clone (~10 extra seconds) to fetch all tags.
           # Otherwise we might be missing the tags for maint PRs
