@@ -2104,9 +2104,23 @@ def get_dataset_root(path: str | Path) -> Optional[str]:
         altered = path
         path = dirname(path)
     apath = abspath(path)
+    # gh-7882: only meaningful when `altered` itself is a dataset, so
+    # the fallback below can succeed -- for symlinks that merely point
+    # at some non-dataset location the ordinary walk contract applies
+    real_altered = (
+        op.realpath(altered)
+        if altered and exists(op.join(altered, suffix))
+        else None
+    )
     # while we can still go up
     while split(apath)[1]:
         if exists(op.join(path, suffix)):
+            # gh-7882: skip a `.git` reached only by crossing the
+            # symlink -- it lives in an unrelated tree; the fallback
+            # below returns `altered` itself
+            if real_altered is not None \
+                    and not path_startswith(real_altered, op.realpath(apath)):
+                break
             return path
         # new test path in the format we got it
         path = normpath(op.join(path, os.pardir))

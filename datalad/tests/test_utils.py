@@ -895,6 +895,38 @@ def test_get_dataset_root(path=None):
         eq_(get_dataset_root(fname), os.curdir)
 
 
+@skip_wo_symlink_capability
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_get_dataset_root_symlinks(outer=None, sibling=None):
+    # Three symlink cases, distinguished by whether `altered` itself
+    # is a dataset and whether its realpath is under the walked-up
+    # `.git`:
+    #   (a) test_bf1886 guard: symlink -> subdataset inside outer;
+    #       outer wins (so the symlink is tracked as a file in outer).
+    #   (b) gh-7882: symlink -> dataset in a different tree, an
+    #       unrelated `.git` sits in the symlink's apparent parent;
+    #       the symlink itself wins.
+    #   (c) copilot review guard: tracked symlink to a non-dataset
+    #       external location; the containing dataset must still win
+    #       (only cases where `altered` itself is a dataset get the
+    #       ancestry rejection).
+    AnnexRepo(outer, create=True)
+    AnnexRepo(op.join(outer, 'sub'), create=True)
+    inside = op.join(outer, 'link_to_sub')
+    os.symlink('sub', inside)
+    eq_(get_dataset_root(inside), outer)                              # (a)
+    os.mkdir(op.join(sibling, '.git'))                                # unrelated
+    outside = op.join(sibling, 'link_to_outer')
+    os.symlink(outer, outside)
+    eq_(get_dataset_root(outside), outside)                           # (b)
+    ext = op.join(sibling, 'ext')                                     # non-dataset
+    os.makedirs(ext)
+    tracked = op.join(outer, 'link_to_ext')
+    os.symlink(ext, tracked)
+    eq_(get_dataset_root(tracked), outer)                             # (c)
+
+
 def _p(p: str) -> str:
     """A helper to code paths as POSIX paths in tests  below. Would prepend fake drive
        C: to absolute paths on Windows"""
