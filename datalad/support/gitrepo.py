@@ -1228,6 +1228,8 @@ class GitRepo(CoreGitRepo):
         except OSError:
             toppath = GitRepo.get_toppath(dirname(path), follow_up=follow_up,
                                           git_options=git_options)
+            if toppath is None:
+                return None
 
         # normalize the report, because, e.g. on windows it can come out
         # with improper directory separators (C:/Users/datalad)
