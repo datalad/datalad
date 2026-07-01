@@ -801,9 +801,9 @@ def test_GitRepo_get_toppath_nonexistent():
     # not crash with TypeError when the OSError recursion reaches root
     # without finding any parent .git
     eq_(GitRepo.get_toppath(
-        '/tmp/__datalad_crash_test__/a/b/c/d', follow_up=True), None)
+        '/tmp/__nonexisting__/a/b/c/d', follow_up=True), None)
     eq_(GitRepo.get_toppath(
-        '/tmp/__datalad_crash_test__/a/b/c/d', follow_up=False), None)
+        '/tmp/__nonexisting__/a/b/c/d', follow_up=False), None)
 
 
 @with_tempfile(mkdir=True)
