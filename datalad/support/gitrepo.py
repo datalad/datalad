@@ -75,12 +75,12 @@ from datalad.consts import (
     RESERVED_NAMES_WIN,
 )
 from datalad.core.local.repo import repo_from_path
-from datalad.dochelpers import single_or_plural
 from datalad.dataset.gitrepo import GitRepo as CoreGitRepo
 from datalad.dataset.gitrepo import (
     _get_dot_git,
     path_based_str_repr,
 )
+from datalad.dochelpers import single_or_plural
 from datalad.log import log_progress
 from datalad.support.due import (
     Doi,
@@ -819,7 +819,7 @@ class GitRepo(CoreGitRepo):
     # should do it once
     _config_checked = False
 
-    GIT_MIN_VERSION = "2.25.0"
+    GIT_MIN_VERSION = "2.31.0"
     git_version = None
 
     @classmethod
