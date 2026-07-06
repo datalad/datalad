@@ -44,6 +44,13 @@ jobs:
         pip install ".[devel-docs]"
         # the benchmarks use `ls`
         pip install datalad_deprecated
+        # asv-runner >= 0.2.2 mis-classifies class-level `setup(self)`
+        # as a parameter-free hook and invokes it before setup_cache,
+        # breaking any suite whose setup() reads what setup_cache writes.
+        # asv >= 0.6.6 requires asv-runner>=0.2.5, so pin asv too and let
+        # `pip install asv` in tools/ci/benchmark-travis-pr.sh be a no-op.
+        # See airspeed-velocity/asv_runner#52; unpin both once fixed upstream.
+        pip install "asv<0.6.6" "asv-runner<0.2.2"
     - name: Run benchmarks
       env:
         # fake environment to be able to reuse script for travis
