@@ -780,10 +780,19 @@ class CreateSibling(Interface):
         # TODO: centralize and generalize template symbol handling
         replicate_local_structure = "%RELNAME" not in target_dir
 
-        if not shell.get_annex_version():
+        # git-annex is only needed if any of the local datasets to process
+        # is a git-annex repository.  Plain-git datasets (e.g. created with
+        # --no-annex, marked by a .noannex file) can be sibling-ed onto a
+        # remote that has no git-annex installed.
+        any_annex = any(
+            isinstance(Dataset(cd['path']).repo, AnnexRepo)
+            for cd in to_process
+        )
+        if any_annex and not shell.get_annex_version():
             raise MissingExternalDependency(
                 'git-annex',
                 msg="It's required on the {} machine to create a sibling"
+                    " for a git-annex enabled dataset"
                     .format('remote' if ssh_sibling else 'local'))
 
         #

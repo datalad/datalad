@@ -19,6 +19,7 @@ from os.path import (
     exists,
 )
 from os.path import join as opj
+from unittest.mock import patch
 
 import pytest
 
@@ -890,6 +891,31 @@ def test_local_path_target_dir(path=None):
         sshurl=str(path / "e"), target_dir="d%RELNAME")
     ok_((path / "e" / "d").exists())
     ok_((path / "e" / "d-subds").exists())
+
+
+@skip_if_on_windows
+@with_tempfile(mkdir=True)
+def test_no_annex_no_remote_annex_required(path=None):
+    # A plain-git (no-annex) dataset should not require git-annex on the
+    # target machine to create a sibling.  Regression test: previously,
+    # create-sibling unconditionally checked for git-annex presence and
+    # errored out even for datasets without annex.
+    path = Path(path)
+    ds = Dataset(path / "src").create(annex=False)
+    ok_((ds.pathobj / ".noannex").exists())
+
+    with patch.object(_RunnerAdapter, "get_annex_version", return_value=""):
+        # plain-git dataset: works without annex on the target
+        ds.create_sibling(name="plain", sshurl=str(path / "target-plain"))
+        ok_((path / "target-plain").exists())
+
+        # annex dataset: still errors when target lacks git-annex
+        ds_annex = Dataset(path / "annex").create()
+        assert_raises(
+            Exception,
+            ds_annex.create_sibling,
+            name="annex", sshurl=str(path / "target-annex"),
+        )
 
 
 @slow  # 12sec on Yarik's laptop
