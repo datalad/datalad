@@ -2872,9 +2872,9 @@ def available_cpu_count():
     job schedulers).  Note that this does not account for cgroup CPU
     *quota* limits (e.g. Docker ``--cpus``), which throttle CPU time
     rather than restrict which cores are available.  On macOS/Windows,
-    falls back to ``os.cpu_count``.  Returns 1 if the count cannot be
-    determined.  The result is computed once and cached for the lifetime
-    of the process.
+    falls back to ``os.cpu_count``.  Emits a warning and returns 1 if the
+    count cannot be determined.  The result is computed once and cached for
+    the lifetime of the process.
     """
     global _n_available_cpus
     if _n_available_cpus is None:
@@ -2883,8 +2883,10 @@ def available_cpu_count():
         except (AttributeError, NotImplementedError):
             # no sched_getaffinity (macOS/Windows or exotic platforms):
             # fall back to the total CPU count, or 1 if undeterminable
-            _n_available_cpus = os.cpu_count() or 1
-            lgr.debug(
-                "os.sched_getaffinity unavailable; falling back to "
-                "os.cpu_count() = %d available CPU(s)", _n_available_cpus)
+            if not (cpu_count := os.cpu_count()):
+                lgr.warning(
+                    "Could not determine the number of CPUs available to "
+                    "this process; defaulting to 1")
+                cpu_count = 1
+            _n_available_cpus = cpu_count
     return _n_available_cpus

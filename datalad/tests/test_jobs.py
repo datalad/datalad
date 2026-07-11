@@ -118,12 +118,13 @@ def test_call_annex_resolves_cpus(path=None):
 
 
 @pytest.mark.ai_generated
-def test_jobs_cpus_warns_when_single_cpu():
-    """'cpus' resolving to a single CPU warns about lack of parallelism"""
-    with patch('datalad.support.parallel.available_cpu_count',
-               return_value=1), \
-            swallow_logs(new_level=logging.WARNING) as cml:
-        jobs = ProducerConsumer.get_effective_jobs('cpus')
-        assert jobs == 1
-        cml.assert_logged("'-J cpus' resolved to a single CPU",
-                          level='WARNING', regex=False)
+def test_available_cpu_count_warns_when_undetermined():
+    """available_cpu_count warns and returns 1 when the OS cannot report a count"""
+    import datalad.utils as du
+    with patch.object(du, '_n_available_cpus', None), \
+         patch('os.sched_getaffinity', side_effect=AttributeError, create=True), \
+         patch('os.cpu_count', return_value=None), \
+         swallow_logs(new_level=logging.WARNING) as cml:
+        n = available_cpu_count()
+    assert n == 1
+    cml.assert_logged("Could not determine", level='WARNING', regex=False)

@@ -959,10 +959,6 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         if jobs == 'cpus':
             jobs = available_cpu_count()
-            if jobs == 1:
-                lgr.warning(
-                    "'-J cpus' resolved to a single CPU available to this "
-                    "process; proceeding without parallelism")
         elif jobs == 'auto':
             # Limit to # of CPUs (but at least 3 to start with)
             # and also an additional config constraint (by default 1

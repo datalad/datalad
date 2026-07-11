@@ -253,10 +253,6 @@ class ProducerConsumer:
         """
         if jobs == "cpus":
             jobs = available_cpu_count()
-            if jobs == 1:
-                lgr.warning(
-                    "'-J cpus' resolved to a single CPU available to this "
-                    "process; proceeding without parallelism")
         elif jobs in (None, "auto"):
             from datalad import cfg
 
