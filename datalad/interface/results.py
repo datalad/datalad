@@ -14,10 +14,22 @@ from __future__ import annotations
 
 __docformat__ = 'restructuredtext'
 
+import atexit
+import json
 import logging
+import os
+import traceback
+from collections import defaultdict
 from collections.abc import (
     Iterable,
     Iterator,
+    Mapping,
+    MutableMapping,
+)
+from dataclasses import (
+    dataclass,
+    field,
+    fields,
 )
 from os.path import (
     isabs,
@@ -30,6 +42,7 @@ from os.path import (
 )
 from typing import (
     Any,
+    ClassVar,
     Optional,
 )
 
@@ -57,6 +70,549 @@ success_status_map = {
     'error': 'failure',
 }
 
+# Canonical status values per docs/source/design/result_records.rst.
+# Used by StatusRecord to validate status assignments in v2.4 strict mode.
+_VALID_STATUSES = frozenset(success_status_map)
+
+
+def _strict_mode_enabled() -> bool:
+    """Whether StatusRecord runs in strict mode.
+
+    Controlled by ``DATALAD_STATUSRECORD_STRICT`` environment variable
+    (truthy values: ``1``, ``true``, ``yes`` — case-insensitive). Off by
+    default so existing producers and extensions are unaffected.
+    """
+    v = os.environ.get('DATALAD_STATUSRECORD_STRICT', '').strip().lower()
+    return v in ('1', 'true', 'yes')
+
+
+# ---------------------------------------------------------------------------
+# v2.6: runtime extras-key telemetry
+#
+# When ``DATALAD_STATUSRECORD_TRACE=1`` is set in the environment, every
+# write of a key into ``StatusRecord._extras`` is recorded with the
+# topmost in-tree call site, the producing ``action`` / ``type`` (where
+# known on the record at that point), the value's Python type, and a
+# few example values. On process exit the accumulated buckets are
+# serialised to JSONL at ``DATALAD_STATUSRECORD_TRACE_PATH`` (default
+# ``/tmp/datalad_statusrecord_trace.jsonl``).
+#
+# The output drives the v2.6 promote-or-subclass redo per
+# ``docs/designs/status-record.md``: a static grep is structurally
+# incomplete (it misses dynamic key construction in addurls, helpers
+# that spread ``**res_kwargs`` from closures, etc.); the runtime audit
+# replaces it with real data.
+#
+# When trace is off (the default), the only cost on the hot path is
+# one cached-bool check.
+# ---------------------------------------------------------------------------
+
+# Frames inside these files are skipped when locating the producer call
+# site — they are part of the StatusRecord plumbing, not the producer.
+_TRACE_SKIP_FILES = (
+    'datalad/interface/results.py',
+    'datalad/interface/utils.py',
+    # standard library / framework frames are skipped via the
+    # 'datalad/' substring check below
+)
+
+_TRACE_ENABLED: Optional[bool] = None
+_TRACE_BUCKETS: dict = defaultdict(lambda: {
+    'count': 0,
+    'actions': defaultdict(int),
+    'types': defaultdict(int),
+    'value_types': defaultdict(int),
+    'examples': [],
+})
+
+
+def _trace_enabled() -> bool:
+    """Whether runtime extras-key telemetry is on.
+
+    Controlled by ``DATALAD_STATUSRECORD_TRACE`` (truthy: ``1`` /
+    ``true`` / ``yes``). The result is cached on first read so the hot
+    path stays cheap when off.
+    """
+    global _TRACE_ENABLED
+    if _TRACE_ENABLED is None:
+        v = os.environ.get(
+            'DATALAD_STATUSRECORD_TRACE', '').strip().lower()
+        _TRACE_ENABLED = v in ('1', 'true', 'yes')
+    return _TRACE_ENABLED
+
+
+def _trace_reset() -> None:
+    """Clear cached enabled-state and accumulated buckets.
+
+    Test-only helper; resets module state between sweeps so unit tests
+    can drive the env var with ``monkeypatch``.
+    """
+    global _TRACE_ENABLED
+    _TRACE_ENABLED = None
+    _TRACE_BUCKETS.clear()
+
+
+def _trace_top_frame() -> str:
+    """Find the topmost in-tree call site, skipping plumbing frames.
+
+    Walks the stack from innermost to outermost and returns the
+    deepest frame inside ``datalad/`` that is *not* part of the
+    StatusRecord plumbing. Returned as ``"datalad/...:lineno"`` so it
+    groups well in the JSONL output. Returns ``<no-in-tree-caller>``
+    if the call stack contains no datalad/ producer frame (synthetic
+    REPL invocations, third-party callers, etc.).
+    """
+    for frame in reversed(traceback.extract_stack()):
+        path = frame.filename
+        if 'datalad/' not in path:
+            continue
+        if any(skip in path for skip in _TRACE_SKIP_FILES):
+            continue
+        idx = path.rfind('datalad/')
+        return f"{path[idx:]}:{frame.lineno}"
+    return '<no-in-tree-caller>'
+
+
+def _trace_record_extra(
+    key: str,
+    value: Any,
+    action: Any,
+    type_: Any,
+) -> None:
+    """Record a single extras-key write. No-op when trace is off."""
+    if not _trace_enabled():
+        return
+    frame = _trace_top_frame()
+    bucket = _TRACE_BUCKETS[(key, frame)]
+    bucket['count'] += 1
+    if action is not None and action is not _UNSET:
+        bucket['actions'][str(action)] += 1
+    if type_ is not None and type_ is not _UNSET:
+        bucket['types'][str(type_)] += 1
+    bucket['value_types'][type(value).__name__] += 1
+    if len(bucket['examples']) < 3:
+        try:
+            bucket['examples'].append(repr(value)[:200])
+        except Exception:
+            pass
+
+
+def _trace_dump() -> None:
+    """Serialise accumulated extras-key buckets to JSONL.
+
+    Runs at process exit via ``atexit``. Also callable explicitly for
+    test harnesses. No-op when trace is off or no records were
+    captured. Output path is ``DATALAD_STATUSRECORD_TRACE_PATH`` or
+    ``/tmp/datalad_statusrecord_trace.jsonl``.
+    """
+    if not _trace_enabled() or not _TRACE_BUCKETS:
+        return
+    path = os.environ.get(
+        'DATALAD_STATUSRECORD_TRACE_PATH',
+        '/tmp/datalad_statusrecord_trace.jsonl')
+    try:
+        with open(path, 'w') as f:
+            for (key, frame), bucket in sorted(_TRACE_BUCKETS.items()):
+                rec = {
+                    'key': key,
+                    'frame': frame,
+                    'count': bucket['count'],
+                    'actions': dict(bucket['actions']),
+                    'types': dict(bucket['types']),
+                    'value_types': dict(bucket['value_types']),
+                    'examples': bucket['examples'],
+                }
+                f.write(json.dumps(rec) + '\n')
+        # also leave a hint in the log so humans notice the file
+        lgr.info(
+            'StatusRecord extras-key telemetry written to %s '
+            '(%d distinct (key, frame) clusters)',
+            path, len(_TRACE_BUCKETS))
+    except Exception as exc:
+        # best-effort; do not break process exit on telemetry I/O
+        lgr.debug(
+            'StatusRecord telemetry dump failed: %s', exc)
+
+
+atexit.register(_trace_dump)
+
+
+# ---------------------------------------------------------------------------
+# StatusRecord: typed result record that also implements MutableMapping
+#
+# Designed to be a drop-in replacement for the plain dict that
+# ``get_status_dict()`` historically returned. The class declares the
+# documented result-record fields (see ``docs/source/design/result_records.rst``)
+# as typed attributes, while any unknown / domain-specific keys are stored in
+# an internal ``_extras`` mapping so that:
+#
+#   * existing dict-style consumers (``r['k']``, ``r.get('k')``, ``'k' in r``,
+#     ``r['k'] = v``, ``dict(r)``, ``r.items()``, JSON serialization, hook
+#     match, pickling, etc.) keep working unchanged;
+#   * new code may use typed attribute access (``r.status``, ``r.path``);
+#   * the visible "key set" mirrors the old dict: a declared field is only
+#     reported as present when it has been explicitly set to a non-None value.
+#
+# See ``docs/designs/status-record.md`` for the migration plan.
+# ---------------------------------------------------------------------------
+
+# A sentinel to distinguish "field never set" from "explicitly set to None".
+# Plain ``None`` is a valid value for several fields (``message`` etc.) so we
+# need an unambiguous unset marker for declared fields. The marker is hidden
+# from external consumers: __getitem__/__contains__/__iter__ treat _UNSET as
+# "absent", and __setitem__ writing _UNSET routes through __delitem__.
+_UNSET: Any = object()
+
+
+@dataclass(eq=False)
+class StatusRecord(MutableMapping):
+    """Typed DataLad result record.
+
+    Behaves as both a dataclass (typed attribute access for declared fields)
+    and a :class:`MutableMapping` (dict-style access for backward
+    compatibility). Unknown / domain-specific keys are stored in an internal
+    extras mapping and are spliced into the Mapping view transparently.
+
+    Examples
+    --------
+    >>> r = StatusRecord(action='get', path='/x', status='ok')
+    >>> r['status']
+    'ok'
+    >>> r.status
+    'ok'
+    >>> 'status' in r
+    True
+    >>> r['custom'] = 42         # routed into extras
+    >>> r['custom']
+    42
+    >>> sorted(r.keys())
+    ['action', 'custom', 'path', 'status']
+    """
+
+    # --- documented result-record fields ---
+    # All default to a sentinel so that, just like the legacy dict, a field
+    # is only "present" once explicitly assigned a non-_UNSET value. The
+    # public type of each field is documented in
+    # ``docs/source/design/result_records.rst``; the runtime annotations stay
+    # ``Any`` to keep this minimal-diff and avoid forcing strict types on
+    # existing call sites that pass ``None`` etc.
+    #
+    # Mandatory and common optional fields:
+    action: Any = _UNSET
+    path: Any = _UNSET
+    status: Any = _UNSET
+    type: Any = _UNSET
+    message: Any = _UNSET
+    logger: Any = _UNSET
+    refds: Any = _UNSET
+    parentds: Any = _UNSET
+    state: Any = _UNSET
+    error_message: Any = _UNSET
+    exception: Any = _UNSET
+    exception_traceback: Any = _UNSET
+    exit_code: Any = _UNSET
+    # Cross-type fields confirmed by the v2.6 sweep (and grep in
+    # gitrepo.py) to apply to both ``type='dataset'`` and
+    # ``type='file'`` records — they remain on the base class.
+    gitshasum: Any = _UNSET         # SHA1 of the entity
+    prev_gitshasum: Any = _UNSET    # SHA1 of a previous state
+
+    # --- escape hatch for arbitrary action-specific keys ---
+    _extras: dict = field(default_factory=dict, repr=False)
+
+    # Declared field names in declaration order, plus a frozenset for O(1)
+    # membership tests. Computed once per class in __init_subclass__ / via
+    # the bootstrap below the class body for the base class. ClassVar keeps
+    # @dataclass from treating these as instance fields.
+    _DECLARED_FIELDS: ClassVar[tuple] = ()
+    _DECLARED_FIELDS_SET: ClassVar[frozenset] = frozenset()
+
+    # Subclasses must call ``_bootstrap_declared_fields(cls)`` after the
+    # ``@dataclass`` decorator runs (see helper defined below the class).
+    # ``__init_subclass__`` cannot do this for us because it fires before
+    # ``@dataclass`` has processed the subclass body.
+
+    def __post_init__(self) -> None:
+        # v2.6 telemetry: record any pre-loaded extras at construction time
+        # so we capture from_kwargs / direct ``StatusRecord(_extras=...)``
+        # call paths in addition to post-construction __setitem__ paths.
+        if self._extras and _trace_enabled():
+            action = getattr(self, 'action', _UNSET)
+            type_ = getattr(self, 'type', _UNSET)
+            for k, v in self._extras.items():
+                _trace_record_extra(k, v, action, type_)
+
+    # ---- permissive construction from arbitrary kwargs -----------------
+    @classmethod
+    def from_kwargs(
+        cls,
+        _mapping: Optional[Mapping] = None,
+        /,
+        **kwargs: Any,
+    ) -> 'StatusRecord':
+        """Construct from a mapping and/or arbitrary keyword arguments.
+
+        Mirrors :func:`dict` merge semantics: a positional mapping
+        provides the base, and keyword arguments override matching keys.
+        Unknown keys are routed into ``_extras``. Used by producers that
+        spread an existing result-kwargs dict and add or override fields,
+        e.g.::
+
+            yield StatusRecord.from_kwargs(res_kwargs, status='ok')
+
+        For the kwargs-only case (no base mapping), simply omit the
+        positional argument::
+
+            yield StatusRecord.from_kwargs(action='get', custom='v')
+        """
+        merged = dict(_mapping) if _mapping is not None else {}
+        merged.update(kwargs)
+        declared = {k: v for k, v in merged.items()
+                    if k in cls._DECLARED_FIELDS_SET}
+        extras = {k: v for k, v in merged.items()
+                  if k not in cls._DECLARED_FIELDS_SET}
+        return cls(**declared, _extras=extras)
+
+    # ---- MutableMapping protocol ------------------------------------
+    def __getitem__(self, key: str) -> Any:
+        if key in self._DECLARED_FIELDS_SET:
+            v = getattr(self, key)
+            if v is _UNSET:
+                raise KeyError(key)
+            return v
+        return self._extras[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        if value is _UNSET:
+            # treat as deletion to keep "_UNSET means absent" invariant
+            try:
+                del self[key]
+            except KeyError:
+                pass
+            return
+        # v2.4 opt-in unknown-key warning. Off by default so existing
+        # producers and extensions are unaffected. Enable via
+        # DATALAD_STATUSRECORD_STRICT=1. Status-value validation is in
+        # __setattr__ so it catches both dict-style and dataclass-init
+        # paths.
+        if key not in self._DECLARED_FIELDS_SET:
+            if _strict_mode_enabled():
+                lgr.warning(
+                    "StatusRecord: unknown key %r assigned to extras "
+                    "(strict mode is on)", key)
+            # v2.6 telemetry: record post-construction extras writes.
+            # No-op when DATALAD_STATUSRECORD_TRACE is off.
+            _trace_record_extra(
+                key, value,
+                getattr(self, 'action', _UNSET),
+                getattr(self, 'type', _UNSET))
+        if key in self._DECLARED_FIELDS_SET:
+            setattr(self, key, value)
+        else:
+            self._extras[key] = value
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        # v2.4 opt-in status-value validation. Catches both
+        # ``StatusRecord(status=v)`` (auto-generated dataclass __init__
+        # routes through __setattr__) and ``r.status = v`` and
+        # ``r['status'] = v`` (which calls setattr on declared fields).
+        if name == 'status' \
+                and value is not _UNSET \
+                and value is not None \
+                and value not in _VALID_STATUSES \
+                and _strict_mode_enabled():
+            raise ValueError(
+                f"invalid status value {value!r}; "
+                f"expected one of {sorted(_VALID_STATUSES)}")
+        super().__setattr__(name, value)
+
+    def __delitem__(self, key: str) -> None:
+        if key in self._DECLARED_FIELDS_SET:
+            if getattr(self, key) is _UNSET:
+                raise KeyError(key)
+            setattr(self, key, _UNSET)
+        else:
+            del self._extras[key]
+
+    def __iter__(self) -> Iterator[str]:
+        for name in self._DECLARED_FIELDS:
+            if getattr(self, name) is not _UNSET:
+                yield name
+        yield from self._extras
+
+    def __len__(self) -> int:
+        n = sum(1 for f in self._DECLARED_FIELDS
+                if getattr(self, f) is not _UNSET)
+        return n + len(self._extras)
+
+    def __contains__(self, key: object) -> bool:
+        if not isinstance(key, str):
+            return False
+        if key in self._DECLARED_FIELDS_SET:
+            return getattr(self, key) is not _UNSET
+        return key in self._extras
+
+    def copy(self) -> 'StatusRecord':
+        """Return a shallow copy as a fresh ``StatusRecord`` (or subclass).
+
+        Mirrors ``dict.copy()`` for backward compatibility with code that
+        treats result records as dicts (e.g. test helpers like
+        ``_without_command`` in ``test_foreach_dataset.py`` that mutate
+        a copy of each result). The result is a new instance of the same
+        concrete class — ``FileStatusRecord.copy()`` returns a
+        ``FileStatusRecord`` — and ``_extras`` is also shallow-copied so
+        in-place mutation on the copy does not leak back.
+        """
+        return type(self).from_kwargs(self)
+
+    # ---- equality with dict and other StatusRecord ------------------
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, StatusRecord):
+            return dict(self) == dict(other)
+        if isinstance(other, dict):
+            return dict(self) == other
+        return NotImplemented
+
+    def __ne__(self, other: object) -> bool:
+        result = self.__eq__(other)
+        if result is NotImplemented:
+            return result
+        return not result
+
+    # explicit __hash__ disabled (Mapping-style equality is mutation-sensitive)
+    __hash__ = None  # type: ignore[assignment]
+
+    # ---- pickling ---------------------------------------------------
+    # Default dataclass pickling round-trips ``__dict__`` verbatim, but the
+    # _UNSET sentinel does not survive identity comparison after unpickling
+    # (``object()`` instances become fresh objects). Round-trip via the
+    # public Mapping view instead.
+    def __getstate__(self) -> dict:
+        return dict(self)
+
+    def __setstate__(self, state: dict) -> None:
+        for name in self._DECLARED_FIELDS:
+            object.__setattr__(self, name, _UNSET)
+        object.__setattr__(self, '_extras', {})
+        for k, v in state.items():
+            self[k] = v
+
+    # ---- repr / debugging -------------------------------------------
+    def __repr__(self) -> str:
+        # mirror plain dict repr so log output etc. doesn't change shape
+        return f'{type(self).__name__}({dict(self)!r})'
+
+
+def _bootstrap_declared_fields(cls: 'type[StatusRecord]') -> None:
+    """Refresh ``_DECLARED_FIELDS`` / ``_DECLARED_FIELDS_SET`` on a
+    ``StatusRecord`` subclass after the ``@dataclass`` decorator has
+    applied.
+
+    ``__init_subclass__`` runs during class creation — before the
+    ``@dataclass`` decorator has processed the subclass body — so it
+    only sees inherited fields. Subclasses must re-bootstrap after the
+    decorator runs. The base class is bootstrapped manually below; new
+    subclasses defined elsewhere should call this helper after
+    ``@dataclass``.
+    """
+    cls._DECLARED_FIELDS = tuple(
+        f.name for f in fields(cls) if not f.name.startswith('_')
+    )
+    cls._DECLARED_FIELDS_SET = frozenset(cls._DECLARED_FIELDS)
+
+
+# bootstrap _DECLARED_FIELDS on the base class itself.
+_bootstrap_declared_fields(StatusRecord)
+
+
+# ---------------------------------------------------------------------------
+# Specialised subclasses introduced in v2.6 per the runtime extras-key
+# telemetry sweep (see ``docs/designs/status-record.md`` v2.6 outcome and
+# ``.git-meta/v26_report.md``). Each subclass extends the base with fields
+# that the data showed clustering tightly with a specific entity type.
+#
+# Subclasses are purely additive; the base ``StatusRecord`` is unchanged
+# semantically — extras flow through the same Mapping API regardless.
+# Producers opt in by constructing the subclass directly (or via
+# ``FileStatusRecord.from_kwargs(...)`` etc.). Consumers do not need to
+# change: ``isinstance(r, StatusRecord)`` is True for any subclass and
+# the Mapping contract is preserved.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(eq=False)
+class FileStatusRecord(StatusRecord):
+    """Result record for file / symlink entities.
+
+    Adds typed fields that the v2.6 runtime audit showed concentrate on
+    ``type='file'`` results and appear at ≥2 distinct in-tree call sites.
+    Most of these come from ``GitRepo.status()`` /
+    ``get_content_annexinfo()`` and ``annexjson2result()``.
+
+    File-specific fields previously declared on the base class
+    (``bytesize``, ``key`` — promoted in v1+v2.3 from a static grep)
+    have been moved here in v2.6 because the runtime data confirmed
+    they are strictly file-scoped.
+    """
+
+    # Moved from base in v2.6 — runtime audit confirmed file-only use.
+    bytesize: Any = _UNSET            # entity size in bytes (int)
+    key: Any = _UNSET                 # git-annex key (canonical name)
+
+    # Promoted in v2.6 from extras based on the sweep
+    # (see .git-meta/v26_report.md):
+    annexkey: Any = _UNSET            # 9 frames, 213 occurrences — alt
+                                      # name for ``key``; kept distinct
+                                      # because producers populate them
+                                      # via different code paths
+    backend: Any = _UNSET             # 2 frames, 22 occ
+    has_content: Any = _UNSET         # 2 frames, 18 occ
+    hashdirlower: Any = _UNSET        # 2 frames,  4 occ
+    hashdirmixed: Any = _UNSET        # 2 frames,  4 occ
+    humansize: Any = _UNSET           # 2 frames, 22 occ
+    keyname: Any = _UNSET             # 2 frames, 22 occ
+    mtime: Any = _UNSET               # 2 frames, 22 occ
+    objloc: Any = _UNSET              # 2 frames, 18 occ
+
+
+@dataclass(eq=False)
+class SiblingStatusRecord(StatusRecord):
+    """Result record for sibling / git-remote entities.
+
+    Adds the canonical sibling name. The remaining sibling-specific
+    keys observed in the v2.6 sweep are either hyphenated git-config
+    style identifiers (``annex-uuid``, ``annex-ignore``, ``annex-*``,
+    ``datalad-publish-depends``) — which cannot be Python attributes
+    and therefore must stay in ``_extras`` — or single-call-site
+    fields that fail the ≥2 promotion rule. ``url`` is kept in extras
+    for now (single call site at sweep time); promote in a future PR
+    if a second producer adds it.
+    """
+
+    name: Any = _UNSET                # 8 frames, 120 occ
+
+
+# refresh declared-fields cache on each subclass now that @dataclass has run
+_bootstrap_declared_fields(FileStatusRecord)
+_bootstrap_declared_fields(SiblingStatusRecord)
+
+
+def as_status_record(res: Mapping) -> 'StatusRecord':
+    """Coerce a result record to a :class:`StatusRecord`.
+
+    Returns ``res`` unchanged if it is already a ``StatusRecord``;
+    otherwise wraps the mapping in a fresh ``StatusRecord`` so downstream
+    code can rely on typed attribute access. Used at the central pipeline
+    entry (``_process_results``) so the in-pipeline result type is
+    guaranteed regardless of what a producer yielded.
+
+    The wrapping is shallow: keys flow through ``from_kwargs``, so unknown
+    keys land in ``_extras``. The original mapping is not mutated.
+    """
+    if isinstance(res, StatusRecord):
+        return res
+    return StatusRecord.from_kwargs(res)
+
 
 def get_status_dict(
     action: Optional[str] = None,
@@ -70,14 +626,14 @@ def get_status_dict(
     exception: Exception | CapturedException | None = None,
     error_message: str | tuple | None = None,
     **kwargs: Any,
-) -> dict[str, Any]:
+) -> StatusRecord:
     # `type` is intentionally not `type_` or something else, as a mismatch
     # with the dict key 'type' causes too much pain all over the place
     # just for not shadowing the builtin `type` in this function
-    """Helper to create a result dictionary.
+    """Helper to create a result record.
 
-    Most arguments match their key in the resulting dict, and their given
-    values are simply assigned to the result record under these keys.  Only
+    Most arguments match their key in the resulting record, and their given
+    values are simply assigned to the record under these keys.  Only
     exceptions are listed here.
 
     Parameters
@@ -95,10 +651,14 @@ def get_status_dict(
 
     Returns
     -------
-    dict
+    StatusRecord
+        A record that behaves like a dict for backward-compatible
+        consumers (subscription, ``.get()``, ``in``, iteration, JSON
+        serialization, etc.) and exposes typed attributes for the
+        documented fields.
     """
 
-    d: dict[str, Any] = {}
+    d: StatusRecord = StatusRecord()
     if action is not None:
         d['action'] = action
     if ds:
@@ -145,7 +705,7 @@ def results_from_paths(
     status: Optional[str] = None,
     message: Optional[str] = None,
     exception: Exception | CapturedException | None = None,
-) -> Iterator[dict[str, Any]]:
+) -> Iterator[StatusRecord]:
     """
     Helper to yield analog result dicts for each path in a sequence.
 
@@ -168,16 +728,24 @@ def results_from_paths(
         )
 
 
-def is_ok_dataset(r: dict) -> bool:
-    """Convenience test for a non-failure dataset-related result dict"""
+def is_ok_dataset(r: Mapping) -> bool:
+    """Convenience test for a non-failure dataset-related result record.
+
+    Accepts both :class:`StatusRecord` and plain ``dict`` (e.g. results
+    yielded from extensions that have not migrated yet).
+    """
     return r.get('status', None) == 'ok' and r.get('type', None) == 'dataset'
 
 
 class ResultXFM:
     """Abstract definition of the result transformer API"""
 
-    def __call__(self, res: dict[str, Any]) -> Any:
-        """This is called with one result dict at a time"""
+    def __call__(self, res: Mapping) -> Any:
+        """This is called with one result record at a time.
+
+        ``res`` is a :class:`Mapping` — ``StatusRecord`` is supported as
+        the typed common case, but plain ``dict`` is also valid.
+        """
         raise NotImplementedError
 
 
@@ -192,7 +760,7 @@ class YieldDatasets(ResultXFM):
     def __init__(self, success_only: bool = False) -> None:
         self.success_only = success_only
 
-    def __call__(self, res: dict[str, Any]) -> Optional[Dataset]:
+    def __call__(self, res: Mapping) -> Optional[Dataset]:
         if res.get('type', None) == 'dataset':
             if not self.success_only or \
                     res.get('status', None) in ('ok', 'notneeded'):
@@ -210,7 +778,7 @@ class YieldRelativePaths(ResultXFM):
     Relative paths are determined from the 'refds' value in the result. If
     no such value is found, `None` is returned.
     """
-    def __call__(self, res: dict[str, Any]) -> Optional[str]:
+    def __call__(self, res: Mapping) -> Optional[str]:
         refpath = res.get('refds', None)
         if refpath:
             return relpath(res['path'], start=refpath)
@@ -229,7 +797,7 @@ class YieldField(ResultXFM):
         """
         self.field = field
 
-    def __call__(self, res: dict[str, Any]) -> Any:
+    def __call__(self, res: Mapping) -> Any:
         if self.field in res:
             return res[self.field]
         else:
@@ -254,8 +822,8 @@ translate_annex_notes = {
 }
 
 
-def annexjson2result(d: dict[str, Any], ds: Dataset, **kwargs: Any) -> dict[str, Any]:
-    """Helper to convert an annex JSON result to a datalad result dict
+def annexjson2result(d: dict[str, Any], ds: Dataset, **kwargs: Any) -> StatusRecord:
+    """Helper to convert an annex JSON result to a datalad result record
 
     Info from annex is rather heterogeneous, partly because some of it
     our support functions are faking.
@@ -306,13 +874,13 @@ def annexjson2result(d: dict[str, Any], ds: Dataset, **kwargs: Any) -> dict[str,
     return res
 
 
-def count_results(res: Iterable[dict[str, Any]], **kwargs: Any) -> int:
+def count_results(res: Iterable[Mapping], **kwargs: Any) -> int:
     """Return number of results that match all property values in kwargs"""
     return sum(
         all(k in r and r[k] == v for k, v in kwargs.items()) for r in res)
 
 
-def only_matching_paths(res: dict[str, Any], **kwargs: Any) -> bool:
+def only_matching_paths(res: Mapping, **kwargs: Any) -> bool:
     # TODO handle relative paths by using a contained 'refds' value
     paths = ensure_list(kwargs.get('path', []))
     respath = res.get('path', None)
@@ -321,7 +889,7 @@ def only_matching_paths(res: dict[str, Any], **kwargs: Any) -> bool:
 
 # needs decorator, as it will otherwise bind to the command classes that use it
 @staticmethod  # type: ignore[misc]
-def is_result_matching_pathsource_argument(res: dict[str, Any], **kwargs: Any) -> bool:
+def is_result_matching_pathsource_argument(res: Mapping, **kwargs: Any) -> bool:
     # we either have any non-zero number of "paths" (that could be anything), or
     # we have one path and one source
     # we don't do any error checking here, done by the command itself
@@ -375,7 +943,7 @@ def results_from_annex_noinfo(
     noinfo_file_msg: str,
     noinfo_status: str = 'notneeded',
     **kwargs: Any
-) -> Iterator[dict[str, Any]]:
+) -> Iterator[StatusRecord]:
     """Helper to yield results based on what information git annex did no give us.
 
     The helper assumes that the annex command returned without an error code,
