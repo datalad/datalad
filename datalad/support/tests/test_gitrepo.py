@@ -796,6 +796,16 @@ def test_GitRepo_get_toppath(repo=None, tempdir=None, repo2=None):
     eq_(GitRepo.get_toppath(tempdir), None)
 
 
+@with_tempfile
+def test_GitRepo_get_toppath_nonexistent(unique_base=None):
+    # gh-7882: get_toppath with a nonexistent path should return None,
+    # not crash with TypeError when the OSError recursion reaches root
+    # without finding any parent .git
+    nonexistent = op.join(unique_base, 'a', 'b', 'c', 'd')
+    eq_(GitRepo.get_toppath(nonexistent, follow_up=True), None)
+    eq_(GitRepo.get_toppath(nonexistent, follow_up=False), None)
+
+
 @with_tempfile(mkdir=True)
 def test_GitRepo_dirty(path=None):
 
