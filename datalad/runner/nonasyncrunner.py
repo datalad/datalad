@@ -544,9 +544,23 @@ class ThreadedRunner:
 
     def _handle_process_timeout(self):
         if self.protocol.timeout(None) is True:
-            self.ensure_stdin_stdout_stderr_closed()
+            # Close our end of the child's stdin first to signal EOF -- a
+            # well-behaved child may wind down cleanly on that alone.  We
+            # MUST NOT close stdout/stderr yet: the child (or anything
+            # sharing its stdout fd, e.g. a `tar`/`curl` helper that git-
+            # annex spawned) would then be killed by SIGPIPE on its next
+            # write, surfacing as exitcode 141 to the runner's caller.
+            self.close_stdin()
             self.process.terminate()
-            self.process.wait()
+            try:
+                self.process.wait(timeout=1.0)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+                self.process.wait()
+            # Child is now reaped; safe to close our end of stdout/stderr.
+            self._ensure_closed(
+                (self.process.stdout, self.process.stderr)
+            )
             self.remove_process()
 
     def _handle_source_timeout(self, source):
