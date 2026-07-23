@@ -1,4 +1,39 @@
 
+<a id='changelog-1.6.1'></a>
+# 1.6.1 (2026-07-23)
+
+## 🐛 Bug Fixes
+
+- `get_toppath()` now returns `None` instead of crashing with `TypeError` when
+  called on a path whose existence can't be verified (e.g. a broken symlink or
+  a nonexistent directory).  Discovered while investigating
+  [#7882](https://github.com/datalad/datalad/issues/7882).
+  (by [@LiamDGray](https://github.com/LiamDGray))
+
+- BF: terminate child before closing stdout/stderr on process timeout.  [PR #7866](https://github.com/datalad/datalad/pull/7866) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Fix `get_dataset_root()` to reject an ancestor `.git/` that is reached only by crossing a symlink boundary.  Previously, `cwd` inside a symlink whose apparent parent contained an unrelated `.git/` (e.g. an abandoned `git init` with no commits) caused `datalad status` / `datalad rerun` to bind to that parent, while `git` and `git-annex` correctly followed the symlink to the real dataset.  The existing "symlink itself is a dataset" fallback now handles that case; the `test_bf1886` semantics (symlink → subdataset within outer dataset resolves to outer) is preserved via a realpath-ancestry check.  Fixes [#7882](https://github.com/datalad/datalad/issues/7882) via [PR #7883](https://github.com/datalad/datalad/pull/7883) (by [@yarikoptic](https://github.com/yarikoptic))
+
+- `create-sibling` no longer requires `git-annex` on the target (remote or local) when the source dataset is a plain-git dataset (`--no-annex`, i.e. marked with a `.noannex` file).  Previously it errored out with `No working git-annex installation. It's required on the remote machine to create a sibling` even though no annex functionality would be used.  Via [PR #7888](https://github.com/datalad/datalad/pull/7888) (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🔩 Dependencies
+
+- Bump minimum required Git version from 2.25.0 to 2.31.0.  The `-c
+  key=value` config-override propagation to subprocesses added in
+  [PR #7858](https://github.com/datalad/datalad/pull/7858) relies on
+  Git's `GIT_CONFIG_COUNT` / `GIT_CONFIG_KEY_<n>` / `GIT_CONFIG_VALUE_<n>`
+  environment mechanism, which was introduced in Git 2.31.0 (2021-03).
+  On older Git the CLI override was silently ignored.  This bump makes the
+  requirement explicit at startup rather than manifesting as a silent
+  feature loss.  Git 2.31 is available on all currently-supported LTS
+  distributions.
+  Via [PR #7887](https://github.com/datalad/datalad/pull/7887)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🏠 Internal
+
+- Pin `asv<0.6.6` and `asv-runner<0.2.2` in `.github/workflows/benchmarks.yml`.  Starting with asv-runner 0.2.2 (released 2026-06-27), `do_setup_cache()` invokes any class-level `setup(self)` method it can bind with no positional args -- for the `save_run` benchmarks that means `setup()` runs before `setup_cache()` has written `bm_heavy.tar`, breaking every Benchmarks CI run since #7402.  asv itself needs pinning too because asv 0.6.6 requires `asv-runner>=0.2.5`, and `tools/ci/benchmark-travis-pr.sh` re-runs `pip install asv` unconditionally which would otherwise defeat the pin.  Reported upstream at [airspeed-velocity/asv_runner#52](https://github.com/airspeed-velocity/asv_runner/issues/52).  [PR #7886](https://github.com/datalad/datalad/pull/7886) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.6.0'></a>
 # 1.6.0 (2026-06-09)
 
