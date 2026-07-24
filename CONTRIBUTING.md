@@ -21,6 +21,9 @@ pytest --cov=datalad path/to/tests                          # with coverage
 tox -e lint                   # codespell + pylint
 tox -e typing                 # mypy
 make code-analysis            # flake8 + pylint
+
+# Docs
+make -C docs html doctest     # build HTML docs + run doctests
 ```
 
 ## Files organization
