@@ -647,6 +647,17 @@
             "avatar_url": [
                 "https://avatars.githubusercontent.com/u/14842795?v=4"
             ]
+        },
+        {
+            "login": "LiamDGray",
+            "name": "Liam D. Gray",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://liamdgray.com",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/3453757?v=4"
+            ]
         }
     ],
     "contributorsPerLine": 7
