@@ -19,6 +19,7 @@ from os.path import lexists
 
 from datalad.consts import ADJUSTED_BRANCH_EXPR
 from datalad.distribution.dataset import require_dataset
+from datalad.distribution.utils import _try_command
 from datalad.interface.base import (
     Interface,
     build_doc,
@@ -49,6 +50,10 @@ from datalad.support.param import Parameter
 from .dataset import (
     EnsureDataset,
     datasetmethod,
+)
+from .reset import (
+    _annex_reset_target,
+    _reset_hard,
 )
 
 lgr = logging.getLogger('datalad.distribution.update')
@@ -401,15 +406,25 @@ class Update(Interface):
                 if is_annex and reobtain_data:
                     update_fn = _reobtain(ds, update_fn)
 
-                for ures in update_fn(repo, sibling_, target, opts=fn_opts):
-                    # NOTE: Ideally the "merge" action would also be prefixed
-                    # with "update.", but a plain "merge" is used for backward
-                    # compatibility.
-                    if ures["status"] != "ok" and (
-                            ures["action"] == "merge" or
-                            ures["action"].startswith("update.")):
-                        saw_update_failure = True
-                    yield dict(res, **ures)
+                # Refuse a dirty working tree HERE instead of inside the reset helpers.
+                # `_reset_hard` / `_annex_reset_target` are now pure -- they
+                # always discard like `git reset --hard`, so they are shared reset engine
+                # between `update` and `reset`.
+                if how_curr == "reset" and repo.dirty:
+                    yield dict(res, action="update.reset", status="error",
+                               message="Refusing to reset dirty working tree")
+                    saw_update_failure = True
+                else:
+                    for ures in update_fn(repo, sibling_, target,
+                                          opts=fn_opts):
+                        # NOTE: Ideally the "merge" action would also be
+                        # prefixed with "update.", but a plain "merge" is used
+                        # for backward compatibility.
+                        if ures["status"] != "ok" and (
+                                ures["action"] == "merge" or
+                                ures["action"].startswith("update.")):
+                            saw_update_failure = True
+                        yield dict(res, **ures)
 
             if saw_update_failure:
                 update_failures.add(ds)
@@ -485,6 +500,12 @@ def _choose_update_target(repo, branch, remote, cfg_remote):
              f"{repo.get_corresponding_branch(branch) or ''}" "@{upstream}"],
             read_only=True)
     elif branch:
+        # On an adjusted branch the active branch (e.g.
+        # 'adjusted/master(unlocked)') has no remote counterpart; the sibling
+        # tracks the corresponding branch ('master'). Resolve it so the target
+        # becomes e.g. 'origin/master' instead of the nonexistent
+        # 'origin/adjusted/master(unlocked)'.
+        branch = repo.get_corresponding_branch(branch) or branch
         remote_branch = "{}/{}".format(remote, branch)
         if repo.commit_exists(remote_branch):
             target = remote_branch
@@ -531,29 +552,6 @@ def _choose_update_fn(repo, how, is_annex=False, adjusted=False,
     return fn
 
 
-def _try_command(record, fn, *args, **kwargs):
-    """Call `fn`, catching a `CommandError`.
-
-    Parameters
-    ----------
-    record : dict
-        A partial result record. It should at least have 'action' and 'message'
-        fields. A 'status' value of 'ok' or 'error' will be added based on
-        whether calling `fn` raises a `CommandError`.
-
-    Returns
-    -------
-    A new record with a 'status' field.
-    """
-    try:
-        fn(*args, **kwargs)
-    except CommandError as exc:
-        ce = CapturedException(exc)
-        return dict(record, status="error", message=str(ce))
-    else:
-        return dict(record, status="ok")
-
-
 def _plain_merge(repo, _, target, opts=None):
     yield _try_command(
         {"action": "merge", "message": ("Merged %s", target)},
@@ -572,10 +570,27 @@ def _annex_plain_merge(repo, _, target, opts=None):
 
 
 def _annex_sync(repo, remote, _target, opts=None):
-    yield _try_command(
+    # git-annex-sync creates a synced/<branch> ref. Mirror
+    # AnnexRepo.localsync's delete-if-created hygiene: if this sync created it,
+    # remove it again, so a later git-annex-sync (run internally by save/push)
+    # cannot merge the zombie back and resurrect discarded commits (gh-7772).
+    branch = repo.get_active_branch()
+    branch = repo.get_corresponding_branch(branch) or branch
+    synced_branch = 'synced/{}'.format(branch)
+    had_synced_branch = synced_branch in repo.get_branches()
+    res = _try_command(
         {"action": "update.annex_sync", "message": "Ran git-annex-sync"},
         repo.call_annex,
         ['sync', '--no-push', '--pull', '--no-commit', '--no-content', remote])
+    yield res
+    # Use -D (force): after a --pull sync, synced/<branch> may hold commits not
+    # reachable from the *adjusted* HEAD (they live on the corresponding branch
+    # and remote-tracking ref), so -d would refuse. Force-deleting the ref we
+    # just created loses nothing.
+    if res.get("status") != "error" \
+            and not had_synced_branch \
+            and synced_branch in repo.get_branches():
+        repo.call_git(['branch', '-D', synced_branch])
 
 
 def _annex_merge_target(repo, _remote, target, opts=None):
@@ -589,80 +604,6 @@ def _annex_merge_target(repo, _remote, target, opts=None):
         {"action": "update.annex_merge", "message": ("Merged %s", target)},
         repo.call_annex,
         ['merge', target])
-
-
-def _get_adjust_mode(branch_name):
-    """Extract the adjustment mode from an adjusted branch name.
-
-    E.g., 'adjusted/master(unlocked)' -> '--unlock'
-    """
-    match = ADJUSTED_BRANCH_EXPR.match(branch_name or '')
-    if not match:
-        # Default to unlocked mode as it is the most common adjustment,
-        # especially on crippled filesystems where unlocked behavior is expected.
-        return '--unlock'
-    mode = match.group('mode')
-    mode_to_option = {
-        'unlocked': '--unlock',
-        'locked': '--lock',
-        'fix': '--fix',
-        'fixed': '--fix',
-        'hidemissing': '--hide-missing',
-    }
-    return mode_to_option.get(mode, '--unlock')
-
-
-def _annex_reset_target(repo, _remote, target, opts=None):
-    """Reset an adjusted branch to a specific target revision.
-
-    This performs a hard reset on the corresponding branch, then re-adjusts
-    the branch to maintain the adjusted state. This is useful for
-    `how_subds='reset'` on adjusted branches.
-    """
-    if repo.dirty:
-        yield {"action": "update.reset",
-               "status": "error",
-               "message": "Refusing to reset dirty working tree"}
-        return
-
-    active_branch = repo.get_active_branch()
-    corr_branch = repo.get_corresponding_branch(active_branch)
-    adjust_mode = _get_adjust_mode(active_branch)
-
-    def do_reset():
-        # Checkout the corresponding branch
-        repo.call_git(['checkout', corr_branch])
-        try:
-            # Reset to target
-            repo.call_git(['reset', '--hard', target])
-            # Re-adjust with --force to overwrite existing adjusted branch
-            repo.call_annex(['adjust', adjust_mode, '--force'])
-        except Exception:
-            # Try to restore the adjusted branch so the repo isn't stranded
-            # on the corresponding branch
-            try:
-                repo.call_annex(['adjust', adjust_mode, '--force'])
-            except Exception:
-                lgr.debug(
-                    "Failed to restore adjusted branch %s after "
-                    "failed reset", active_branch, exc_info=True)
-            raise
-
-    yield _try_command(
-        {"action": "update.reset", "message": ("Reset to %s", target)},
-        do_reset)
-
-
-def _reset_hard(repo, _, target, opts=None):
-    if repo.dirty:
-        yield {"action": "update.reset",
-               "status": "error",
-               "message": "Refusing to reset dirty working tree"}
-    else:
-        yield _try_command(
-            {"action": "update.reset", "message": ("Reset to %s", target)},
-            repo.call_git,
-            ["reset", "--hard", target])
 
 
 def _checkout(repo, _, target, opts=None):

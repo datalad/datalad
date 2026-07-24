@@ -1952,6 +1952,48 @@ def maybe_adjust_repo(repo):
         repo.adjust()
 
 
+def maybe_unadjust_repo(repo):
+    """Check out `repo`'s *corresponding* branch (the real history beneath
+    the adjusting commit), the inverse of `maybe_adjust_repo`.
+
+    Call this function before you need to modify the commit history of a source/
+    sibling repo that has been created on a crippled FS (e.g. Windows CI).
+    A crippled FS forces every repo onto the adjusted branch. A plain
+    ``git reset --hard`` must land on the corresponding branch (not the adjusted
+    view). On a repo that is not adjusted it is a no-op.
+
+    Caveats:
+
+    - only faithful for asserting SHA-identity after a history-rewrite. If you
+      try to assert content-identity, you'll need to materialize the content first
+      via e.g. ``git checkout -- .``.
+
+    - only plain ``git`` keeps the repo unadjusted. DataLad's ``save``, ``update``
+      and ``push`` run ``git annex sync`` internally, which re-adjusts the branch
+      on a crippled filesystem.
+    """
+    if repo.is_managed_branch():
+        corr_branch = repo.get_corresponding_branch()
+        adjusted = repo.get_active_branch()
+        repo.call_git(["checkout", corr_branch])
+        repo.call_git(["branch", "-D", adjusted])
+
+
+def corresponding_hexsha(repo, ref="HEAD"):
+    """Hexsha of ``ref``, read from the corresponding branch when adjusted, otherwise from the active branch.
+
+    A plain ``get_hexsha(HEAD)`` on an adjusted repo returns the SHA of the git-annex
+    "adjusting" commit which is just the view. To read the SHA of the real history,
+    HEAD-relative refs need to be resolved against the corresponding branch instead.
+    On a normal branch it is a plain ``get_hexsha(ref)``.
+    """
+    if corr := repo.get_corresponding_branch():
+        target_ref = ref.replace("HEAD", corr)
+    else:
+        target_ref = ref
+    return repo.get_hexsha(target_ref)
+
+
 @lru_cache()
 @with_tempfile
 @with_tempfile
