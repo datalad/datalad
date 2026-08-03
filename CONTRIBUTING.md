@@ -252,7 +252,9 @@ own setup/teardown overhead.
 
 Test helpers live in
 [datalad/tests/utils_pytest.py](datalad/tests/utils_pytest.py); import what
-you need from there.
+you need from there.  A helper you *add* there is code like any other, so pin
+its contract with a test in
+[datalad/tests/test_tests_utils_pytest.py](datalad/tests/test_tests_utils_pytest.py).
 
 **Setting up files and directories** — use `@with_tempfile` and `@with_tree`:
 
