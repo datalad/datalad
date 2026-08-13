@@ -41,6 +41,7 @@ import pytest
 
 from datalad import cfg as dl_cfg
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.external_versions import external_versions
 from datalad.utils import (
     CMD_MAX_ARG,
     Path,
@@ -803,8 +804,14 @@ def test_assure_unicode():
     eq_(ensure_unicode(mom_koi8r), u"мама мыла раму")
     eq_(ensure_unicode(mom_koi8r, confidence=0.01), u"мама мыла раму")
     mom_iso8859 = u'mamá'.encode('iso-8859-1')
-    eq_(ensure_unicode(mom_iso8859), u'mamá')
-    eq_(ensure_unicode(mom_iso8859, confidence=0.01), u'mamá')
+    try:
+        eq_(ensure_unicode(mom_iso8859), u'mamá')
+        eq_(ensure_unicode(mom_iso8859, confidence=0.01), u'mamá')
+    except (UnicodeDecodeError, AssertionError):
+        # chardet 7.5.0/7.5.1 misdetect ISO-8859-1 'mamá' as UTF-8;
+        # monitor https://github.com/chardet/chardet/issues/380
+        if not ('7.5.0' <= external_versions['chardet'] < '7.5.2'):
+            raise
     # but when we mix, it does still guess something allowing to decode
     # (chardet < 7) or fails to decode (chardet >= 7 picks iso2022-jp-2
     # which can't handle the koi8-r bytes):
