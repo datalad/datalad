@@ -25,6 +25,7 @@ from datalad.core.local.run import (
     _format_cmd_shorty,
     assume_ready_opt,
     format_command,
+    on_cmd_failure_opt,
     run_command,
 )
 from datalad.distribution.dataset import (
@@ -169,6 +170,7 @@ class Rerun(Interface):
             every one. Care should also be taken when using [CMD: --onto
             CMD][PY: `onto` PY] because checking out a new HEAD can easily fail
             when the working tree has modifications."""),
+        on_cmd_failure=on_cmd_failure_opt,
         jobs=jobs_opt
     )
 
@@ -208,6 +210,7 @@ class Rerun(Interface):
             report=False,
             assume_ready=None,
             explicit=False,
+            on_cmd_failure=None,
             jobs=None):
 
         ds = require_dataset(
@@ -272,7 +275,8 @@ class Rerun(Interface):
             handler = _report
         else:
             handler = partial(_rerun, assume_ready=assume_ready,
-                              explicit=explicit, jobs=jobs)
+                              explicit=explicit, on_cmd_failure=on_cmd_failure,
+                              jobs=jobs)
 
         for res in handler(ds, results):
             yield res
@@ -413,7 +417,8 @@ def _mark_nonrun_result(result, which):
     return result
 
 
-def _rerun(dset, results, assume_ready=None, explicit=False, jobs=None):
+def _rerun(dset, results, assume_ready=None, explicit=False,
+           on_cmd_failure=None, jobs=None):
     ds_repo = dset.repo
     # Keep a map from an original hexsha to a new hexsha created by the rerun
     # (i.e. a reran, cherry-picked, or merged commit).

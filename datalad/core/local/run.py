@@ -111,6 +111,26 @@ assume_ready_opt = Parameter(
     are unnecessary.""")
 
 
+on_cmd_failure_opt = Parameter(
+    args=("--on-cmd-failure",),
+    constraints=EnsureChoice(None, "error", "save", "all"),
+    doc="""Determine how a non-zero exit code of the command being run is
+    handled. By default (no option given), a command failure causes
+    ``datalad run`` to exit with an error and no changes are saved.
+    [CMD: --on-cmd-failure CMD][PY: on_cmd_failure PY] can be set to one of
+    the following values to alter this behavior:
+    ``error``: the command exit code is passed on as the exit code of
+    ``datalad run``, and no changes are saved (identical to the default
+    behavior, but with explicit signaling);
+    ``save``: changes are saved regardless of the command exit code, and
+    ``datalad run`` exits with 0 (no error is raised);
+    ``all``: combines both behaviors -- changes are saved and the command
+    exit code is passed on as the exit code of ``datalad run``.
+    Unlike the global ``--on-failure`` option, this setting only affects
+    the handling of the command's exit code, not other types of failures
+    (e.g., input retrieval or output preparation errors).""")
+
+
 @build_doc
 class Run(Interface):
     """Run an arbitrary shell command and record its impact on a dataset.
@@ -302,6 +322,7 @@ class Run(Interface):
             uninstalled dataset will be left unexpanded because no subdatasets
             will be installed for a dry run.""",
             constraints=EnsureChoice(None, "basic", "command")),
+        on_cmd_failure=on_cmd_failure_opt,
         jobs=jobs_opt
     )
     _params_['jobs']._doc += """\
@@ -324,6 +345,7 @@ class Run(Interface):
             message=None,
             sidecar=None,
             dry_run=None,
+            on_cmd_failure=None,
             jobs=None):
         for r in run_command(cmd, dataset=dataset,
                              inputs=inputs, outputs=outputs,
@@ -333,6 +355,7 @@ class Run(Interface):
                              message=message,
                              sidecar=sidecar,
                              dry_run=dry_run,
+                             on_cmd_failure=on_cmd_failure,
                              jobs=jobs):
             yield r
 
@@ -828,7 +851,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 parametric_record=False,
                 remove_outputs=False,
                 skip_dirtycheck=False,
-                yield_expanded=None):
+                yield_expanded=None,
+                on_cmd_failure=None):
     """Run `cmd` in `dataset` and record the results.
 
     `Run.__call__` is a simple wrapper over this function. Aside from backward
@@ -874,6 +898,15 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         Include a 'expanded_%s' item into the run result with the expanded list
         of paths matching the inputs and/or outputs specification,
         respectively.
+    on_cmd_failure : {'error', 'save', 'all'} or None, optional
+        Determines how a non-zero exit code of the executed command is handled.
+        ``None`` (default): command failure yields an error result and no
+        changes are saved (unless `on_failure` is set to ``ignore``).
+        ``error``: identical to the default but explicitly signals the command
+        exit code.
+        ``save``: save changes regardless of the command exit code, and yield
+        an ``ok`` result (no error is propagated).
+        ``all``: save changes and propagate the command exit code as an error.
 
 
     Yields
@@ -1193,8 +1226,16 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         outputs_to_save = None
         do_save = True
 
+    # Determine behavior for command failure based on on_cmd_failure
+    _save_on_cmd_failure = on_cmd_failure in ("save", "all")
+    _error_on_cmd_failure = on_cmd_failure in ("error", "all") or \
+        on_cmd_failure is None
+
+    expected_exit = rerun_info.get("exit", 0) if rerun_info else None
+    cmd_failed = bool(cmd_exitcode and expected_exit != cmd_exitcode)
+
     msg_path = None
-    if not rerun_info and cmd_exitcode:
+    if cmd_failed and not _save_on_cmd_failure and not rerun_info:
         if do_save:
             repo = ds.repo
             # must record path to be relative to ds.path to meet
@@ -1203,11 +1244,33 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 repo.dot_git.relative_to(repo.pathobj) / "COMMIT_EDITMSG"
             msg_path.write_text(msg)
 
-    expected_exit = rerun_info.get("exit", 0) if rerun_info else None
-    if cmd_exitcode and expected_exit != cmd_exitcode:
+    if cmd_failed and _error_on_cmd_failure:
         status = "error"
     else:
         status = "ok"
+
+    # When save-on-failure is requested, perform the save BEFORE yielding the
+    # run result so that it happens regardless of the caller's on_failure
+    # handling of the (potentially error-status) run result.
+    if cmd_failed and _save_on_cmd_failure and do_save:
+        with chpwd(pwd):
+            for r in Save.__call__(
+                    dataset=ds_path,
+                    path=outputs_to_save,
+                    recursive=True,
+                    message=msg,
+                    jobs=jobs,
+                    since=pre_cmd_hexsha if cmd_made_commits else None,
+                    _since_sub_info=_parse_sub_status(
+                        pre_cmd_sub_status, ds_path)
+                    if cmd_made_commits and pre_cmd_sub_status
+                    else None,
+                    _sub_message="Remaining changes after command execution",
+                    return_type='generator',
+                    result_renderer='disabled',
+                    on_failure='ignore'):
+                yield r
+        do_save = False
 
     run_result = get_status_dict(
         "run", ds=ds,
