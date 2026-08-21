@@ -1435,6 +1435,55 @@ def test_run_explicit_nested_run(path=None, scriptpath=None):
 
 
 @with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_explicit_nested_run_in_subdataset(path=None, scriptpath=None):
+    """A subdataset pointer move is judged by the subdataset's commits"""
+    ds = Dataset(path).create()
+    ds.create("sub")
+    assert_repo_status(ds.path)
+
+    def _cmd(inner):
+        # a command that produces a commit in the subdataset -- by a
+        # nested `run` or a plain one -- and records the new pointer
+        script = op.join(scriptpath, "cmd_%s.py" % inner)
+        with open(script, "w") as f:
+            f.write(
+                "import os, subprocess, sys\n"
+                "top = os.getcwd()\n"
+                "os.chdir('sub')\n"
+                + ("from datalad.api import run\n"
+                   "run(cmd=[sys.executable, '-c',"
+                   " \"open('inner_run', 'w').write('x')\"],\n"
+                   "    outputs=['inner_run'], explicit=True,\n"
+                   "    message='inner', result_renderer='disabled')\n"
+                   if inner == "run" else
+                   "open('inner_plain', 'w').write('x')\n"
+                   "subprocess.check_call(['git', 'add', 'inner_plain'])\n"
+                   "subprocess.check_call("
+                   "['git', 'commit', '-m', 'plain inner commit'])\n")
+                + "os.chdir(top)\n"
+                "subprocess.check_call(['git', 'add', 'sub'])\n"
+                "subprocess.check_call("
+                "['git', 'commit', '-m', 'record sub pointer'])\n"
+                "open('declared', 'w').write(%r)\n" % inner)
+        return ds.run([sys.executable, script], outputs=["declared"],
+                      explicit=True, message="outer",
+                      on_failure='ignore', result_renderer='disabled')
+
+    # the subdataset's new commit has a run record: the pointer move is
+    # recorded provenance, not an undeclared modification
+    assert_not_in_results(_cmd("run"), action='run', status='error')
+    assert_repo_status(ds.path)
+
+    # a plain commit in the subdataset is still reported
+    res = _cmd("plain")
+    assert_in_results(res, action='run', status='error')
+    ok_(any('not declared as --output' in str(r.get('message', ''))
+            for r in res))
+
+
+@with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
 def test_run_explicit_concurrent(path=None):
     """Concurrent `--explicit` runs record what they produced (gh-7899)"""
