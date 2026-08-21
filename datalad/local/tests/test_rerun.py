@@ -1096,3 +1096,33 @@ def test_rerun_merge_runs(path=None):
     assert_repo_status(ds.path)
     ok_((ds.pathobj / "normal_file").exists())
     ok_((ds.pathobj / "inner2").exists())
+
+
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_rerun_explicit_dirty_input(path=None):
+    """`rerun --explicit` must not use a modified input (gh-5312, gh-3565)"""
+    ds = Dataset(path).create(annex=False)
+    create_tree(ds.path, {"in.dat": "content"})
+    ds.save()
+    ds.run("{} in.dat > out.dat".format(cat_command),
+           inputs=["in.dat"], outputs=["out.dat"],
+           result_renderer='disabled')
+    assert_repo_status(ds.path)
+
+    # a rerun with a modified input would record a state that never was
+    (ds.pathobj / "in.dat").write_text("modified")
+    hexsha_before = ds.repo.get_hexsha()
+    res = ds.rerun(explicit=True, on_failure='ignore',
+                   result_renderer='disabled')
+    assert_in_results(res, action='run', status='impossible')
+    ok_(any('unsaved modifications' in str(r.get('message', ''))
+            for r in res))
+    eq_(hexsha_before, ds.repo.get_hexsha())
+
+    # the input state is what is asserted to be ready, not the command
+    assert_in_results(
+        ds.rerun(explicit=True, assume_ready="inputs",
+                 result_renderer='disabled'),
+        action='run', status='ok')
+    ok_file_has_content(str(ds.pathobj / "out.dat"), "modified", strip=True)

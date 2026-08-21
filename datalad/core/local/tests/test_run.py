@@ -1292,3 +1292,87 @@ def test_run_merge_subdataset_deletions(path=None):
 
     # super also has merge
     _assert_run_merge(ds)
+
+
+# -- Tests for the `--explicit` contract: inputs, outputs, nesting --
+
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_explicit_dirty_inputs(path=None):
+    """`--explicit` must not run with modified declared inputs (gh-5312)"""
+    ds = Dataset(path).create(annex=False)
+    create_tree(ds.path, {"in.dat": "content",
+                          "data": {"tracked.dat": "tracked"}})
+    ds.save()
+    write_cmd = "{} -c \"open('out.dat', 'w').write('x')\"".format(
+        sys.executable)
+
+    def _run(**kwargs):
+        return ds.run(write_cmd, outputs=["out.dat"], explicit=True,
+                      on_failure='ignore', result_renderer='disabled',
+                      **kwargs)
+
+    # a clean input is no problem
+    assert_in_results(_run(inputs=["in.dat"]), action='run', status='ok')
+
+    # ... but a modified one is
+    (ds.pathobj / "in.dat").write_text("modified")
+    hexsha_before = ds.repo.get_hexsha()
+    res = _run(inputs=["in.dat"])
+    assert_in_results(res, action='run', status='impossible')
+    ok_(any('unsaved modifications' in str(r.get('message', ''))
+            for r in res))
+    # the command was not executed and no output was prepared, the only
+    # modification is the one we made ourselves
+    eq_(hexsha_before, ds.repo.get_hexsha())
+    assert_repo_status(ds.path, modified=["in.dat"])
+
+    # an unrelated dirty file is still no problem -- that is what
+    # --explicit is for
+    assert_in_results(_run(inputs=["data/tracked.dat"]), action='run', status='ok')
+
+    # escape hatch 1: the caller knows what they are doing
+    assert_in_results(_run(inputs=["in.dat"], assume_ready="inputs"), action='run', status='ok')
+    assert_in_results(_run(inputs=["in.dat"], assume_ready="both"), action='run', status='ok')
+
+    # escape hatch 2: configuration
+    ds.config.set('datalad.run.dirty-inputs', 'ignore', scope='local')
+    assert_in_results(_run(inputs=["in.dat"]), action='run', status='ok')
+    ds.config.set('datalad.run.dirty-inputs', 'warning', scope='local')
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        assert_in_results(_run(inputs=["in.dat"]), action='run', status='ok')
+        assert_in('unsaved modifications', cml.out)
+    ds.config.unset('datalad.run.dirty-inputs', scope='local')
+
+    ds.save()
+    assert_repo_status(ds.path)
+
+    # untracked content that is a declared input itself is reported...
+    create_tree(ds.path, {"untracked.dat": "untracked",
+                          "data": {"untracked.dat": "untracked"}})
+    assert_in_results(_run(inputs=["untracked.dat"]),
+                      action='run', status='impossible')
+    # ...but untracked content that merely sits inside a declared
+    # directory is not
+    assert_in_results(_run(inputs=["data"]), action='run', status='ok')
+
+    # inputs declared from a subdirectory are reported relative to the
+    # dataset, and are found in the first place
+    create_tree(ds.path, {"data": {"in.dat": "content"}})
+    ds.save()
+    (ds.pathobj / "data" / "in.dat").write_text("modified")
+    with chpwd(op.join(ds.path, "data")):
+        res = run(write_cmd, outputs=["out.dat"], inputs=["in.dat"],
+                  explicit=True, on_failure='ignore',
+                  result_renderer='disabled')
+    assert_in_results(res, action='run', status='impossible')
+    ok_(any('data/in.dat' in str(r.get('message', '')) for r in res))
+    ds.save()
+
+    # without --explicit nothing changes: any dirty dataset is refused
+    # outright, as before
+    (ds.pathobj / "in.dat").write_text("modified once more")
+    assert_in_results(
+        ds.run(write_cmd, inputs=["in.dat"], outputs=["out.dat"],
+               on_failure='ignore', result_renderer='disabled'),
+        action='run', status='impossible')
