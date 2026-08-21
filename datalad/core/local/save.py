@@ -336,6 +336,9 @@ class Save(Interface):
                  since=None,
                  _since_sub_info=None,
                  _sub_message=None,
+                 # limit the commit to the given `path`s, even when nothing
+                 # was staged beforehand (see GitRepo.save())
+                 _partial_commit=False,
                  ):
         if message and message_file:
             raise ValueError(
@@ -555,7 +558,8 @@ class Save(Interface):
                         # detect anything else
                         untracked='no',
                         _status=pds_status,
-                        amend=amend):
+                        amend=amend,
+                        _partial_commit=_partial_commit):
                     for k in ('path', 'refds'):
                         if k in res:
                             res[k] = str(

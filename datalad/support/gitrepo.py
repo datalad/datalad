@@ -3442,6 +3442,12 @@ class GitRepo(CoreGitRepo):
             passed to Repo.status()
           - untracked : {'no', 'normal', 'all'} - passed to Repo.status()
           - amend : bool (passed to GitRepo.commit)
+          - _partial_commit : bool
+            If True, the commit is always limited to the paths reported by
+            the status, even when nothing was staged beforehand. Use this
+            when no content but the given paths may end up in the commit,
+            e.g. because a concurrent process could stage content in the
+            same repository.
         """
         return list(
             self.save_(
@@ -3456,6 +3462,7 @@ class GitRepo(CoreGitRepo):
         """Like `save()` but working as a generator."""
         from datalad.interface.results import get_status_dict
 
+        force_partial_commit = kwargs.pop('_partial_commit', False)
         status_state = _get_save_status_state(
             self._save_pre(paths, _status, **kwargs) or {}
         )
@@ -3475,7 +3482,11 @@ class GitRepo(CoreGitRepo):
         #   potential pre-staged bits)
 
         staged_paths = self.get_staged_paths()
-        need_partial_commit = bool(staged_paths)
+        # a partial commit is unavoidable when something was staged
+        # before this save. It can also be requested by a caller that
+        # must not commit anything but the paths it gave -- even if
+        # some concurrent process stages content in the meantime
+        need_partial_commit = bool(staged_paths) or force_partial_commit
         if need_partial_commit and hasattr(self, "call_annex"):
             # so we have some staged content. let's check which ones
             # are symlinks -- those could be annex key links that

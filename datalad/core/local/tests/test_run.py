@@ -534,9 +534,11 @@ def test_run_cmdline_disambiguation(path=None):
         with patch("datalad.core.local.run._execute_command") as exec_cmd:
             with assert_raises(SystemExit):
                 main(["datalad", "run", "--", "--message"])
-            exec_cmd.assert_called_once_with(
-                '"--message"' if on_windows else "--message",
-                path)
+            # ATTN: only the positional arguments are of interest here,
+            # `run` also passes an `env` for the command
+            eq_(exec_cmd.call_count, 1)
+            eq_(exec_cmd.call_args.args,
+                ('"--message"' if on_windows else "--message", path))
 
         # Our parser used to mishandle --version (gh-3067),
         # treating 'datalad run CMD --version' as 'datalad --version'.
@@ -546,9 +548,10 @@ def test_run_cmdline_disambiguation(path=None):
             with patch("datalad.core.local.run._execute_command") as exec_cmd:
                 with assert_raises(SystemExit):
                     main(["datalad", "run"] + sep + ["echo", "--version"])
-                exec_cmd.assert_called_once_with(
-                    '"echo" "--version"' if on_windows else "echo --version",
-                    path)
+                eq_(exec_cmd.call_count, 1)
+                eq_(exec_cmd.call_args.args,
+                    ('"echo" "--version"' if on_windows else "echo --version",
+                     path))
 
 
 @with_tempfile(mkdir=True)
@@ -1429,3 +1432,41 @@ def test_run_explicit_nested_run(path=None, scriptpath=None):
     assert_in_results(res, action='run', status='error')
     ok_(any('not declared as --output' in str(r.get('message', ''))
             for r in res))
+
+
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_explicit_concurrent(path=None):
+    """Concurrent `--explicit` runs record what they produced (gh-7899)"""
+    import subprocess
+    ds = Dataset(path).create()
+    nruns = 3
+    procs = [
+        subprocess.Popen(
+            [sys.executable, "-c",
+             "from datalad.api import run\n"
+             "run(cmd=[%r, '-c', \"open('o%d', 'w').write('x')\"],\n"
+             "    dataset=%r, outputs=['o%d'], explicit=True,\n"
+             "    message='cell %d', result_renderer='disabled')\n"
+             % (sys.executable, i, ds.path, i, i)],
+            # ATTN: paths are resolved against the CWD when the dataset is
+            # given as a path (gh-3435)
+            cwd=ds.path, stderr=subprocess.PIPE)
+        for i in range(nruns)
+    ]
+    errs = [p.communicate()[1].decode() for p in procs]
+    eq_([p.returncode for p in procs], [0] * nruns,
+        msg="concurrent runs failed:\n%s" % "\n".join(errs))
+
+    assert_repo_status(ds.path)
+    # no record went missing...
+    revs = ds.repo.get_revisions(options=["--grep", "DATALAD RUNCMD"])
+    eq_(len(revs), nruns)
+    # ...and none of them claims an output it did not produce
+    for rev in revs:
+        info = get_run_info(ds, ds.repo.format_commit("%B", rev))[1]
+        committed = [
+            str(p.relative_to(ds.pathobj))
+            for p in ds.repo.diff(rev + "^", rev)
+        ]
+        eq_(sorted(committed), sorted(info["outputs"]))
