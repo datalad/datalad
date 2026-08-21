@@ -140,11 +140,11 @@ def _is_run_commit_message(message):
 
 
 def _iter_commits(repo, base, head):
-    """Yield ``(hexsha, message)`` for the ``base..head`` first-parent chain
+    """Yield ``(hexsha, parents, message)`` for a ``base..head`` chain
 
-    Following the first-parent chain is what makes a "run merge" commit
-    (cf. ``datalad save --since``) represent everything it wraps: its
-    subsumed commits live on the second parent.
+    The first-parent chain is followed, which is what makes a "run merge"
+    commit (cf. ``datalad save --since``) represent everything it wraps:
+    its subsumed commits live on the second parent.
 
     Parameters
     ----------
@@ -156,14 +156,15 @@ def _iter_commits(repo, base, head):
     # byte cannot occur in a commit message, so it can delimit both the
     # fields and the records without any escaping
     out = repo.call_git(
-        ['log', '--first-parent', '--format=%H%x00%B%x00',
+        ['log', '--first-parent', '--format=%H%x00%P%x00%B%x00',
          '{}..{}'.format(base, head)])
     # ..., git terminates each record with a newline of its own
     fields = out.split('\0')
-    for hexsha, message in zip(fields[::2], fields[1::2]):
+    for hexsha, parents, message in zip(fields[::3], fields[1::3],
+                                        fields[2::3]):
         hexsha = hexsha.strip('\n')
         if hexsha:
-            yield hexsha, message
+            yield hexsha, parents.split(), message
 
 
 def _unrecorded_commit_paths(repo, base, head):
@@ -186,10 +187,12 @@ def _unrecorded_commit_paths(repo, base, head):
       Absolute paths of the modified content.
     """
     unrecorded = set()
-    for hexsha, message in _iter_commits(repo, base, head):
+    for hexsha, parents, message in _iter_commits(repo, base, head):
         if _is_run_commit_message(message):
             continue
-        unrecorded.update(repo.diff('{}^'.format(hexsha), hexsha))
+        # a commit without a parent introduced everything it contains
+        unrecorded.update(
+            repo.diff(parents[0] if parents else None, hexsha))
     return unrecorded
 
 
@@ -214,7 +217,7 @@ def _has_own_commits(repo, base, head, token):
     token : str
       Ancestry token of the `run` asking.
     """
-    for _, message in _iter_commits(repo, base, head):
+    for _, _, message in _iter_commits(repo, base, head):
         if not _is_run_commit_message(message) \
                 or token in _get_commit_ancestry(message):
             return True
@@ -223,7 +226,7 @@ def _has_own_commits(repo, base, head, token):
 
 def _is_run_recorded_range(repo, base, head):
     """Return whether ``base..head`` is non-empty and all `run` commits"""
-    messages = [m for _, m in _iter_commits(repo, base, head)]
+    messages = [m for _, _, m in _iter_commits(repo, base, head)]
     return bool(messages) and all(map(_is_run_commit_message, messages))
 
 
