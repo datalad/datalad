@@ -1376,3 +1376,56 @@ def test_run_explicit_dirty_inputs(path=None):
         ds.run(write_cmd, inputs=["in.dat"], outputs=["out.dat"],
                on_failure='ignore', result_renderer='disabled'),
         action='run', status='impossible')
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_explicit_nested_run(path=None, scriptpath=None):
+    """Commits of a nested `run` are no undeclared side-effect (gh-7900)"""
+    ds = Dataset(path).create()
+    sweep = op.join(scriptpath, "sweep.py")
+    with open(sweep, "w") as f:
+        f.write(
+            "import sys\n"
+            "from datalad.api import run\n"
+            "for i in ('1', '2'):\n"
+            "    run(cmd=[sys.executable, '-c',\n"
+            "             \"open('o' + %r, 'w').write('x')\" % i],\n"
+            "        outputs=['o' + i], explicit=True,\n"
+            "        message='cell ' + i, result_renderer='disabled')\n"
+            "open('summary.txt', 'w').write('done')\n")
+
+    # the outer run declares nothing but its own output
+    res = ds.run([sys.executable, sweep],
+                 outputs=["summary.txt"], explicit=True,
+                 message="sweep",
+                 on_failure='ignore', result_renderer='disabled')
+    assert_not_in_results(res, action='run', status='error')
+    assert_repo_status(ds.path)
+    for f in ("o1", "o2", "summary.txt"):
+        ok_((ds.pathobj / f).exists())
+
+    # every command has a record of its own, the outer one declaring
+    # only what it produced itself
+    records = [
+        get_run_info(ds, ds.repo.format_commit("%B", rev))[1]
+        for rev in ds.repo.get_revisions(options=["--grep", "DATALAD RUNCMD"])
+    ]
+    eq_(len(records), 3)
+    eq_(sorted(r["outputs"][0] for r in records),
+        ["o1", "o2", "summary.txt"])
+    # the outer record wraps the inner commits in a merge
+    _assert_run_merge(ds)
+
+    # a plain commit of an undeclared file is still reported, its
+    # provenance is *not* recorded anywhere
+    res = ds.run(
+        '{} -c "open(\'undeclared\', \'w\').write(\'x\')" '
+        '&& git add undeclared && git commit -m "inner"'.format(
+            sys.executable),
+        outputs=["declared"], explicit=True,
+        on_failure='ignore', result_renderer='disabled')
+    assert_in_results(res, action='run', status='error')
+    ok_(any('not declared as --output' in str(r.get('message', ''))
+            for r in res))
