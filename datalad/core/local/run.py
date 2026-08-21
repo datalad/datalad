@@ -114,6 +114,9 @@ RUN_RECORD_MARKER = '=== Do not change lines below ==='
 RUN_ANCESTRY_ENVVAR = 'DATALAD_RUN_ANCESTRY'
 # commit message trailer reporting that chain for a nested `run`
 RUN_ANCESTRY_TRAILER = 'DataLad-Run-Ancestry:'
+# commit message git-annex uses for the commits it makes to maintain an
+# adjusted branch (cf. AnnexRepo._save_post(), which matches it likewise)
+ANNEX_ADJUSTMENT_MESSAGE = 'git-annex adjusted branch'
 
 
 def _get_run_ancestry():
@@ -137,6 +140,11 @@ def _is_run_commit_message(message):
     """Return whether a commit message carries a `run` record"""
     return message.startswith(RUN_COMMIT_MARKER) \
         and RUN_RECORD_MARKER in message
+
+
+def _is_annex_adjustment_commit(message):
+    """Return whether a commit is git-annex's own branch adjustment"""
+    return message.strip() == ANNEX_ADJUSTMENT_MESSAGE
 
 
 def _iter_commits(repo, base, head):
@@ -167,6 +175,27 @@ def _iter_commits(repo, base, head):
             yield hexsha, parents.split(), message
 
 
+def _iter_command_commits(repo, base, head):
+    """Like ``_iter_commits()``, but skipping git-annex's own commits
+
+    On an adjusted branch git-annex maintains the branch with commits of
+    its own. Those re-render content that is committed elsewhere in the
+    chain and are the doing of no command, so they neither need a `run`
+    record nor make one.
+
+    Parameters
+    ----------
+    repo : GitRepo
+    base, head : str
+      Any commit-ish that delimits the range to report on.
+    """
+    for hexsha, parents, message in _iter_commits(repo, base, head):
+        if _is_annex_adjustment_commit(message):
+            lgr.debug('Skipping git-annex adjustment commit %s', hexsha)
+            continue
+        yield hexsha, parents, message
+
+
 def _unrecorded_commit_paths(repo, base, head):
     """Report paths committed in ``base..head`` without a `run` record
 
@@ -187,7 +216,7 @@ def _unrecorded_commit_paths(repo, base, head):
       Absolute paths of the modified content.
     """
     unrecorded = set()
-    for hexsha, parents, message in _iter_commits(repo, base, head):
+    for hexsha, parents, message in _iter_command_commits(repo, base, head):
         if _is_run_commit_message(message):
             continue
         # a commit without a parent introduced everything it contains
@@ -217,7 +246,7 @@ def _has_own_commits(repo, base, head, token):
     token : str
       Ancestry token of the `run` asking.
     """
-    for _, _, message in _iter_commits(repo, base, head):
+    for _, _, message in _iter_command_commits(repo, base, head):
         if not _is_run_commit_message(message) \
                 or token in _get_commit_ancestry(message):
             return True
@@ -225,9 +254,11 @@ def _has_own_commits(repo, base, head, token):
 
 
 def _is_run_recorded_range(repo, base, head):
-    """Return whether ``base..head`` is non-empty and all `run` commits"""
-    messages = [m for _, _, m in _iter_commits(repo, base, head)]
-    return bool(messages) and all(map(_is_run_commit_message, messages))
+    """Return whether ``base..head`` is non-empty and fully `run`-recorded"""
+    if not any(True for _ in _iter_commits(repo, base, head)):
+        return False
+    return all(_is_run_commit_message(m)
+               for _, _, m in _iter_command_commits(repo, base, head))
 
 
 def _is_run_recorded_subds(path, props):

@@ -67,6 +67,7 @@ from datalad.tests.utils_pytest import (
     ok_exists,
     ok_file_has_content,
     patch_config,
+    skip_if_adjusted_branch,
     slow,
     swallow_logs,
     swallow_outputs,
@@ -1381,12 +1382,8 @@ def test_run_explicit_dirty_inputs(path=None):
         action='run', status='impossible')
 
 
-@with_tempfile(mkdir=True)
-@with_tempfile(mkdir=True)
-@pytest.mark.ai_generated
-def test_run_explicit_nested_run(path=None, scriptpath=None):
-    """Commits of a nested `run` are no undeclared side-effect (gh-7900)"""
-    ds = Dataset(path).create()
+def _write_sweep_script(scriptpath):
+    """Write a script performing two `run`s of its own, plus a summary"""
     sweep = op.join(scriptpath, "sweep.py")
     with open(sweep, "w") as f:
         f.write(
@@ -1398,6 +1395,16 @@ def test_run_explicit_nested_run(path=None, scriptpath=None):
             "        outputs=['o' + i], explicit=True,\n"
             "        message='cell ' + i, result_renderer='disabled')\n"
             "open('summary.txt', 'w').write('done')\n")
+    return sweep
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_explicit_nested_run(path=None, scriptpath=None):
+    """Commits of a nested `run` are no undeclared side-effect (gh-7900)"""
+    ds = Dataset(path).create()
+    sweep = _write_sweep_script(scriptpath)
 
     # the outer run declares nothing but its own output
     res = ds.run([sys.executable, sweep],
@@ -1432,6 +1439,30 @@ def test_run_explicit_nested_run(path=None, scriptpath=None):
     assert_in_results(res, action='run', status='error')
     ok_(any('not declared as --output' in str(r.get('message', ''))
             for r in res))
+
+
+@skip_if_adjusted_branch  # a plain branch is adjusted below
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_explicit_nested_run_adjusted(path=None, scriptpath=None):
+    """git-annex's own commits are no undeclared output either
+
+    On an adjusted branch git-annex maintains the branch with commits of
+    its own, which carry no `run` record and re-render the content of the
+    commits they follow.
+    """
+    ds = Dataset(path).create()
+    ds.repo.call_annex(["adjust", "--unlock"])
+    ok_(ds.repo.is_managed_branch())
+
+    res = ds.run([sys.executable, _write_sweep_script(scriptpath)],
+                 outputs=["summary.txt"], explicit=True, message="sweep",
+                 on_failure='ignore', result_renderer='disabled')
+    assert_not_in_results(res, action='run', status='error')
+    assert_repo_status(ds.path)
+    for f in ("o1", "o2", "summary.txt"):
+        ok_((ds.pathobj / f).exists())
 
 
 @with_tempfile(mkdir=True)
