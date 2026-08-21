@@ -21,7 +21,7 @@ implementation did not keep that promise are addressed here.
    ([gh-7900](https://github.com/datalad/datalad/issues/7900)).  An outer
    run whose command performs inner runs failed with *"command created
    commits that include files not declared as --output"* unless the outer
-   run re-declared every output of every inner run — which for a sweep
+   run redeclared every output of every inner run — which for a sweep
    with a runtime-determined cell list is not knowable when the outer
    command line is constructed.
 
