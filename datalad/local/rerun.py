@@ -187,6 +187,12 @@ class Rerun(Interface):
             doc="""Consider the specification of inputs and outputs in the run
             record to be explicit. Don't warn if the repository is dirty, and
             only save modifications to the outputs from the original record.
+            A recorded input with unsaved modifications is refused, because
+            the command would not be re-executed on the state the new record
+            describes: save it, use [CMD: --assume-ready=inputs CMD][PY:
+            `assume_ready='inputs'` PY], or set the configuration variable
+            'datalad.run.dirty-inputs' to 'warning' or 'ignore' to proceed
+            regardless.
             Note that when several run commits are specified, this applies to
             every one. Care should also be taken when using [CMD: --onto
             CMD][PY: `onto` PY] because checking out a new HEAD can easily fail

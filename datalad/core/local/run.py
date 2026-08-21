@@ -66,6 +66,7 @@ from datalad.utils import (
     get_dataset_root,
     getpwd,
     join_cmdline,
+    path_is_subpath,
     quote_cmdlinearg,
 )
 
@@ -100,6 +101,56 @@ def _parse_sub_status(sub_status_output, ds_path):
             sha, relpath = parts[0], parts[1]
             result[op.join(ds_path, relpath)] = sha
     return result
+
+
+def _get_dirty_inputs(ds, globbed_inputs, pwd):
+    """Report declared inputs that have unsaved modifications
+
+    Untracked content is only reported when it is a declared input
+    itself, and not when it merely happens to be inside a declared
+    directory.
+
+    Parameters
+    ----------
+    ds : Dataset
+    globbed_inputs : GlobbedPaths
+    pwd : str
+      Absolute path the input specification is relative to.
+
+    Returns
+    -------
+    list of (str, str)
+      Sorted ``(path relative to the dataset, state)`` tuples.
+    """
+    abspaths = [
+        p for p in (op.normpath(op.join(pwd, ip))
+                    for ip in globbed_inputs.expand_strict())
+        # an input that is not in this dataset is not ours to judge, it is
+        # reported by the input preparation instead
+        if p == ds.path or path_is_subpath(p, ds.path)
+    ]
+    if not abspaths:
+        return []
+    declared = {op.relpath(p, ds.path) for p in abspaths}
+    dirty = []
+    for p, props in ds.repo.status(
+            paths=abspaths,
+            untracked='normal',
+            # a comprehensive evaluation of a subdataset worktree could
+            # be arbitrarily expensive, the recorded commit is what a
+            # `rerun` would restore
+            eval_submodule_state='commit').items():
+        state = props.get('state')
+        if state in (None, 'clean'):
+            continue
+        # ATTN: relpath() rather than Path.relative_to(), the status
+        # report is anchored at the repo, which need not be the same
+        # path as the dataset (symlinks)
+        relpath = op.relpath(str(p), ds.repo.pathobj)
+        if state == 'untracked' and relpath not in declared:
+            continue
+        dirty.append((relpath, state))
+    return sorted(dirty)
 
 
 assume_ready_opt = Parameter(
@@ -290,7 +341,12 @@ class Run(Interface):
             action="store_true",
             doc="""Consider the specification of inputs and outputs to be
             explicit. Don't warn if the repository is dirty, and only save
-            modifications to the listed outputs."""),
+            modifications to the listed outputs. A declared input with
+            unsaved modifications is refused, because the run record could
+            not describe the state the command was given: save it, use
+            [CMD: --assume-ready=inputs CMD][PY: `assume_ready='inputs'` PY],
+            or set the configuration variable 'datalad.run.dirty-inputs' to
+            'warning' or 'ignore' to proceed regardless."""),
         message=save_message_opt,
         sidecar=Parameter(
             args=('--sidecar',),
@@ -972,6 +1028,31 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 'input/output specification has an unrecognized '
                 'placeholder: %s', exc))
         return
+
+    # Under --explicit a dirty dataset is acceptable, but a declared
+    # *input* with unsaved modifications is not: the run record would
+    # name an input state that is nowhere recorded, and a `rerun` would
+    # use the committed one instead (gh-5312, gh-3565). Checked before
+    # any worktree preparation, so that a rejected run leaves no trace.
+    if explicit and not (inject or dry_run or skip_dirtycheck) \
+            and assume_ready not in ('inputs', 'both'):
+        dirty_inputs = _get_dirty_inputs(ds, globbed['inputs'], pwd)
+        on_dirty_inputs = ds.config.get(
+            'datalad.run.dirty-inputs', default='error') \
+            if dirty_inputs else 'ignore'
+        if on_dirty_inputs in ('error', 'warning'):
+            dirty_inputs_msg = (
+                'declared inputs have unsaved modifications: %s. '
+                'Save them, run with --assume-ready=inputs, or set config '
+                'datalad.run.dirty-inputs=ignore to proceed anyway',
+                ['{} [{}]'.format(ipath, istate)
+                 for ipath, istate in dirty_inputs])
+            if on_dirty_inputs == 'error':
+                yield get_status_dict(
+                    'run', ds=ds, status='impossible',
+                    message=dirty_inputs_msg)
+                return
+            lgr.warning(dirty_inputs_msg[0], dirty_inputs_msg[1])
 
     if not (inject or dry_run):
         yield from _prep_worktree(
