@@ -67,6 +67,14 @@ the commits it subsumes live on its second parent.  A subdataset pointer
 move is resolved one level deeper — it is accounted for when the
 subdataset's own new commits all carry run records.
 
+On an adjusted branch git-annex maintains the branch with commits of its
+own (`git-annex adjusted branch`), which sit on the first-parent chain,
+carry no run record, and re-render the content of the commits they
+follow — under `--unlock`, every file of a `run` shows up in such a
+commit's diff.  They are the doing of no command and are skipped
+throughout.  `AnnexRepo._save_post()` identifies them by the same
+message.
+
 ### Concurrency
 
 Three independent measures, in the order in which they take effect:
@@ -152,5 +160,6 @@ Three independent measures, in the order in which they take effect:
 | `test_run_explicit_dirty_inputs` | Modified/untracked inputs, both escape hatches, no false positives |
 | `test_rerun_explicit_dirty_input` | The gh-5312 reproducer, for `rerun` |
 | `test_run_explicit_nested_run` | Nested runs succeed; a plain commit of an undeclared file still fails |
+| `test_run_explicit_nested_run_adjusted` | The same on an adjusted branch, where git-annex commits of its own |
 | `test_run_explicit_concurrent` | Every concurrent run has a record, and none claims another's output |
 | `test_run_explicit_dirty_committed` | Unchanged: undeclared content from a plain commit is still refused |
