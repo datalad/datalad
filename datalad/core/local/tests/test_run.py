@@ -1589,10 +1589,21 @@ def test_run_explicit_concurrent_subdataset(path=None):
         errs = [p.communicate()[1].decode() for p in procs]
         eq_([p.returncode for p in procs], [0, 0],
             msg="concurrent super/sub runs failed:\n%s" % "\n".join(errs))
-        # neither run left its declared output behind uncommitted
-        ok_((sub.pathobj / ("a%d" % trial)).exists())
-        ok_((sub.pathobj / ("b%d" % trial)).exists())
-        eq_(sub.repo.call_git(["status", "--porcelain"]).strip(), "")
+        # neither run left its declared output behind: both were produced,
+        # both are tracked (the losing run of the race used to leave its
+        # own output untracked and unrecorded), and both are recorded.
+        # ATTN: `git status` is not the check to make here -- on an
+        # adjusted branch git-annex maintains an index state of its own
+        outputs = ["a%d" % trial, "b%d" % trial]
+        for f in outputs:
+            ok_((sub.pathobj / f).exists())
+        eq_(sorted(sub.repo.call_git(["ls-files", "--"] + outputs).split()),
+            outputs)
+        for message in ("super %d" % trial, "sub %d" % trial):
+            ok_(any("[DATALAD RUNCMD] " + message == subject
+                    for subject in sub.repo.call_git(
+                        ["log", "--format=%s"]).splitlines()),
+                msg="no run record for %r in %s" % (message, sub.path))
 
 
 @with_tempfile(mkdir=True)
