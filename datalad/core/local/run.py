@@ -399,7 +399,14 @@ def _lock_save(ds):
             InterProcessLock(str(lock_path)),
             purpose='save results of `run` in %s' % ds.path,
             timeouts=(5, 60, 600, 1800),
-            proceed_unlocked=True):
+            proceed_unlocked=True) as locked:
+        if not locked:
+            # proceeding unlocked is exactly the mode this lock exists to
+            # remove, so say so at a level that matches the consequence
+            lgr.warning(
+                'Saving the results of `run` in %s without a lock on %s. '
+                'A `run` saving concurrently could commit them under its '
+                'own record (gh-7899).', ds.path, lock_path)
         yield
 
 

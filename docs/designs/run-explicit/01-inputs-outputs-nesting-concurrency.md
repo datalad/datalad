@@ -144,6 +144,15 @@ Three independent measures, in the order in which they take effect:
   ignores what is staged for them — a change of semantics that a general
   `save` should not silently adopt.
 
+- **The lock spans the hierarchy, not the dataset.**  Two runs in
+  unrelated subdatasets of one superdataset serialize their saving phases
+  even though neither writes the other's index.  That is the price of
+  covering the recursive save with a single lock; the phase is short, but
+  it is worth knowing for a wide hierarchy driven by many parallel runs.
+  When the lock cannot be acquired at all (after ~41 minutes of
+  contention) saving proceeds unlocked, with a warning, rather than
+  discarding the results of a command that has already run.
+
 - **A run interleaved with a concurrent one records no merge.**  Its own
   inner commits then stay on the linear history with the records they
   carry, and the run's own record commit holds only what was left in the
