@@ -59,6 +59,7 @@ from datalad.support.exceptions import (
     CommandError,
 )
 from datalad.support.globbedpaths import GlobbedPaths
+from datalad.support.locking import try_lock_informatively
 from datalad.support.json_py import dump2stream
 from datalad.support.param import Parameter
 from datalad.ui import ui
@@ -225,8 +226,8 @@ def _unrecorded_commit_paths(repo, base, head):
     return unrecorded
 
 
-def _has_own_commits(repo, base, head, token):
-    """Return whether any commit in ``base..head`` came from this `run`
+def _classify_commits(repo, base, head, token):
+    """Report who made the commits in ``base..head``
 
     Commits appearing in a dataset while a command is executed need not be
     the command's doing: a concurrent `run` may have committed its own
@@ -236,7 +237,8 @@ def _has_own_commits(repo, base, head, token):
     A commit is attributed to this `run` when it reports this run's
     `token` among its ancestry (i.e. it was made by a nested `run` that
     this command started), or when it carries no `run` record at all --
-    then it is a plain commit of the command itself.
+    then it is a plain commit of the command itself. A commit with a `run`
+    record that does not name this run was made by a concurrent one.
 
     Parameters
     ----------
@@ -245,12 +247,21 @@ def _has_own_commits(repo, base, head, token):
       Any commit-ish that delimits the range to report on.
     token : str
       Ancestry token of the `run` asking.
+
+    Returns
+    -------
+    (bool, bool)
+      Whether the range contains a commit of this `run`, and whether it
+      contains a commit of a concurrent one.
     """
+    own = concurrent = False
     for _, _, message in _iter_command_commits(repo, base, head):
         if not _is_run_commit_message(message) \
                 or token in _get_commit_ancestry(message):
-            return True
-    return False
+            own = True
+        else:
+            concurrent = True
+    return own, concurrent
 
 
 def _is_run_recorded_range(repo, base, head):
@@ -335,9 +346,23 @@ def _get_dirty_inputs(ds, globbed_inputs, pwd):
     return sorted(dirty)
 
 
+def _save_lock_path(ds):
+    """Return the lock file that guards saving in `ds`'s hierarchy
+
+    Parameters
+    ----------
+    ds : Dataset
+    """
+    # topmost=True reports `ds` itself when it has no superdataset, and
+    # registered_only=True (the default) keeps an unrelated Git repository
+    # that merely contains the dataset out of it
+    lock_ds = ds.get_superdataset(topmost=True) or ds
+    return lock_ds.repo.dot_git / 'datalad' / 'run-save.lck'
+
+
 @contextmanager
 def _lock_save(ds):
-    """Serialize the result-saving phase of `run` within a dataset
+    """Serialize the result-saving phase of `run` within a dataset hierarchy
 
     Concurrent `run` invocations in a dataset share its Git index. Without
     serialization one process can commit what another one just staged --
@@ -346,11 +371,16 @@ def _lock_save(ds):
     `index.lock` (gh-7899). Only the (short) saving phase is serialized,
     command execution itself remains parallel.
 
+    The lock is taken on the topmost superdataset, not on `ds`: saving is
+    recursive, so a `run` in a superdataset writes the index of every
+    subdataset underneath it, and a `run` in one of those subdatasets
+    would otherwise guard the very same index with a different lock.
+
     Parameters
     ----------
     ds : Dataset
     """
-    lock_path = ds.repo.dot_git / 'datalad' / 'run-save.lck'
+    lock_path = _save_lock_path(ds)
     try:
         lock_path.parent.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
@@ -361,15 +391,16 @@ def _lock_save(ds):
                   lock_path.parent, CapturedException(exc))
         yield
         return
-    lock = InterProcessLock(str(lock_path))
-    if not lock.acquire(blocking=False):
-        lgr.info('Waiting for a concurrent `run` to save its results in %s',
-                 ds.path)
-        lock.acquire()
-    try:
+    # generous timeouts: the command already ran, so giving up on the lock
+    # would mean discarding its results. Wait (with a report on who holds
+    # the lock) far longer than any plausible queue of saves, and only
+    # then proceed unlocked rather than fail
+    with try_lock_informatively(
+            InterProcessLock(str(lock_path)),
+            purpose='save results of `run` in %s' % ds.path,
+            timeouts=(5, 60, 600, 1800),
+            proceed_unlocked=True):
         yield
-    finally:
-        lock.release()
 
 
 assume_ready_opt = Parameter(
@@ -1397,7 +1428,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         if pre_cmd_hexsha is not None else None)
 
     # identity of this `run`, for any `run` that its command may start
-    # to report back in its commit (see _has_own_commits())
+    # to report back in its commit (see _classify_commits())
     run_token = uuid4().hex
     run_ancestry = _get_run_ancestry()
 
@@ -1414,16 +1445,18 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     # which routes through diff_dataset for merge creation.  Without
     # inner commits, since=None uses the standard Status-based save.
     post_cmd_hexsha = ds.repo.get_hexsha() if not inject else None
-    cmd_made_commits = (
+    head_moved = (
         pre_cmd_hexsha is not None
         and post_cmd_hexsha is not None
         and pre_cmd_hexsha != post_cmd_hexsha
-        # not everything that got committed while the command was running
-        # is the command's doing -- a concurrent `run` must not end up
-        # inside this run's merge commit (gh-7899)
-        and _has_own_commits(
-            ds.repo, pre_cmd_hexsha, post_cmd_hexsha, run_token)
     )
+    # not everything that got committed while the command was running is
+    # the command's doing -- a concurrent `run` must not end up inside
+    # this run's merge commit (gh-7899)
+    own_commits, concurrent_commits = _classify_commits(
+        ds.repo, pre_cmd_hexsha, post_cmd_hexsha, run_token) \
+        if head_moved else (False, False)
+    cmd_made_commits = own_commits
 
     # Also detect subdataset-only commits by comparing the single-string
     # submodule status snapshot (one git call, not N Dataset objects).
@@ -1432,6 +1465,20 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
             ["submodule", "status", "--recursive"])
         if pre_cmd_sub_status != post_sub_status:
             cmd_made_commits = True
+
+    # A merge can only ever have one range of commits as its second
+    # parent. Once a concurrent run's commits are interleaved with this
+    # command's own, no such range covers only this command, so a merge
+    # would necessarily claim the other run's work -- and a `rerun` of
+    # this record would re-execute it. Record the results without a merge
+    # instead: the interleaved commits keep the records they came with.
+    wrap_commits_in_merge = cmd_made_commits and not concurrent_commits
+    if cmd_made_commits and concurrent_commits:
+        lgr.info(
+            'Commits of a concurrent `run` are interleaved with those of '
+            'this command in %s. Recording the results without a merge '
+            'commit, so that no record claims the other run\'s commits.',
+            ds.path)
 
     # Re-glob to capture any new outputs.
     #
@@ -1477,7 +1524,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     # Safety: if the command switched branches, creating a merge commit
     # would be wrong — it would link two unrelated lines of history.
     # Save the run record for manual recovery and error out.
-    if cmd_made_commits and pre_cmd_branch is not None:
+    if head_moved and pre_cmd_branch is not None:
         post_cmd_branch = ds.repo.get_active_branch()
         if post_cmd_branch != pre_cmd_branch:
             repo = ds.repo
@@ -1634,14 +1681,14 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                     # Only use since= when the command created commits
                     # (in the top-level or any subdataset).  Without
                     # inner commits, use since=None (standard Status path).
-                    since=pre_cmd_hexsha if cmd_made_commits else None,
+                    since=pre_cmd_hexsha if wrap_commits_in_merge else None,
                     # Pass pre-command sub HEADs so Save can detect
                     # subdataset commits on adjusted branches where
                     # diff_dataset can't see them.  Parse from the
                     # lightweight submodule status snapshot.
                     _since_sub_info=_parse_sub_status(
                         pre_cmd_sub_status, ds_path)
-                    if cmd_made_commits and pre_cmd_sub_status
+                    if wrap_commits_in_merge and pre_cmd_sub_status
                     else None,
                     # Message for the auxiliary commit that wraps
                     # uncommitted changes before the run-merge.  Keeps

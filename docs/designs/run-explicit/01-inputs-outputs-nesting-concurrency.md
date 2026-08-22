@@ -79,7 +79,7 @@ message.
 
 Three independent measures, in the order in which they take effect:
 
-- **Only own commits are wrapped in a merge.**  `run` decides that its
+- **A merge never wraps another run's commits.**  `run` decides that its
   command created commits by comparing HEAD before and after execution.
   A concurrent run committing in that window is indistinguishable from a
   nested one by inspection alone, so a `run` passes its identity to its
@@ -88,8 +88,15 @@ Three independent measures, in the order in which they take effect:
   `DataLad-Run-Ancestry:` commit message trailer.  A commit is attributed
   to this run when it names this run in that trailer, or when it carries
   no run record at all (then it is a plain commit of the command itself).
-  Without this, a concurrent run's record would end up on the second
-  parent of an unrelated run's merge commit.
+
+  A merge has a single second parent, so when a concurrent run's commits
+  are interleaved with this command's own, *no* range covers only this
+  command — narrowing the range cannot help.  The results are then
+  recorded without a merge: the interleaved commits keep the records they
+  came with, and no record claims another run's work.  Without this, a
+  concurrent run's commits end up on the second parent of an unrelated
+  run's merge, and a `rerun` of that record re-executes the other run's
+  commands and re-materialises its files.
 
 - **The commit is limited to the declared outputs.**  `save` commits with
   a pathspec whenever content is already staged; with `_partial_commit`
@@ -102,6 +109,16 @@ Three independent measures, in the order in which they take effect:
   committing — atomic with respect to another `run`, and it is what
   removes the `index.lock` failures.  Command execution stays parallel:
   the lock is taken after the command has run.
+
+  The lock lives in the *topmost* superdataset, not in the dataset the
+  `run` was invoked in.  Saving is recursive, so a `run` in a
+  superdataset writes the index of every subdataset underneath it; a lock
+  per invoked dataset would leave a superdataset run and a subdataset run
+  writing one index while each holds a lock of its own.  It is acquired
+  through `try_lock_informatively()`, which reports which process holds
+  it rather than stalling silently.  The timeouts are generous and end in
+  `proceed_unlocked`: the command has already run at that point, so
+  giving up on the lock would mean discarding its results.
 
 ## Non-goals / limitations
 
@@ -126,6 +143,15 @@ Three independent measures, in the order in which they take effect:
   a pathspec commit takes the worktree state of the given paths and
   ignores what is staged for them — a change of semantics that a general
   `save` should not silently adopt.
+
+- **A run interleaved with a concurrent one records no merge.**  Its own
+  inner commits then stay on the linear history with the records they
+  carry, and the run's own record commit holds only what was left in the
+  worktree.  `rerun` over such a range re-executes the inner records and
+  the outer one separately, as it did before merge-wrapping existed.
+  That is the price of not claiming another run's commits; a sweep that
+  wants one merge per sweep should not share its dataset with a
+  concurrent outer run.
 
 - **Nothing to commit is not an error.**  An `--explicit` run whose
   command changed nothing still produces no record, and reports
@@ -162,4 +188,6 @@ Three independent measures, in the order in which they take effect:
 | `test_run_explicit_nested_run` | Nested runs succeed; a plain commit of an undeclared file still fails |
 | `test_run_explicit_nested_run_adjusted` | The same on an adjusted branch, where git-annex commits of its own |
 | `test_run_explicit_concurrent` | Every concurrent run has a record, and none claims another's output |
+| `test_run_explicit_concurrent_subdataset` | One lock governs the hierarchy: a super run and a sub run do not race |
+| `test_run_explicit_no_merge_of_concurrent_commits` | No merge is made when another run's commits are interleaved |
 | `test_run_explicit_dirty_committed` | Unchanged: undeclared content from a plain commit is still refused |
