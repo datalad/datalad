@@ -1235,16 +1235,9 @@ def test_run_merge_three_levels(path=None):
     ok_((leaf.pathobj / "foo").exists())
 
 
-# On adjusted branches `git annex sync` propagates a submodule pointer
-# update to the corresponding branch only for submodules at the repo's
-# top level; one nested under a directory (`derivatives/thing`) is left
-# behind, so the super keeps reporting the sub as modified.  Reproduced
-# with plain git/git-annex, no datalad involved, on both 10.20250630 and
-# 10.20260717.
-@known_failure_windows  # git-annex: nested submodule pointer not propagated
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
-def test_run_merge_sub_under_plain_dir(path=None):
+def test_run_merge_sub_under_plain_dir(path=None, *, request):
     """Sub nested under a plain directory -> merges in sub and super."""
     ds = Dataset(path).create()
     # not a direct child: `derivatives` is a plain directory
@@ -1253,12 +1246,21 @@ def test_run_merge_sub_under_plain_dir(path=None):
 
     ds.run('cd derivatives/thing && ' + touch_command + 'foo'
            + ' && git add foo && git commit -m "inner"')
-    assert_repo_status(ds.path)
 
     _assert_run_merge(sub)
     _assert_run_merge(ds)
-
     ok_((sub.pathobj / "foo").exists())
+
+    if ds.repo.is_managed_branch():
+        # On adjusted branches `git annex sync` propagates a submodule
+        # pointer update to the corresponding branch only for submodules at
+        # the repo's top level, so the super keeps reporting this one
+        # modified.
+        # https://github.com/datalad/datalad/issues/7905
+        request.node.add_marker(pytest.mark.xfail(
+            strict=True,
+            reason="git-annex: nested submodule pointer not propagated"))
+    assert_repo_status(ds.path)
 
 
 @with_tempfile(mkdir=True)

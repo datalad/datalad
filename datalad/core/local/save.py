@@ -75,8 +75,12 @@ def _parent_ds_path(path, ds_path):
 
     Returns None when `path` is not underneath `ds_path` -- which
     `_parse_sub_status` from ``git submodule status --recursive`` never
-    produces, but a future caller might.
+    produces, but a future caller might.  Checked up front, so a stray
+    path that happens to sit inside some *other* dataset does not send
+    the walk climbing an unrelated hierarchy.
     """
+    if not ut.Path(path).is_relative_to(ds_path):
+        return None
     parent = ut.Path(path).parent
     while True:
         parent_path = str(parent)
