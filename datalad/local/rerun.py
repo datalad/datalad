@@ -64,6 +64,27 @@ class Rerun(Interface):
     then re-execute the command in the recorded path (if it was inside
     the dataset). Afterwards, all modifications will be saved.
 
+    *Exit code of the re-executed command*
+
+    || REFLOW >>
+    A re-execution is considered successful when the exit code of the command
+    matches the one recorded in the run record. A command that is on record to
+    have exited non-zero (see :command:`datalad run`) is therefore reported as
+    "ok" when it fails again in the same way, and as "error" when it exits with
+    a different non-zero code. A re-execution that exits with 0 is always
+    considered successful, also when the record has a non-zero exit code; such
+    a change in behavior can only be detected by comparing the ``exit`` field
+    of the new run record with that of the record it was derived from (the last
+    entry of its ``chain``).
+    << REFLOW ||
+
+    || REFLOW >>
+    Unlike :command:`datalad run`, which stops before saving when the command
+    fails, the default ``continue`` behavior of this command saves the
+    modifications also when the exit code does not match, and reports the error
+    at the end of the operation.
+    << REFLOW ||
+
     *Report mode*
 
     || REFLOW >>
