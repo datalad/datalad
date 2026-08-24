@@ -3674,7 +3674,14 @@ class GitRepo(CoreGitRepo):
         # okay now.
         status_state.pop('modified_or_untracked')  # pop the hybrid state
         self._save_post(message, chain(*status_state.values()),
-                        force_partial_commit,
+                        # a partial commit is unavoidable when something was
+                        # staged before this save: committing without a
+                        # pathspec would sweep it in (see
+                        # test_save_partial_commit_shrinking_annex).  It can
+                        # also be requested by a caller that must not commit
+                        # anything but the paths it gave -- even if some
+                        # concurrent process stages content in the meantime
+                        bool(staged_paths) or force_partial_commit,
                         amend=amend,
                         allow_empty=amend)
         # TODO yield result for commit, prev helper checked hexsha pre
