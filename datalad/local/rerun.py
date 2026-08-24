@@ -71,18 +71,12 @@ class Rerun(Interface):
     matches the one recorded in the run record. A command that is on record to
     have exited non-zero (see :command:`datalad run`) is therefore reported as
     "ok" when it fails again in the same way, and as "error" when it exits with
-    a different non-zero code. A re-execution that exits with 0 is always
+    a different non-zero code -- in which case, as for :command:`datalad run`,
+    no modifications are saved. A re-execution that exits with 0 is always
     considered successful, also when the record has a non-zero exit code; such
     a change in behavior can only be detected by comparing the ``exit`` field
     of the new run record with that of the record it was derived from (the last
     entry of its ``chain``).
-    << REFLOW ||
-
-    || REFLOW >>
-    Unlike :command:`datalad run`, which stops before saving when the command
-    fails, the default ``continue`` behavior of this command saves the
-    modifications also when the exit code does not match, and reports the error
-    at the end of the operation.
     << REFLOW ||
 
     *Report mode*
@@ -113,6 +107,13 @@ class Rerun(Interface):
       dataset to a previous state. The working trees of any subdatasets remain
       unchanged.
     """
+    # `rerun` is routinely used as a shortcut for repeating a previous `run`,
+    # so it must fail in the same way: do not re-execute a command when its
+    # inputs could not be obtained (or its outputs not be prepared), and do
+    # not save the results of a command that failed in a way that was not
+    # recorded.  Can be overridden via the common 'on_failure' parameter.
+    on_failure = 'stop'
+
     _params_ = dict(
         revision=Parameter(
             args=("revision",),
@@ -413,7 +414,12 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
             rerun_dsid = res["run_info"].get("dsid")
             if rerun_dsid is not None and rerun_dsid != dset.id:
                 skip_or_pick(hexsha, res, "was ran from a different dataset")
-                res["status"] = "impossible"
+                # not a failure: the commit is cherry picked or skipped
+                # rather than re-executed, which is the correct outcome
+                # here.  Reporting it as such also keeps a range replay
+                # going, rather than aborting it under the command's
+                # 'stop' on_failure default.
+                res["status"] = "notneeded"
             else:
                 res["rerun_action"] = "run"
                 res["diff"] = diff_revision(dset, hexsha)
@@ -613,7 +619,9 @@ def _report(dset, results):
     ds_repo = dset.repo
     for res in results:
         if "run_info" in res:
-            if res["status"] != "impossible":
+            # no "diff" for records that will not be re-executed
+            # (e.g. recorded in a different dataset)
+            if "diff" in res:
                 res["diff"] = list(res["diff"])
                 # Add extra information that is useful in the report but not
                 # needed for the rerun.
