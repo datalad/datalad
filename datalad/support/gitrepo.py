@@ -3482,12 +3482,7 @@ class GitRepo(CoreGitRepo):
         #   potential pre-staged bits)
 
         staged_paths = self.get_staged_paths()
-        # a partial commit is unavoidable when something was staged
-        # before this save. It can also be requested by a caller that
-        # must not commit anything but the paths it gave -- even if
-        # some concurrent process stages content in the meantime
-        need_partial_commit = bool(staged_paths) or force_partial_commit
-        if need_partial_commit and hasattr(self, "call_annex"):
+        if staged_paths and hasattr(self, "call_annex"):
             # so we have some staged content. let's check which ones
             # are symlinks -- those could be annex key links that
             # are broken after a `git-mv` operation
@@ -3678,7 +3673,9 @@ class GitRepo(CoreGitRepo):
         # possibly different message). If an empty commit was okay before, it's
         # okay now.
         status_state.pop('modified_or_untracked')  # pop the hybrid state
-        self._save_post(message, chain(*status_state.values()), need_partial_commit, amend=amend,
+        self._save_post(message, chain(*status_state.values()),
+                        force_partial_commit,
+                        amend=amend,
                         allow_empty=amend)
         # TODO yield result for commit, prev helper checked hexsha pre
         # and post...
