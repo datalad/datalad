@@ -1026,36 +1026,73 @@ def test_rerun_commit_message_check():
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_skip_regular_commits_before_first_runcmd(path=None):
-    """Test for issue #4700: regular commits before first RUNCMD are not cherry-picked"""
+    """Regression test for `rerun --since=<sha>` leading-non-run ancestry leak.
+
+    Covers two related bugs:
+
+    #4700 (fixed in 1.4.1): leading non-RUNCMD commits were silently dropped
+    by ``dropwhile()`` and never appeared on the rerun branch.
+
+    Follow-up bug introduced by the 1.4.1 fix: with an explicit ``--since``
+    boundary, non-RUNCMD commits are silently skipped by the elif at
+    ``datalad/local/rerun.py:500-507``. The *subsequent* run-command
+    iteration then checks out the ORIGINAL source-branch parent via
+    ``ds_repo.checkout(parent); head = parent``, splicing the source's
+    history past the ``--since`` boundary — including the boundary commit
+    itself — into the rerun branch's ancestry. The most easily-observed
+    symptom is that ``file1.txt`` (introduced by the boundary commit)
+    appears in the rerun-branch worktree even though its introducing commit
+    is meant to be excluded by ``--since``.
+    """
     ds = Dataset(path).create()
     initial_commit = ds.repo.get_hexsha()
 
-    # Create regular commits before any run commands
-    create_tree(ds.path, {"file1.txt": "content1", "file2.txt": "content2"})
-    ds.save(["file1.txt", "file2.txt"], message="Add files before run")
+    # Leading non-RUNCMD commit that will become the --since boundary
+    # (must be EXCLUDED from the rerun range).
+    create_tree(ds.path, {"file1.txt": "content1"})
+    ds.save("file1.txt", message="Add files before run #1")
+    files1_commit = ds.repo.get_hexsha()
 
-    # Create a run command
+    # Leading non-RUNCMD commit inside the --since range (must be picked).
+    create_tree(ds.path, {"file2.txt": "content2"})
+    ds.save("file2.txt", message="Add files before run #2")
+
+    # The RUNCMD.
     ds.run('echo "run output" > run_output.txt')
+    run_commit = ds.repo.get_hexsha()
 
-    # Create another regular commit after the run
+    # Trailing non-RUNCMD commit (covers the original #4700 scenario).
     create_tree(ds.path, {"file3.txt": "content3"})
     ds.save("file3.txt", message="Add file after run")
-
     head_commit = ds.repo.get_hexsha()
 
-    # Go back to initial commit and rerun everything
+    # Rerun {files2, run, files3}; files1 is the --since boundary and
+    # must be excluded per the docs.
     ds.repo.checkout(initial_commit, options=["--detach"])
-
-    # Rerun from the saved HEAD (issue #4700: without fix, regular commits before
-    # first RUNCMD would be dropped by dropwhile())
-    ds.rerun(revision=head_commit, since=initial_commit, branch="rerun-branch")
-
-    # Verify all files exist (with fix, regular commits are no longer dropped)
+    ds.rerun(revision=head_commit, since=files1_commit, branch="rerun-branch")
     ds.repo.checkout("rerun-branch")
-    ok_exists(op.join(path, "file1.txt"))
+
+    # Files inside the --since range were applied.
     ok_exists(op.join(path, "file2.txt"))
     ok_exists(op.join(path, "run_output.txt"))
     ok_exists(op.join(path, "file3.txt"))
+
+    # Primary observable of the ancestry-leak bug: without the fix,
+    # rerun-branch's ancestry includes the --since boundary commit, so
+    # its file (file1.txt) shows up in the worktree. This assertion fires
+    # deterministically against unfixed code (verified 20/20 in an
+    # empirical probe without date pinning).
+    assert not op.exists(op.join(path, "file1.txt")), \
+        "file1.txt should be excluded (its commit is the --since boundary)"
+
+    # Belt-and-braces: neither the --since boundary nor the original run
+    # commit should appear in the rerun-branch ancestry.
+    rerun_ancestry = ds.repo.call_git(
+        ["log", "--format=%H", "rerun-branch"]).split()
+    assert files1_commit not in rerun_ancestry, \
+        f"--since boundary {files1_commit[:7]} leaked into rerun-branch"
+    assert run_commit not in rerun_ancestry, \
+        f"original run commit {run_commit[:7]} leaked into rerun-branch"
 
 
 # -- Tests for rerunning run-merge commits --
