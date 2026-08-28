@@ -414,11 +414,16 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
             rerun_dsid = res["run_info"].get("dsid")
             if rerun_dsid is not None and rerun_dsid != dset.id:
                 skip_or_pick(hexsha, res, "was ran from a different dataset")
-                # not a failure: the commit is cherry picked or skipped
-                # rather than re-executed, which is the correct outcome
-                # here.  Reporting it as such also keeps a range replay
-                # going, rather than aborting it under the command's
-                # 'stop' on_failure default.
+                # `run` duplicates its record into every modified
+                # subdataset, so a subdataset's history can contain run
+                # commits recorded by the superdataset.  Such a commit is
+                # cherry picked or skipped instead of being re-executed
+                # here -- the correct outcome, hence 'notneeded' and not
+                # 'impossible'.  This also matters for the 'stop'
+                # on_failure default above: it is dispatched on status
+                # alone, so an 'impossible' here would abort a range
+                # replay (`--since=`) at the first such commit instead of
+                # continuing with the ones this dataset can re-execute.
                 res["status"] = "notneeded"
             else:
                 res["rerun_action"] = "run"
@@ -619,8 +624,11 @@ def _report(dset, results):
     ds_repo = dset.repo
     for res in results:
         if "run_info" in res:
-            # no "diff" for records that will not be re-executed
-            # (e.g. recorded in a different dataset)
+            # only records that will be re-executed have a "diff" (it is
+            # set right next to the 'notneeded' above).  This used to be
+            # tested as status != "impossible", which was merely a proxy
+            # for the same condition and stopped holding when that status
+            # became 'notneeded'.
             if "diff" in res:
                 res["diff"] = list(res["diff"])
                 # Add extra information that is useful in the report but not
