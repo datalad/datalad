@@ -424,6 +424,10 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
                 # alone, so an 'impossible' here would abort a range
                 # replay (`--since=`) at the first such commit instead of
                 # continuing with the ones this dataset can re-execute.
+                # A replay that re-executes nothing at all is still
+                # reported as a failure, see the end of _rerun().
+                # TODO: add --on-foreign-run=error|auto if a need arises
+                # for more detailed control
                 res["status"] = "notneeded"
             else:
                 res["rerun_action"] = "run"
@@ -452,8 +456,11 @@ def _rerun(dset, results, assume_ready=None, explicit=False, jobs=None):
     new_bases = {}  # original hexsha => reran hexsha
     branch_to_restore = ds_repo.get_active_branch()
     head = onto = ds_repo.get_hexsha()
+    ran_any = False
+    saw_run_commit = False
     for res in results:
         lgr.info(_get_rerun_log_msg(res))
+        saw_run_commit = saw_run_commit or "run_info" in res
         rerun_action = res.get("rerun_action")
         if not rerun_action:
             yield res
@@ -556,6 +563,7 @@ def _rerun(dset, results, assume_ready=None, explicit=False, jobs=None):
                 _mark_nonrun_result(res, "pick")
                 yield res
         elif rerun_action == "run":
+            ran_any = True
             run_info = res["run_info"]
             # Keep a "rerun" trail.
             if "chain" in run_info:
@@ -598,6 +606,18 @@ def _rerun(dset, results, assume_ready=None, explicit=False, jobs=None):
         ds_repo.update_ref("refs/heads/" + branch_to_restore,
                            "HEAD")
         ds_repo.checkout(branch_to_restore)
+
+    if saw_run_commit and not ran_any:
+        # The range did contain run commits, but none of them could be
+        # re-executed here (a range with none at all is already reported
+        # by _rerun_as_results()).  Do not exit 0 having run nothing: the
+        # individual commits are reported as 'notneeded' so that a mixed
+        # range keeps going, so this is the only place left to say that
+        # the request as a whole came to nothing.
+        yield get_status_dict(
+            "run", ds=dset, status="impossible",
+            message="no run commit in the given revision range could be "
+                    "re-executed in this dataset")
 
 
 def _get_rerun_log_msg(res):

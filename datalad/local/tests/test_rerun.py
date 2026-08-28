@@ -374,6 +374,7 @@ def test_rerun_range_with_foreign_run_commit(path=None):
     # a run recorded in the superdataset leaves a record in the subdataset
     # that the subdataset itself cannot re-execute
     ds.run("echo super >>{}".format(op.join("sub", "from-super")))
+    foreign_hexsha = sub.repo.get_hexsha()
     sub.run("echo own >>own")
     # replaying a range must skip that record and continue with the commit
     # that does belong to this dataset
@@ -381,6 +382,14 @@ def test_rerun_range_with_foreign_run_commit(path=None):
     assert_result_count(res, 1, action="run", rerun_action="skip",
                         status="notneeded")
     assert_result_count(res, 1, action="run", status="ok", path=sub.path)
+
+    # but a replay that re-executes nothing at all is a failure, rather
+    # than a silent no-op
+    assert_in_results(
+        sub.rerun(foreign_hexsha, result_renderer=None, on_failure="ignore"),
+        action="run", status="impossible")
+    with assert_raises(IncompleteResultsError):
+        sub.rerun(foreign_hexsha, result_renderer=None)
 
 
 @with_tempfile(mkdir=True)
