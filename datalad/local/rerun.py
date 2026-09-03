@@ -64,6 +64,21 @@ class Rerun(Interface):
     then re-execute the command in the recorded path (if it was inside
     the dataset). Afterwards, all modifications will be saved.
 
+    *Exit code of the re-executed command*
+
+    || REFLOW >>
+    A re-execution is considered successful when the exit code of the command
+    matches the one recorded in the run record. A command that is on record to
+    have exited non-zero (see :command:`datalad run`) is therefore reported as
+    "ok" when it fails again in the same way, and as "error" when it exits with
+    a different non-zero code -- in which case, as for :command:`datalad run`,
+    no modifications are saved. A re-execution that exits with 0 is always
+    considered successful, also when the record has a non-zero exit code; such
+    a change in behavior can only be detected by comparing the ``exit`` field
+    of the new run record with that of the record it was derived from (the last
+    entry of its ``chain``).
+    << REFLOW ||
+
     *Report mode*
 
     || REFLOW >>
@@ -92,6 +107,13 @@ class Rerun(Interface):
       dataset to a previous state. The working trees of any subdatasets remain
       unchanged.
     """
+    # `rerun` is routinely used as a shortcut for repeating a previous `run`,
+    # so it must fail in the same way: do not re-execute a command when its
+    # inputs could not be obtained (or its outputs not be prepared), and do
+    # not save the results of a command that failed in a way that was not
+    # recorded.  Can be overridden via the common 'on_failure' parameter.
+    on_failure = 'stop'
+
     _params_ = dict(
         revision=Parameter(
             args=("revision",),
@@ -392,7 +414,21 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
             rerun_dsid = res["run_info"].get("dsid")
             if rerun_dsid is not None and rerun_dsid != dset.id:
                 skip_or_pick(hexsha, res, "was ran from a different dataset")
-                res["status"] = "impossible"
+                # `run` duplicates its record into every modified
+                # subdataset, so a subdataset's history can contain run
+                # commits recorded by the superdataset.  Such a commit is
+                # cherry picked or skipped instead of being re-executed
+                # here -- the correct outcome, hence 'notneeded' and not
+                # 'impossible'.  This also matters for the 'stop'
+                # on_failure default above: it is dispatched on status
+                # alone, so an 'impossible' here would abort a range
+                # replay (`--since=`) at the first such commit instead of
+                # continuing with the ones this dataset can re-execute.
+                # A replay that re-executes nothing at all is still
+                # reported as a failure, see the end of _rerun().
+                # TODO: add --on-foreign-run=error|auto if a need arises
+                # for more detailed control
+                res["status"] = "notneeded"
             else:
                 res["rerun_action"] = "run"
                 res["diff"] = diff_revision(dset, hexsha)
@@ -420,8 +456,11 @@ def _rerun(dset, results, assume_ready=None, explicit=False, jobs=None):
     new_bases = {}  # original hexsha => reran hexsha
     branch_to_restore = ds_repo.get_active_branch()
     head = onto = ds_repo.get_hexsha()
+    ran_any = False
+    saw_run_commit = False
     for res in results:
         lgr.info(_get_rerun_log_msg(res))
+        saw_run_commit = saw_run_commit or "run_info" in res
         rerun_action = res.get("rerun_action")
         if not rerun_action:
             yield res
@@ -524,6 +563,7 @@ def _rerun(dset, results, assume_ready=None, explicit=False, jobs=None):
                 _mark_nonrun_result(res, "pick")
                 yield res
         elif rerun_action == "run":
+            ran_any = True
             run_info = res["run_info"]
             # Keep a "rerun" trail.
             if "chain" in run_info:
@@ -567,6 +607,18 @@ def _rerun(dset, results, assume_ready=None, explicit=False, jobs=None):
                            "HEAD")
         ds_repo.checkout(branch_to_restore)
 
+    if saw_run_commit and not ran_any:
+        # The range did contain run commits, but none of them could be
+        # re-executed here (a range with none at all is already reported
+        # by _rerun_as_results()).  Do not exit 0 having run nothing: the
+        # individual commits are reported as 'notneeded' so that a mixed
+        # range keeps going, so this is the only place left to say that
+        # the request as a whole came to nothing.
+        yield get_status_dict(
+            "run", ds=dset, status="impossible",
+            message="no run commit in the given revision range could be "
+                    "re-executed in this dataset")
+
 
 def _get_rerun_log_msg(res):
     "Prepare log message for a rerun to summarize an action about to happen"
@@ -592,7 +644,12 @@ def _report(dset, results):
     ds_repo = dset.repo
     for res in results:
         if "run_info" in res:
-            if res["status"] != "impossible":
+            # only records that will be re-executed have a "diff" (it is
+            # set right next to the 'notneeded' above).  This used to be
+            # tested as status != "impossible", which was merely a proxy
+            # for the same condition and stopped holding when that status
+            # became 'notneeded'.
+            if "diff" in res:
                 res["diff"] = list(res["diff"])
                 # Add extra information that is useful in the report but not
                 # needed for the rerun.

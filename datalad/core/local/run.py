@@ -129,6 +129,20 @@ class Run(Interface):
     input or output preparation. This default ``stop`` behavior can be
     overridden via [CMD: --on-failure ... CMD][PY: `on_failure=...` PY].
 
+    || REFLOW >>
+    The exit code of the command is always part of the run record (``exit``
+    field), also when it is zero. With
+    [CMD: --on-failure ignore CMD][PY: `on_failure='ignore'` PY] a non-zero
+    exit does not prevent the modifications from being saved, and the
+    resulting provenance record is a regular run record that carries that
+    exit code. Like any other run, this requires the command to have
+    actually modified the dataset -- a command that leaves the dataset
+    unmodified is not recorded, whether it failed or not.
+    :command:`datalad rerun` compares the exit code of a re-execution against
+    the recorded one, see that command's documentation for the exact
+    semantics.
+    << REFLOW ||
+
     In the presence of subdatasets, the full dataset hierarchy will be checked
     for unsaved changes prior command execution, and changes in any dataset
     will be saved after execution. Any modification of subdatasets is also
