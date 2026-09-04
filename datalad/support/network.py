@@ -62,6 +62,25 @@ from datalad.utils import (
     on_windows,
 )
 
+# Public interface of this module.  Everything else is considered internal
+# and might change without notice, even though it might be imported
+# elsewhere within datalad itself.
+__all__ = [
+    # Resource identifiers
+    'RI',
+    'URL',
+    'PathRI',
+    'SSHRI',
+    'DataLadRI',
+    'GitTransportRI',
+    # Helpers to classify resource identifiers
+    'is_url',
+    'is_ssh',
+    'is_datalad_compat_ri',
+    # Conversion of local paths to file:// URLs
+    'get_local_file_url',
+]
+
 # !!! Lazily import requests where needed -- needs 30ms or so
 # import requests
 
