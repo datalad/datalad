@@ -227,6 +227,13 @@ def skip_if_url_is_not_available(url, regex=None):
             pytest.skip("%s matched %r -- skipping the test" % (url, regex))
     except DownloadError:
         pytest.skip("%s failed to download" % url)
+    except Exception as exc:
+        # Anything else raised while merely probing availability also means
+        # we could not reach the URL.  Notably a 403 sends the downloader
+        # down its credential-entry path, which cannot work in a
+        # non-interactive test session.  (`pytest.skip` above raises a
+        # BaseException, so it is not caught here.)
+        pytest.skip("%s is not available: %r" % (url, exc))
 
 
 def check_not_generatorfunction(func):
