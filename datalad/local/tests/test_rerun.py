@@ -29,6 +29,8 @@ from datalad.core.local.run import run_command
 from datalad.core.local.tests.test_run import (
     _assert_run_merge,
     _merge_ref,
+    _parents,
+    _setup_incoming,
     last_commit_msg,
 )
 from datalad.distribution.dataset import Dataset
@@ -111,7 +113,7 @@ def test_rerun(path=None, nodspath=None):
     eq_(ds.id, sub_info["dsid"])
     assert_result_count(
         sub.rerun(return_type="list", on_failure="ignore"),
-        1, status="impossible", action="run", rerun_action="skip")
+        1, status="notneeded", action="run", rerun_action="skip")
     eq_('xx\n', open(probe_path).read())
 
     # Rerun fails with a dirty repo.
@@ -346,11 +348,71 @@ def test_run_failure(path=None):
     assert_in_results(ds.rerun(result_renderer=None, on_failure="ignore"),
                       action="run", status="error")
 
+    # ... and, like `run`, such a re-execution does not save anything
+    ds.run("echo a >>modme && [ ! -e trigger ]")
+    run_hexsha = ds.repo.get_hexsha()
+    create_tree(ds.path, {"trigger": "x"})
+    ds.save("trigger")
+    hexsha_pre_rerun = ds.repo.get_hexsha()
+    with assert_raises(IncompleteResultsError):
+        ds.rerun(run_hexsha, result_renderer=None)
+    eq_(hexsha_pre_rerun, ds.repo.get_hexsha())
+    # note: whether the working tree is left dirty depends on the file
+    # system -- on an adjusted branch the output is removed rather than
+    # unlocked before the command, so it comes back identical
+    ds.save()
+
     # We don't show instructions if the caller specified us not to save.
     remove(msgfile)
     with assert_raises(IncompleteResultsError):
         ds.run("false", explicit=True, outputs=None, on_failure="stop")
     assert_false(op.exists(msgfile))
+
+
+@with_tempfile(mkdir=True)
+def test_rerun_range_with_foreign_run_commit(path=None):
+    ds = Dataset(path).create()
+    sub = ds.create("sub")
+    # a run recorded in the superdataset leaves a record in the subdataset
+    # that the subdataset itself cannot re-execute
+    ds.run("echo super >>{}".format(op.join("sub", "from-super")))
+    foreign_hexsha = sub.repo.get_hexsha()
+    sub.run("echo own >>own")
+    # replaying a range must skip that record and continue with the commit
+    # that does belong to this dataset
+    res = sub.rerun(since="", return_type="list")
+    assert_result_count(res, 1, action="run", rerun_action="skip",
+                        status="notneeded")
+    assert_result_count(res, 1, action="run", status="ok", path=sub.path)
+
+    # but a replay that re-executes nothing at all is a failure, rather
+    # than a silent no-op
+    assert_in_results(
+        sub.rerun(foreign_hexsha, result_renderer=None, on_failure="ignore"),
+        action="run", status="impossible")
+    with assert_raises(IncompleteResultsError):
+        sub.rerun(foreign_hexsha, result_renderer=None)
+
+
+@with_tempfile(mkdir=True)
+def test_rerun_unavailable_input(path=None):
+    ds = Dataset(path).create()
+    create_tree(ds.path, {"in.dat": "content"})
+    ds.save()
+    # the command appends, so any (re-)execution is detectable
+    ds.run("echo ran >>marker", inputs=["in.dat"])
+    assert_repo_status(ds.path)
+    # no other copy of the content exists, so a rerun cannot get it
+    ds.drop("in.dat", reckless="availability")
+    assert_false(ds.repo.file_has_content("in.dat"))
+
+    hexsha_pre_rerun = ds.repo.get_hexsha()
+    marker_pre_rerun = (ds.pathobj / "marker").read_text()
+    with assert_raises(IncompleteResultsError):
+        ds.rerun(result_renderer=None)
+    # the command was not executed, and nothing was recorded
+    eq_(marker_pre_rerun, (ds.pathobj / "marker").read_text())
+    eq_(hexsha_pre_rerun, ds.repo.get_hexsha())
 
 
 @with_tempfile(mkdir=True)
@@ -1036,3 +1098,34 @@ def test_rerun_merge_runs(path=None):
     assert_repo_status(ds.path)
     ok_((ds.pathobj / "normal_file").exists())
     ok_((ds.pathobj / "inner2").exists())
+
+
+@with_tempfile(mkdir=True)
+@skip_if_adjusted_branch
+@pytest.mark.ai_generated
+def test_rerun_merge(path=None):
+    # a run that recorded a merge has to merge again on replay, otherwise
+    # the command would be re-executed on an entirely different tree
+    ds = Dataset(path).create()
+    repo = ds.repo
+    _setup_incoming(ds, {"raw.dat": "one"})
+    repo.checkout('incoming', options=['-b', 'processed'])
+    cmd = "{} raw.dat > cooked.dat".format(cat_command)
+    ds.run(cmd, merge='incoming', merge_strategy='theirs')
+    incoming = _setup_incoming(ds, {"raw.dat": "two"})
+    processed_before = repo.get_hexsha()
+    ds.run(cmd, merge='incoming', merge_strategy='theirs')
+    merge_commit = repo.get_hexsha()
+
+    ds.rerun()
+    assert_repo_status(ds.path)
+    # the replay recreated the merge, rather than re-executing the command
+    # on the state of the previous 'processed' commit
+    eq_(_parents(repo), [processed_before, incoming])
+    # ... with the same outcome
+
+    def tree(ref):
+        return repo.call_git(['rev-parse', ref + '^{tree}']).strip()
+    eq_(tree(merge_commit), tree("HEAD"))
+    _, info = get_run_info(ds, repo.format_commit("%B"))
+    eq_(info["merge"]["commit"], incoming)

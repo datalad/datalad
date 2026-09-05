@@ -49,6 +49,7 @@ from datalad.support.constraints import (
     EnsureBool,
     EnsureChoice,
     EnsureNone,
+    EnsureStr,
 )
 from datalad.support.exceptions import (
     CapturedException,
@@ -129,6 +130,20 @@ class Run(Interface):
     input or output preparation. This default ``stop`` behavior can be
     overridden via [CMD: --on-failure ... CMD][PY: `on_failure=...` PY].
 
+    || REFLOW >>
+    The exit code of the command is always part of the run record (``exit``
+    field), also when it is zero. With
+    [CMD: --on-failure ignore CMD][PY: `on_failure='ignore'` PY] a non-zero
+    exit does not prevent the modifications from being saved, and the
+    resulting provenance record is a regular run record that carries that
+    exit code. Like any other run, this requires the command to have
+    actually modified the dataset -- a command that leaves the dataset
+    unmodified is not recorded, whether it failed or not.
+    :command:`datalad rerun` compares the exit code of a re-execution against
+    the recorded one, see that command's documentation for the exact
+    semantics.
+    << REFLOW ||
+
     In the presence of subdatasets, the full dataset hierarchy will be checked
     for unsaved changes prior command execution, and changes in any dataset
     will be saved after execution. Any modification of subdatasets is also
@@ -138,6 +153,41 @@ class Run(Interface):
     interpretable and re-executable in the actual top-level superdataset. For
     this reason the provenance record contains the dataset ID of that
     superdataset.
+
+    *Deriving one branch from another*
+
+    || REFLOW >>
+    With [CMD: --merge REVISION CMD][PY: `merge='REVISION'` PY] the command is
+    executed as part of merging REVISION into the current branch, and the
+    commit that carries the run record is that merge commit. This formalizes a
+    workflow in which one branch is *built* from another one by a particular
+    command -- for example an "incoming" branch that holds pristine archives as
+    they were obtained from a data provider, and an "incoming-processed" branch
+    that holds their extracted content:
+    << REFLOW ||
+
+      Rebuild "incoming-processed" from the current state of "incoming"::
+
+        % git checkout incoming-processed
+        % datalad run --merge incoming --merge-strategy theirs \\
+            'datalad add-archive-content --allow-dirty --no-commit --delete *.tar.gz'
+
+    || REFLOW >>
+    The "theirs" strategy replaces the working tree with the tree of REVISION
+    in its entirety before the command is executed, so content of the two
+    branches is never mixed. The recorded merge then states exactly which state
+    of "incoming" the processed state was derived from, and the run record
+    states how. As for any run, the effect of the command is the difference
+    between the resulting commit and its first parent -- here the previous
+    state of "incoming-processed" -- and can be reviewed as such.
+    << REFLOW ||
+
+    || REFLOW >>
+    A prepared merge is left in the working tree when the command fails; use
+    :command:`git merge --abort` to discard it -- files that the merged
+    revision adds are left behind as untracked. Merging a revision that changes
+    the state of a subdataset is not supported.
+    << REFLOW ||
 
     *Command format*
 
@@ -220,7 +270,16 @@ class Run(Interface):
                  outputs=['output_dir/**'])""",
              code_cmd="""\
              datalad run -m 'run my script' -i 'data/**/*.dat' \\
-             -o 'output_dir/**' 'code/script.sh'""")
+             -o 'output_dir/**' 'code/script.sh'"""),
+        dict(text="Build the content of the current branch from the state of "
+                  "another branch, and record the command that did it in the "
+                  "resulting merge commit",
+             code_py="""\
+             run(cmd='code/process.sh',
+                 merge='incoming', merge_strategy='theirs')""",
+             code_cmd="""\
+             datalad run --merge incoming --merge-strategy theirs \\
+             'code/process.sh'""")
     ]
 
     result_renderer = "tailored"
@@ -302,6 +361,40 @@ class Run(Interface):
             uninstalled dataset will be left unexpanded because no subdatasets
             will be installed for a dry run.""",
             constraints=EnsureChoice(None, "basic", "command")),
+        merge=Parameter(
+            args=("--merge",),
+            metavar="REVISION",
+            doc="""merge REVISION into the current branch as part of this run.
+            The working tree is prepared as specified by [CMD: --merge-strategy
+            CMD][PY: `merge_strategy` PY] before the command is executed, and
+            the commit that records the outcome (together with the run record)
+            is the merge commit: its first parent is the state of the current
+            branch before the run, its second parent is REVISION. This makes it
+            possible to record how the content of one branch is derived from
+            another one by a particular command. If the command creates commits
+            of its own, the merge is recorded by the first of them, and the run
+            record goes into the commit that wraps them, as for any run that
+            commits. If REVISION is already merged into the current branch, no
+            merge is recorded, but the working tree is still prepared as
+            requested and the outcome is recorded as an ordinary run commit.
+            Note that a dry run does not prepare the working tree, hence input
+            and output globs are reported as they expand on the current state,
+            not on the merged one.""",
+            constraints=EnsureStr() | EnsureNone()),
+        merge_strategy=Parameter(
+            args=("--merge-strategy",),
+            metavar="{merge|theirs|ours}",
+            doc="""how to prepare the working tree for a merge requested via
+            [CMD: --merge CMD][PY: `merge` PY]. "merge" (the default) performs
+            a regular Git merge of the two trees, and fails when it conflicts.
+            "theirs" replaces the working tree with the tree of REVISION in its
+            entirety, without merging any content, so that the command is
+            applied to exactly the state of REVISION. "ours" keeps the current
+            working tree and ignores the content of REVISION altogether. Note
+            that "theirs" and "ours" name the tree to start the command from,
+            they are not the equally named Git merge strategy options for
+            conflict resolution.""",
+            constraints=EnsureChoice(None, "merge", "theirs", "ours")),
         jobs=jobs_opt
     )
     _params_['jobs']._doc += """\
@@ -324,6 +417,8 @@ class Run(Interface):
             message=None,
             sidecar=None,
             dry_run=None,
+            merge=None,
+            merge_strategy=None,
             jobs=None):
         for r in run_command(cmd, dataset=dataset,
                              inputs=inputs, outputs=outputs,
@@ -333,6 +428,8 @@ class Run(Interface):
                              message=message,
                              sidecar=sidecar,
                              dry_run=dry_run,
+                             merge=merge,
+                             merge_strategy=merge_strategy,
                              jobs=jobs):
             yield r
 
@@ -389,6 +486,12 @@ def _display_basic(res):
     if outputs:
         lines.append(fmt_line("expanded outputs", outputs,
                               multiline=True))
+
+    merge_info = res["run_info"].get("merge")
+    if merge_info:
+        lines.append(fmt_line(
+            "merge", "{source} ({commit}), strategy: {strategy}".format(
+                **merge_info)))
 
     cmd = res["run_info"]["cmd"]
     cmd_expanded = dry_run_info["cmd_expanded"]
@@ -781,6 +884,114 @@ def _prep_worktree(ds_path, pwd, globbed,
                     yield res
 
 
+def _merge_pending(repo):
+    """Is a merge prepared, but not yet committed, in `repo`?"""
+    return (repo.dot_git / 'MERGE_HEAD').exists()
+
+
+def _merge_changes_subdatasets(repo, source):
+    """Would merging `source` change the recorded state of a subdataset?
+
+    Parameters
+    ----------
+    repo : GitRepo
+    source : str
+      Commit-ish to be merged.
+
+    Returns
+    -------
+    bool
+    """
+    for line in repo.call_git(
+            ['diff', '--raw', 'HEAD', source], read_only=True).splitlines():
+        if not line.startswith(':'):
+            continue
+        # ":<src mode> <dst mode> <src sha> <dst sha> <status>\t<path>"
+        modes = line[1:].split()[:2]
+        # 160000 is the mode of a gitlink, i.e. a subdataset
+        if '160000' in modes:
+            return True
+    return False
+
+
+def _prepare_merge(repo, source, strategy):
+    """Prepare the working tree for a merge of `source`, without committing it.
+
+    Afterwards the working tree holds the state the command is to be executed
+    on, and -- unless `source` was already merged -- Git's merge state is set
+    up such that the next commit becomes a merge commit with `source` as an
+    additional parent.
+
+    Parameters
+    ----------
+    repo : GitRepo
+    source : str
+      Commit-ish to merge.
+    strategy : {'merge', 'theirs', 'ours'}
+      See the ``merge_strategy`` parameter of `run`.
+
+    Returns
+    -------
+    bool
+      Whether a merge is now pending. This is False when `source` was already
+      merged into the current branch -- there is nothing to record in that
+      case, but the working tree was still prepared as requested.
+
+    Raises
+    ------
+    CommandError
+      If the merge cannot be prepared, e.g. because it conflicts. No merge
+      state is left behind in that case.
+    """
+    # 'theirs' and 'ours' must not have Git touch the content at all, the
+    # tree to run the command on is established here, not by a content merge.
+    merge_opts = ['--no-commit', '--no-ff'] \
+        + ([] if strategy == 'merge' else ['-s', 'ours'])
+    try:
+        repo.merge(source, options=merge_opts, allow_unrelated=True,
+                   expect_stderr=True)
+    except CommandError as exc:
+        # a conflict is the expected way for this to fail, and the paths that
+        # conflict are the useful part of the report -- collect them before
+        # the merge is undone
+        conflicts = [
+            p for p in repo.call_git(
+                ['diff', '--name-only', '--diff-filter=U'],
+                read_only=True).splitlines() if p]
+        # do not leave a half-prepared merge behind. `--abort` fails when
+        # nothing was started (e.g. the merge was refused outright), which
+        # is not an error to report on top of the actual failure.
+        repo.call_git_success(['merge', '--abort'])
+        if conflicts:
+            raise CommandError(
+                cmd='merge',
+                msg='conflicts in: {}'.format(', '.join(conflicts))) from exc
+        raise
+    if strategy == 'theirs':
+        # take the tree of `source` in its entirety, including deletion of
+        # anything that is not part of it. Unlike `git checkout`, this leaves
+        # HEAD (and hence the first parent of the merge) alone.
+        repo.call_git(['read-tree', '-u', '--reset', source])
+    return _merge_pending(repo)
+
+
+def _unstage_merge(repo):
+    """Reset the index to HEAD, keeping the working tree and merge state.
+
+    Preparing a merge stages its outcome. That is the state input and output
+    preparation must see -- git-annex consults the index to determine the key
+    of a file it is asked to unlock -- but it is the wrong state to execute a
+    command in: `save` determines what to record by comparing HEAD to the
+    working tree, so anything left staged but no longer matching the working
+    tree (think of an archive that the command extracted and removed) would be
+    committed from the index behind `save`'s back. Once the index is reset,
+    the prepared merge is an ordinary modification of the working tree, and is
+    saved as such -- Git still turns the resulting commit into the merge,
+    because the merge state itself is untouched by this.
+    """
+    repo.call_git(['read-tree', 'HEAD'])
+
+
 def _create_record(run_info, sidecar_flag, ds):
     """
     Returns
@@ -819,7 +1030,7 @@ def _create_record(run_info, sidecar_flag, ds):
 
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 assume_ready=None, explicit=False, message=None, sidecar=None,
-                dry_run=False, jobs=None,
+                dry_run=False, merge=None, merge_strategy=None, jobs=None,
                 extra_info=None,
                 rerun_info=None,
                 extra_inputs=None,
@@ -905,6 +1116,53 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     lgr.debug('tracking command output underneath %s', ds)
 
+    if merge_strategy and not merge:
+        yield get_status_dict(
+            'run', ds=ds, status='impossible',
+            message='a merge strategy was given, but no revision to merge')
+        return
+    merge_strategy = merge_strategy or 'merge'
+    merge_commit = None
+    if merge:
+        # a merge is only recordable if all of the following hold. Check them
+        # all before anything is done to the working tree.
+        if explicit:
+            yield get_status_dict(
+                'run', ds=ds, status='impossible',
+                message=(
+                    'a merge cannot be recorded in explicit mode: it brings '
+                    'in changes beyond the declared outputs'))
+            return
+        if ds.repo.get_corresponding_branch():
+            yield get_status_dict(
+                'run', ds=ds, status='impossible',
+                message='a merge cannot be recorded on an adjusted branch')
+            return
+        if not ds.repo.get_hexsha():
+            yield get_status_dict(
+                'run', ds=ds, status='impossible',
+                message='cannot merge into a dataset without any commit')
+            return
+        if not ds.repo.commit_exists(merge):
+            yield get_status_dict(
+                'run', ds=ds, status='error',
+                message=('revision specified for --merge (%s) does not exist',
+                         merge))
+            return
+        # record the state that was merged, not the name it went by
+        merge_commit = ds.repo.get_hexsha(merge)
+        if merge_strategy != 'ours' \
+                and _merge_changes_subdatasets(ds.repo, merge_commit):
+            # the merge would only update the recorded commit of the
+            # subdataset, not its worktree, and `save` would then dutifully
+            # record the unchanged worktree state again, silently undoing it
+            yield get_status_dict(
+                'run', ds=ds, status='impossible',
+                message=(
+                    'merging %s would change the state of a subdataset, '
+                    'which is not supported', merge))
+            return
+
     # skip for callers that already take care of this
     if not (skip_dirtycheck or rerun_info or inject):
         # For explicit=True, we probably want to check whether any inputs have
@@ -960,12 +1218,33 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         return
 
     if not (inject or dry_run):
+        if merge_commit:
+            # before any input is obtained or any output is prepared: they
+            # are to be determined on the tree the command will see
+            lgr.info('Preparing merge of %s (strategy: %s)',
+                     merge, merge_strategy)
+            try:
+                if not _prepare_merge(ds.repo, merge_commit, merge_strategy):
+                    lgr.info(
+                        '%s is already merged, no merge will be recorded',
+                        merge)
+            except CommandError as e:
+                ce = CapturedException(e)
+                yield get_status_dict(
+                    'run', ds=ds, status='error',
+                    message=('cannot merge %s: %s', merge, e.msg or ce),
+                    exception=ce)
+                return
         yield from _prep_worktree(
             ds_path, pwd, globbed,
             assume_ready=assume_ready,
             remove_outputs=remove_outputs,
             rerun_outputs=rerun_outputs,
             jobs=None)
+        if merge_commit and merge_strategy != 'ours':
+            # inputs and outputs are prepared, the command can be handed a
+            # clean index now (only 'ours' never touched it)
+            _unstage_merge(ds.repo)
     else:
         # If an inject=True caller wants to override the exit code, they can do
         # so in extra_info.
@@ -1022,6 +1301,11 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         run_info['pwd'] = rel_pwd
     if ds.id:
         run_info["dsid"] = ds.id
+    if merge_commit:
+        # `commit` is what a rerun needs to reproduce the same merge, the
+        # other two document what was asked for
+        run_info['merge'] = dict(
+            source=merge, commit=merge_commit, strategy=merge_strategy)
     if extra_info:
         run_info.update(extra_info)
 
@@ -1269,3 +1553,14 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                     result_renderer='disabled',
                     on_failure='ignore'):
                 yield r
+
+    if merge_commit and _merge_pending(ds.repo):
+        # `save` had nothing to commit -- the command left the tree of the
+        # merged revision unchanged, or reproduced the state that is already
+        # recorded. The merge itself is still worth recording: it is what says
+        # that this state was derived from the merged one.
+        ds.repo.commit(msg=msg)
+        yield get_status_dict(
+            'save', ds=ds, type='dataset', status='ok',
+            message=('recorded merge of %s without any change to the '
+                     'dataset content', merge))

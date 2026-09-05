@@ -3476,6 +3476,12 @@ class GitRepo(CoreGitRepo):
 
         staged_paths = self.get_staged_paths()
         need_partial_commit = bool(staged_paths)
+        if need_partial_commit and (self.dot_git / 'MERGE_HEAD').exists():
+            # a pending merge has its outcome staged. That is not a user's
+            # pre-staged content that a partial commit would have to bypass
+            # -- and Git refuses a partial commit while a merge is pending
+            # anyway.
+            need_partial_commit = False
         if need_partial_commit and hasattr(self, "call_annex"):
             # so we have some staged content. let's check which ones
             # are symlinks -- those could be annex key links that
