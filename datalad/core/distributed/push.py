@@ -266,10 +266,20 @@ class Push(Interface):
             matched_anything = True
             lgr.debug('Pushing Dataset at %s', dspath)
             pbars = {}
-            yield from _push(
-                dspath, dsrecords, to, data, force, jobs, res_kwargs.copy(), pbars,
-                got_path_arg=True if path else False,
-                set_upstream=set_upstream)
+            pushed_ok = True
+            for res in _push(
+                    dspath, dsrecords, to, data, force, jobs, res_kwargs.copy(), pbars,
+                    got_path_arg=True if path else False):
+                if res.get('status') == 'error':
+                    pushed_ok = False
+                yield res
+            if set_upstream and pushed_ok:
+                # do this as a separate step, rather than threading
+                # `set_upstream` through `_push()`/`_push_refspecs()` --
+                # `_push()` is monkey-patched wholesale by some extensions
+                # (e.g. datalad-next), so changing its call signature here
+                # would break them
+                yield from _set_push_upstream(dspath, to, res_kwargs.copy())
             # take down progress bars for this dataset
             for i, ds in pbars.items():
                 log_progress(lgr.info, i, 'Finished push of %s', ds)
@@ -436,7 +446,7 @@ def _transfer_data(repo, ds, target, content, data, force, jobs, res_kwargs,
 
 
 def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
-          got_path_arg=False, set_upstream=False):
+          got_path_arg=False):
     force_git_push = force in ('all', 'gitpush')
 
     # nothing recursive in here, we only need a repo to work with
@@ -736,27 +746,36 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
         res_kwargs.copy(),
     )
 
-    if set_upstream and active_branch:
-        # mimic `git push -u`: configure `target` as the upstream
-        # (tracking) remote for the active branch. The branch was just
-        # pushed above, so this is a cheap up-to-date push that merely
-        # has git record the tracking configuration -- the same as
-        # `git branch --set-upstream-to` would (but without requiring a
-        # pre-existing remote-tracking ref). Kept as a separate push, so
-        # this does not also mark internal branches (e.g. `git-annex`)
-        # that ride along in `refspecs2push` as tracking `target`.
-        yield from _push_refspecs(
-            repo,
-            target,
-            ['{0}:{0}'.format(active_branch)],
-            False,
-            res_kwargs.copy(),
-            set_upstream=True,
-        )
-        # git wrote the tracking configuration straight to the config
-        # file via the `git push` subprocess above -- make sure our own
-        # in-memory config cache picks it up too
-        repo.config.reload()
+
+def _set_push_upstream(dspath, target, res_kwargs):
+    # mimic `git push -u`: configure `target` as the upstream (tracking)
+    # remote for the active branch of the dataset at `dspath`. Assumes the
+    # branch has just been pushed to `target` by a preceding, regular
+    # `_push()` call for the same dataset -- this performs one more, cheap
+    # ("everything up-to-date") push, just to have git itself record the
+    # tracking configuration, the same way `git push -u` does. Kept as a
+    # standalone call (rather than a `_push()`/`_push_refspecs()` param),
+    # so that datasets without a push (e.g. nothing needed pushing) do not
+    # get the corresponding branch pushed here.
+    repo = Dataset(dspath).repo
+    active_branch = repo.get_corresponding_branch() or repo.get_active_branch()
+    if not active_branch:
+        return
+    # a separate push, rather than folding into the caller's refspecs2push,
+    # so this does not also mark internal branches (e.g. `git-annex`) that
+    # ride along in the same push as tracking `target`
+    yield from _push_refspecs(
+        repo,
+        target,
+        ['{0}:{0}'.format(active_branch)],
+        False,
+        res_kwargs,
+        set_upstream=True,
+    )
+    # git wrote the tracking configuration straight to the config file via
+    # the `git push` subprocess above -- make sure our own in-memory config
+    # cache picks it up too
+    repo.config.reload()
 
 
 def _append_branch_to_refspec_if_needed(ds, refspecs, branch):
@@ -772,7 +791,7 @@ def _append_branch_to_refspec_if_needed(ds, refspecs, branch):
 
 
 def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs,
-                    set_upstream=False):
+                   set_upstream=False):
     git_options = []
     if force_git_push:
         git_options.append('--force')
