@@ -1126,3 +1126,35 @@ def test_rerun_explicit_dirty_input(path=None):
                  result_renderer='disabled'),
         action='run', status='ok')
     ok_file_has_content(str(ds.pathobj / "out.dat"), "modified", strip=True)
+
+
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_rerun_explicit_dirty_input_stops_range(path=None):
+    """A refused commit must end a range replay, not just be reported
+
+    `Rerun` defaults to on_failure='stop' (gh-7906), so the 'impossible'
+    of the input check aborts the replay. Without it the replay would
+    carry on and re-execute the *following* run commits, although the
+    dataset was just found to be in a state a `rerun` must not run in.
+    """
+    ds = Dataset(path).create(annex=False)
+    create_tree(ds.path, {"in.dat": "content"})
+    ds.save()
+    # only the first of the two commands declares the input that is
+    # dirtied below; the second one would be re-executable on its own
+    ds.run("{} in.dat > out.dat".format(cat_command),
+           inputs=["in.dat"], outputs=["out.dat"], explicit=True,
+           result_renderer='disabled')
+    ds.run("echo appended >>log.dat", outputs=["log.dat"], explicit=True,
+           result_renderer='disabled')
+    assert_repo_status(ds.path)
+
+    (ds.pathobj / "in.dat").write_text("modified")
+    hexsha_before = ds.repo.get_hexsha()
+    with assert_raises(IncompleteResultsError) as cme:
+        ds.rerun(since="HEAD~2", explicit=True, result_renderer='disabled')
+    assert_in_results(cme.value.failed, action='run', status='impossible')
+    # the replay stopped: the second command did not append a second time
+    eq_(hexsha_before, ds.repo.get_hexsha())
+    ok_file_has_content(str(ds.pathobj / "log.dat"), "appended", strip=True)
