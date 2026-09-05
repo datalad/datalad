@@ -32,6 +32,7 @@ from datalad.api import (
     add_archive_content,
     clean,
 )
+from datalad.cli.tests.test_main import run_main
 from datalad.consts import (
     ARCHIVES_SPECIAL_REMOTE,
     DATALAD_SPECIAL_REMOTES_UUIDS,
@@ -50,6 +51,7 @@ from datalad.tests.utils_pytest import (
     assert_not_in,
     assert_raises,
     assert_repo_status,
+    assert_result_count,
     assert_result_values_cond,
     assert_true,
     create_tree,
@@ -486,6 +488,121 @@ def test_add_archive_single_file(repo_path=None):
             archive_content = os.path.basename(archive_name)
             ds.add_archive_content(archive)
             ok_file_has_content(archive_name, archive_content)
+
+
+multi_tree_args = dict(
+    tree={
+        '1.tar.gz': {'1 f.txt': '1 f load'},
+        '2.tar.gz': {'2 f.txt': '2 f load'},
+        'd': {'3.tar.gz': {'3 f.txt': '3 f load'}},
+    }
+)
+
+
+def _get_ncommits(ds):
+    return len(list(ds.repo.get_branch_commits_()))
+
+
+@assert_cwd_unchanged(ok_to_chdir=True)
+@with_tree(**multi_tree_args)
+def test_add_archive_content_multiple(repo_path=None):
+    ds = Dataset(repo_path).create(force=True)
+    archives = ['1.tar.gz', '2.tar.gz', opj('d', '3.tar.gz')]
+    with swallow_outputs():
+        # 2.tar.gz is left untracked for now
+        ds.save(['1.tar.gz', opj('d', '3.tar.gz')], message="added archives")
+    with chpwd(repo_path):
+        ncommits_prior = _get_ncommits(ds)
+        # if any of the archives can not be used, nothing is added at all
+        res = add_archive_content(['1.tar.gz', '2.tar.gz'],
+                                  allow_dirty=True, on_failure='ignore')
+        assert_in_results(
+            res,
+            action='add-archive-content',
+            status='impossible',
+            message="Can not add an untracked archive. "
+                    "Run 'datalad save 2.tar.gz'")
+        # not even the content of the archive which was ok
+        assert_false(exists(opj(repo_path, '1')))
+        assert_equal(_get_ncommits(ds), ncommits_prior)
+
+        # ... the same for an archive which is not there at all
+        res = add_archive_content(['1.tar.gz', 'nonexisting.tar.gz'],
+                                  allow_dirty=True, on_failure='ignore')
+        assert_in_results(res, action='add-archive-content',
+                          status='impossible')
+        assert_false(exists(opj(repo_path, '1')))
+        assert_equal(_get_ncommits(ds), ncommits_prior)
+
+        with swallow_outputs():
+            ds.save('2.tar.gz', message="added the remaining archive")
+        ncommits_prior = _get_ncommits(ds)
+        res = add_archive_content(archives)
+        # a result record per archive, and one for the dataset
+        assert_result_count(
+            res, len(archives) + 1, action='add-archive-content', status='ok')
+        for archive in archives:
+            assert_in_results(
+                res,
+                action='add-archive-content',
+                status='ok',
+                type='file',
+                path=str(Path(repo_path) / archive))
+        ok_file_under_git(repo_path, opj('1', '1 f.txt'), annexed=True)
+        ok_file_under_git(repo_path, opj('2', '2 f.txt'), annexed=True)
+        # archives within a subdirectory are extracted next to them
+        ok_file_under_git(repo_path, opj('d', '3', '3 f.txt'), annexed=True)
+        ok_archives_caches(repo_path, 0)
+        assert_repo_status(repo_path)
+
+        if not ds.repo.is_managed_branch():
+            # all the content ended up in a single commit
+            assert_equal(_get_ncommits(ds), ncommits_prior + 1)
+        commit_msg = ds.repo.format_commit("%B")
+        # all archives are mentioned in that single commit message
+        for archive in archives:
+            assert_in(archive, commit_msg)
+
+    # adding multiple archives while being in a subdirectory should not leave
+    # any temporary directory behind
+    with chpwd(opj(repo_path, 'd')):
+        add_archive_content([opj(pardir, '1.tar.gz'), '3.tar.gz'],
+                            delete_after=True, drop_after=True)
+    assert_equal(
+        list(find_files(r'\.datalad..*', repo_path, exclude='config',
+                        dirs=True)),
+        [])
+    assert_repo_status(repo_path)
+
+
+@assert_cwd_unchanged(ok_to_chdir=True)
+@with_tree(**multi_tree_args)
+def test_add_archive_content_multiple_cmdline_and_keys(repo_path=None):
+    ds = Dataset(repo_path).create(force=True)
+    with swallow_outputs():
+        ds.save(message="added archives")
+    with chpwd(repo_path):
+        # multiple archives could be provided on the command line
+        run_main(['add-archive-content', '1.tar.gz', '2.tar.gz'],
+                 expect_stderr=True)
+        ok_file_under_git(repo_path, opj('1', '1 f.txt'), annexed=True)
+        ok_file_under_git(repo_path, opj('2', '2 f.txt'), annexed=True)
+        assert_repo_status(repo_path)
+
+        keys = [ds.repo.get_file_annexinfo(a)['key']
+                for a in ('1.tar.gz', '2.tar.gz')]
+    # ... and so could be multiple keys, which are extracted under the
+    # current directory
+    with chpwd(opj(repo_path, 'sub'), mkdir=True):
+        res = add_archive_content(keys, key=True, dataset=ds.path)
+        assert_result_count(
+            res, len(keys) + 1, action='add-archive-content', status='ok')
+        ok_file_under_git(repo_path, opj('sub', '1', '1 f.txt'), annexed=True)
+        ok_file_under_git(repo_path, opj('sub', '2', '2 f.txt'), annexed=True)
+        assert_repo_status(repo_path)
+        commit_msg = ds.repo.format_commit("%B")
+        for key in keys:
+            assert_in(key, commit_msg)
 
 
 class TestAddArchiveOptions():
