@@ -41,10 +41,12 @@ from datalad.tests.utils_pytest import (
     assert_repo_status,
     assert_result_count,
     assert_status,
+    corresponding_hexsha,
     create_tree,
     eq_,
     known_failure_windows,
     maybe_adjust_repo,
+    maybe_unadjust_repo,
     neq_,
     ok_,
     ok_file_has_content,
@@ -1039,6 +1041,65 @@ def test_update_reset_dirty(path=None):
     assert_repo_status(ds_clone.path,
                        modified=[ds_clone_s1.repo.path,
                                  ds_clone_s2.repo.path])
+
+
+@slow  # ~10s
+@pytest.mark.parametrize("divergence", ["local_discard", "remote_discard"])
+@with_tempfile(mkdir=True)
+def test_update_reset_adjusted(path=None, *, divergence):
+    """`update --how=reset` must actually run on an adjusted branch following a sibling.
+
+    Two ways the corresponding branch can differ from the sibling:
+    ``local_discard`` (clone has an extra local commit) and ``remote_discard``
+    (the sibling moved back without the clone, e.g. via --force push).
+    Either way, target determination and the reset itself must work on the adjusted branch.
+
+    Regression: target determination used the *adjusted* branch name (e.g.
+    ``adjusted/master(unlocked)``) and built a nonexistent
+    ``<remote>/adjusted/master(unlocked)`` ref, so the command aborted with
+    "Could not determine update target".  It must instead resolve the
+    corresponding branch and reset to ``<remote>/<corresponding>``.
+    """
+    path = Path(path)
+
+    ds_src = Dataset(path / "source").create()
+    (ds_src.pathobj / "remote.txt").write_text("base commit")
+    ds_src.save()
+
+    ds_clone = install(source=ds_src.path, path=path / "clone",
+                       result_xfm="datasets")
+    maybe_adjust_repo(ds_clone.repo)
+    if not ds_clone.repo.is_managed_branch():
+        pytest.skip("test requires adjusted branch support")
+
+    if divergence == 'local_discard':
+        (ds_clone.pathobj / "local.txt").write_text("local only, discard me by reset")
+        ds_clone.save()
+    elif divergence == 'remote_discard':
+        # A raw git reset --hard must move the sibling's corresponding branch
+        # -- the one rewrite that needs an unadjust here (see maybe_unadjust_repo).
+        maybe_unadjust_repo(ds_src.repo)
+        ds_src.repo.call_git(["reset", "--hard", "HEAD~"])
+
+    # Read both real tips with corresponding_hexsha (corr-aware)
+    target_hexsha = corresponding_hexsha(ds_src.repo)
+    pre_update_hexsha = corresponding_hexsha(ds_clone.repo)
+    neq_(pre_update_hexsha, target_hexsha)  # the local clone has diverged
+
+    # reset local clone to sibling (previously raised "Could not determine update target")
+    assert_in_results(
+        ds_clone.update(follow="sibling", how="reset"),
+        action="update.reset", status="ok")
+
+    # The corresponding branch matches the sibling again (local commit gone)...
+    post_update_hexsha = corresponding_hexsha(ds_clone.repo)
+    eq_(post_update_hexsha, target_hexsha)
+    # ... the adjusted view's anchor (basis) was re-anchored to the target too,
+    # otherwise the next git annex adjust would rebuild the view from the wrong basis
+    adjusted = ds_clone.repo.get_active_branch()
+    eq_(ds_clone.repo.get_hexsha(f"refs/basis/{adjusted}"), target_hexsha)
+    # ... and we are still on the adjusted branch.
+    ok_(ds_clone.repo.is_managed_branch())
 
 
 def test_process_how_args():
