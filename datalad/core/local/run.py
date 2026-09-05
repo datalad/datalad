@@ -17,8 +17,12 @@ import os
 import os.path as op
 import warnings
 from argparse import REMAINDER
+from contextlib import contextmanager
 from pathlib import Path
 from tempfile import mkdtemp
+from uuid import uuid4
+
+from fasteners import InterProcessLock
 
 import datalad
 import datalad.support.ansi_colors as ac
@@ -55,6 +59,7 @@ from datalad.support.exceptions import (
     CommandError,
 )
 from datalad.support.globbedpaths import GlobbedPaths
+from datalad.support.locking import try_lock_informatively
 from datalad.support.json_py import dump2stream
 from datalad.support.param import Parameter
 from datalad.ui import ui
@@ -66,6 +71,7 @@ from datalad.utils import (
     get_dataset_root,
     getpwd,
     join_cmdline,
+    path_is_subpath,
     quote_cmdlinearg,
 )
 
@@ -100,6 +106,308 @@ def _parse_sub_status(sub_status_output, ds_path):
             sha, relpath = parts[0], parts[1]
             result[op.join(ds_path, relpath)] = sha
     return result
+
+
+RUN_COMMIT_MARKER = '[DATALAD RUNCMD]'
+RUN_RECORD_MARKER = '=== Do not change lines below ==='
+# environment variable that lets a `run` executed by another `run`'s
+# command discover the chain of `run`s it is nested in
+RUN_ANCESTRY_ENVVAR = 'DATALAD_RUN_ANCESTRY'
+# commit message trailer reporting that chain for a nested `run`
+RUN_ANCESTRY_TRAILER = 'DataLad-Run-Ancestry:'
+# commit message git-annex uses for the commits it makes to maintain an
+# adjusted branch (cf. AnnexRepo._save_post(), which matches it likewise)
+ANNEX_ADJUSTMENT_MESSAGE = 'git-annex adjusted branch'
+
+
+def _get_run_ancestry():
+    """Return the tokens of the `run`s this process is running inside of
+
+    Outermost first. Empty for a `run` that was not started by the command
+    of another `run`.
+    """
+    return os.environ.get(RUN_ANCESTRY_ENVVAR, '').split()
+
+
+def _get_commit_ancestry(message):
+    """Return the `run` ancestry tokens recorded in a commit message"""
+    for line in reversed(message.splitlines()):
+        if line.startswith(RUN_ANCESTRY_TRAILER):
+            return line[len(RUN_ANCESTRY_TRAILER):].split()
+    return []
+
+
+def _is_run_commit_message(message):
+    """Return whether a commit message carries a `run` record"""
+    return message.startswith(RUN_COMMIT_MARKER) \
+        and RUN_RECORD_MARKER in message
+
+
+def _is_annex_adjustment_commit(message):
+    """Return whether a commit is git-annex's own branch adjustment"""
+    return message.strip() == ANNEX_ADJUSTMENT_MESSAGE
+
+
+def _iter_commits(repo, base, head):
+    """Yield ``(hexsha, parents, message)`` for a ``base..head`` chain
+
+    The first-parent chain is followed, which is what makes a "run merge"
+    commit (cf. ``datalad save --since``) represent everything it wraps:
+    its subsumed commits live on the second parent.
+
+    Parameters
+    ----------
+    repo : GitRepo
+    base, head : str
+      Any commit-ish that delimits the range to report on.
+    """
+    # a single git call for all commits and their full messages. A NUL
+    # byte cannot occur in a commit message, so it can delimit both the
+    # fields and the records without any escaping
+    out = repo.call_git(
+        ['log', '--first-parent', '--format=%H%x00%P%x00%B%x00',
+         '{}..{}'.format(base, head)])
+    # ..., git terminates each record with a newline of its own
+    fields = out.split('\0')
+    for hexsha, parents, message in zip(fields[::3], fields[1::3],
+                                        fields[2::3]):
+        hexsha = hexsha.strip('\n')
+        if hexsha:
+            yield hexsha, parents.split(), message
+
+
+def _iter_command_commits(repo, base, head):
+    """Like ``_iter_commits()``, but skipping git-annex's own commits
+
+    On an adjusted branch git-annex maintains the branch with commits of
+    its own. Those re-render content that is committed elsewhere in the
+    chain and are the doing of no command, so they neither need a `run`
+    record nor make one.
+
+    Parameters
+    ----------
+    repo : GitRepo
+    base, head : str
+      Any commit-ish that delimits the range to report on.
+    """
+    for hexsha, parents, message in _iter_commits(repo, base, head):
+        if _is_annex_adjustment_commit(message):
+            lgr.debug('Skipping git-annex adjustment commit %s', hexsha)
+            continue
+        yield hexsha, parents, message
+
+
+def _unrecorded_commit_paths(repo, base, head):
+    """Report paths committed in ``base..head`` without a `run` record
+
+    A commit made by a (nested) `datalad run` documents its own
+    provenance completely, hence the files it contains are not
+    undeclared side-effects of an outer command (gh-7900). Only changes
+    introduced by commits *without* such a record are reported here.
+
+    Parameters
+    ----------
+    repo : GitRepo
+    base, head : str
+      Any commit-ish that delimits the range to report on.
+
+    Returns
+    -------
+    set of Path
+      Absolute paths of the modified content.
+    """
+    unrecorded = set()
+    for hexsha, parents, message in _iter_command_commits(repo, base, head):
+        if _is_run_commit_message(message):
+            continue
+        # a commit without a parent introduced everything it contains
+        unrecorded.update(
+            repo.diff(parents[0] if parents else None, hexsha))
+    return unrecorded
+
+
+def _classify_commits(repo, base, head, token):
+    """Report who made the commits in ``base..head``
+
+    Commits appearing in a dataset while a command is executed need not be
+    the command's doing: a concurrent `run` may have committed its own
+    results in the meantime, and wrapping those into this run's merge
+    commit would attribute them to the wrong command (gh-7899).
+
+    A commit is attributed to this `run` when it reports this run's
+    `token` among its ancestry (i.e. it was made by a nested `run` that
+    this command started), or when it carries no `run` record at all --
+    then it is a plain commit of the command itself. A commit with a `run`
+    record that does not name this run was made by a concurrent one.
+
+    Parameters
+    ----------
+    repo : GitRepo
+    base, head : str
+      Any commit-ish that delimits the range to report on.
+    token : str
+      Ancestry token of the `run` asking.
+
+    Returns
+    -------
+    (bool, bool)
+      Whether the range contains a commit of this `run`, and whether it
+      contains a commit of a concurrent one.
+    """
+    own = concurrent = False
+    for _, _, message in _iter_command_commits(repo, base, head):
+        if not _is_run_commit_message(message) \
+                or token in _get_commit_ancestry(message):
+            own = True
+        else:
+            concurrent = True
+    return own, concurrent
+
+
+def _is_run_recorded_range(repo, base, head):
+    """Return whether ``base..head`` is non-empty and fully `run`-recorded"""
+    if not any(True for _ in _iter_commits(repo, base, head)):
+        return False
+    return all(_is_run_commit_message(m)
+               for _, _, m in _iter_command_commits(repo, base, head))
+
+
+def _is_run_recorded_subds(path, props):
+    """Return whether a subdataset pointer move is covered by `run` commits
+
+    Parameters
+    ----------
+    path : Path
+      Absolute path of the subdataset.
+    props : dict
+      Properties of the respective ``diff()`` report on the subdataset.
+    """
+    if props.get('type') != 'dataset':
+        return False
+    prev_sha = props.get('prev_gitshasum')
+    sha = props.get('gitshasum')
+    if not prev_sha or not sha:
+        return False
+    subrepo = Dataset(str(path)).repo
+    if subrepo is None:
+        # not installed (anymore), we cannot tell
+        lgr.debug('Cannot inspect commits of uninstalled subdataset %s', path)
+        return False
+    return _is_run_recorded_range(subrepo, prev_sha, sha)
+
+
+def _get_dirty_inputs(ds, globbed_inputs, pwd):
+    """Report declared inputs that have unsaved modifications
+
+    Untracked content is only reported when it is a declared input
+    itself, and not when it merely happens to be inside a declared
+    directory.
+
+    Parameters
+    ----------
+    ds : Dataset
+    globbed_inputs : GlobbedPaths
+    pwd : str
+      Absolute path the input specification is relative to.
+
+    Returns
+    -------
+    list of (str, str)
+      Sorted ``(path relative to the dataset, state)`` tuples.
+    """
+    abspaths = [
+        p for p in (op.normpath(op.join(pwd, ip))
+                    for ip in globbed_inputs.expand_strict())
+        # an input that is not in this dataset is not ours to judge, it is
+        # reported by the input preparation instead
+        if p == ds.path or path_is_subpath(p, ds.path)
+    ]
+    if not abspaths:
+        return []
+    declared = {op.relpath(p, ds.path) for p in abspaths}
+    dirty = []
+    for p, props in ds.repo.status(
+            paths=abspaths,
+            untracked='normal',
+            # a comprehensive evaluation of a subdataset worktree could
+            # be arbitrarily expensive, the recorded commit is what a
+            # `rerun` would restore
+            eval_submodule_state='commit').items():
+        state = props.get('state')
+        if state in (None, 'clean'):
+            continue
+        # ATTN: relpath() rather than Path.relative_to(), the status
+        # report is anchored at the repo, which need not be the same
+        # path as the dataset (symlinks)
+        relpath = op.relpath(str(p), ds.repo.pathobj)
+        if state == 'untracked' and relpath not in declared:
+            continue
+        dirty.append((relpath, state))
+    return sorted(dirty)
+
+
+def _save_lock_path(ds):
+    """Return the lock file that guards saving in `ds`'s hierarchy
+
+    Parameters
+    ----------
+    ds : Dataset
+    """
+    # topmost=True reports `ds` itself when it has no superdataset, and
+    # registered_only=True (the default) keeps an unrelated Git repository
+    # that merely contains the dataset out of it
+    lock_ds = ds.get_superdataset(topmost=True) or ds
+    return lock_ds.repo.dot_git / 'datalad' / 'run-save.lck'
+
+
+@contextmanager
+def _lock_save(ds):
+    """Serialize the result-saving phase of `run` within a dataset hierarchy
+
+    Concurrent `run` invocations in a dataset share its Git index. Without
+    serialization one process can commit what another one just staged --
+    misattributing it in a `run` record, and leaving the other command
+    with nothing to commit and no record at all -- or fail outright on
+    `index.lock` (gh-7899). Only the (short) saving phase is serialized,
+    command execution itself remains parallel.
+
+    The lock is taken on the topmost superdataset, not on `ds`: saving is
+    recursive, so a `run` in a superdataset writes the index of every
+    subdataset underneath it, and a `run` in one of those subdatasets
+    would otherwise guard the very same index with a different lock.
+
+    Parameters
+    ----------
+    ds : Dataset
+    """
+    lock_path = _save_lock_path(ds)
+    try:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        # e.g. a read-only .git -- nothing we could (or need to) fix,
+        # a lock is an optimization of the concurrent case, not a
+        # requirement for the (predominant) serial one
+        lgr.debug('Cannot create %s, proceeding without a lock: %s',
+                  lock_path.parent, CapturedException(exc))
+        yield
+        return
+    # generous timeouts: the command already ran, so giving up on the lock
+    # would mean discarding its results. Wait (with a report on who holds
+    # the lock) far longer than any plausible queue of saves, and only
+    # then proceed unlocked rather than fail
+    with try_lock_informatively(
+            InterProcessLock(str(lock_path)),
+            purpose='save results of `run` in %s' % ds.path,
+            timeouts=(5, 60, 600, 1800),
+            proceed_unlocked=True) as locked:
+        if not locked:
+            # proceeding unlocked is exactly the mode this lock exists to
+            # remove, so say so at a level that matches the consequence
+            lgr.warning(
+                'Saving the results of `run` in %s without a lock on %s. '
+                'A `run` saving concurrently could commit them under its '
+                'own record (gh-7899).', ds.path, lock_path)
+        yield
 
 
 assume_ready_opt = Parameter(
@@ -152,6 +460,26 @@ class Run(Interface):
     interpretable and re-executable in the actual top-level superdataset. For
     this reason the provenance record contains the dataset ID of that
     superdataset.
+
+    *Nested and concurrent execution*
+
+    || REFLOW >>
+    A command may run `datalad run` itself. Such a nested run records its own
+    provenance completely, hence its commits are not reported as undeclared
+    modifications of the enclosing command, which only needs to declare the
+    outputs it produces itself. Any *other* commit that a command creates in
+    [CMD: --explicit CMD][PY: `explicit` PY] mode must be covered by an output
+    declaration -- set the configuration variable
+    'datalad.run.dirty-committed' to 'ignore' to disable that check.
+    << REFLOW ||
+
+    || REFLOW >>
+    Several `run` invocations can operate in one dataset simultaneously. Only
+    the recording of results is serialized between them, command execution is
+    not. In [CMD: --explicit CMD][PY: `explicit` PY] mode a commit is limited
+    to the declared outputs, so that no run record can claim a concurrently
+    produced result of another command.
+    << REFLOW ||
 
     *Command format*
 
@@ -290,7 +618,12 @@ class Run(Interface):
             action="store_true",
             doc="""Consider the specification of inputs and outputs to be
             explicit. Don't warn if the repository is dirty, and only save
-            modifications to the listed outputs."""),
+            modifications to the listed outputs. A declared input with
+            unsaved modifications is refused, because the run record could
+            not describe the state the command was given: save it, use
+            [CMD: --assume-ready=inputs CMD][PY: `assume_ready='inputs'` PY],
+            or set the configuration variable 'datalad.run.dirty-inputs' to
+            'warning' or 'ignore' to proceed regardless."""),
         message=save_message_opt,
         sidecar=Parameter(
             args=('--sidecar',),
@@ -598,7 +931,9 @@ def _unlock_or_remove(dset_path, paths, remove=False):
                 to_remove.append(res)
                 continue
             elif (
-                res["status"] == "error" and res["error_message"] == "File unknown to git"
+                res["status"] == "error"
+                # not every error result comes with this key
+                and res.get("error_message") == "File unknown to git"
                 and op.isdir(res["path"]) and not os.listdir(res["path"])
             ):
                 lgr.debug("Empty directory %(path)s is not known to git, skipping unlock", res)
@@ -731,12 +1066,26 @@ def _format_iospecs(specs, **kwargs):
     ]
 
 
-def _execute_command(command, pwd):
+def _execute_command(command, pwd, env=None):
+    """Execute `command` in `pwd`
+
+    Parameters
+    ----------
+    command : str
+    pwd : str
+    env : dict, optional
+      Complete environment for the command. The environment of this
+      process is inherited when none is given.
+
+    Returns
+    -------
+    (int, CommandError or None)
+    """
     from datalad.cmd import WitlessRunner
 
     exc = None
     cmd_exitcode = None
-    runner = WitlessRunner(cwd=pwd)
+    runner = WitlessRunner(cwd=pwd, env=env)
     try:
         lgr.info("== Command start (output follows) =====")
         runner.run(
@@ -973,6 +1322,31 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 'placeholder: %s', exc))
         return
 
+    # Under --explicit a dirty dataset is acceptable, but a declared
+    # *input* with unsaved modifications is not: the run record would
+    # name an input state that is nowhere recorded, and a `rerun` would
+    # use the committed one instead (gh-5312, gh-3565). Checked before
+    # any worktree preparation, so that a rejected run leaves no trace.
+    if explicit and not (inject or dry_run or skip_dirtycheck) \
+            and assume_ready not in ('inputs', 'both'):
+        dirty_inputs = _get_dirty_inputs(ds, globbed['inputs'], pwd)
+        on_dirty_inputs = ds.config.get(
+            'datalad.run.dirty-inputs', default='error') \
+            if dirty_inputs else 'ignore'
+        if on_dirty_inputs in ('error', 'warning'):
+            dirty_inputs_msg = (
+                'declared inputs have unsaved modifications: %s. '
+                'Save them, run with --assume-ready=inputs, or set config '
+                'datalad.run.dirty-inputs=ignore to proceed anyway',
+                ['{} [{}]'.format(ipath, istate)
+                 for ipath, istate in dirty_inputs])
+            if on_dirty_inputs == 'error':
+                yield get_status_dict(
+                    'run', ds=ds, status='impossible',
+                    message=dirty_inputs_msg)
+                return
+            lgr.warning(dirty_inputs_msg[0], dirty_inputs_msg[1])
+
     if not (inject or dry_run):
         yield from _prep_worktree(
             ds_path, pwd, globbed,
@@ -1060,8 +1434,17 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         ds.repo.call_git(["submodule", "status", "--recursive"])
         if pre_cmd_hexsha is not None else None)
 
+    # identity of this `run`, for any `run` that its command may start
+    # to report back in its commit (see _classify_commits())
+    run_token = uuid4().hex
+    run_ancestry = _get_run_ancestry()
+
     if not inject:
-        cmd_exitcode, exc = _execute_command(cmd_expanded, pwd)
+        cmd_exitcode, exc = _execute_command(
+            cmd_expanded, pwd,
+            env=dict(os.environ,
+                     **{RUN_ANCESTRY_ENVVAR: ' '.join(
+                         run_ancestry + [run_token])}))
         run_info['exit'] = cmd_exitcode
 
     # Detect if the command created commits — either in the top-level
@@ -1069,11 +1452,18 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     # which routes through diff_dataset for merge creation.  Without
     # inner commits, since=None uses the standard Status-based save.
     post_cmd_hexsha = ds.repo.get_hexsha() if not inject else None
-    cmd_made_commits = (
+    head_moved = (
         pre_cmd_hexsha is not None
         and post_cmd_hexsha is not None
         and pre_cmd_hexsha != post_cmd_hexsha
     )
+    # not everything that got committed while the command was running is
+    # the command's doing -- a concurrent `run` must not end up inside
+    # this run's merge commit (gh-7899)
+    own_commits, concurrent_commits = _classify_commits(
+        ds.repo, pre_cmd_hexsha, post_cmd_hexsha, run_token) \
+        if head_moved else (False, False)
+    cmd_made_commits = own_commits
 
     # Also detect subdataset-only commits by comparing the single-string
     # submodule status snapshot (one git call, not N Dataset objects).
@@ -1082,6 +1472,20 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
             ["submodule", "status", "--recursive"])
         if pre_cmd_sub_status != post_sub_status:
             cmd_made_commits = True
+
+    # A merge can only ever have one range of commits as its second
+    # parent. Once a concurrent run's commits are interleaved with this
+    # command's own, no such range covers only this command, so a merge
+    # would necessarily claim the other run's work -- and a `rerun` of
+    # this record would re-execute it. Record the results without a merge
+    # instead: the interleaved commits keep the records they came with.
+    wrap_commits_in_merge = cmd_made_commits and not concurrent_commits
+    if cmd_made_commits and concurrent_commits:
+        lgr.info(
+            'Commits of a concurrent `run` are interleaved with those of '
+            'this command in %s. Recording the results without a merge '
+            'commit, so that no record claims the other run\'s commits.',
+            ds.path)
 
     # Re-glob to capture any new outputs.
     #
@@ -1118,11 +1522,16 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     msg = msg.format(
         message if message is not None else cmd_shorty,
         '"{}"'.format(record) if record_path else record)
+    if run_ancestry:
+        # a `run` nested in another one: let the enclosing `run` tell this
+        # commit apart from one of a concurrent, unrelated `run`
+        msg += '\n{} {}\n'.format(
+            RUN_ANCESTRY_TRAILER, ' '.join(run_ancestry))
 
     # Safety: if the command switched branches, creating a merge commit
     # would be wrong — it would link two unrelated lines of history.
     # Save the run record for manual recovery and error out.
-    if cmd_made_commits and pre_cmd_branch is not None:
+    if head_moved and pre_cmd_branch is not None:
         post_cmd_branch = ds.repo.get_active_branch()
         if post_cmd_branch != pre_cmd_branch:
             repo = ds.repo
@@ -1167,8 +1576,15 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     # since there is no declaration to check against.
     if cmd_made_commits and explicit and has_declared_outputs:
         committed_diff = ds.repo.diff(pre_cmd_hexsha, post_cmd_hexsha)
+        # anything that a (nested) `datalad run` committed comes with a
+        # complete provenance record of its own, and is no undeclared
+        # side-effect of this command (gh-7900) -- only consider content
+        # that was committed without such a record
+        unrecorded = _unrecorded_commit_paths(
+            ds.repo, pre_cmd_hexsha, post_cmd_hexsha)
         committed_paths = {
-            str(p.relative_to(ds.pathobj)) for p in committed_diff
+            str(p.relative_to(ds.pathobj)) for p, props in committed_diff.items()
+            if p in unrecorded and not _is_run_recorded_subds(p, props)
         }
         # Normalize declared outputs to relative-to-dataset format
         declared_set = set()
@@ -1256,24 +1672,30 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     yield run_result
 
     if do_save:
-        with chpwd(pwd):
+        # serialize with any concurrent `run` in this dataset: staging
+        # and committing share the Git index (gh-7899)
+        with _lock_save(ds), chpwd(pwd):
             for r in Save.__call__(
                     dataset=ds_path,
                     path=outputs_to_save,
+                    # under --explicit only the declared outputs must end
+                    # up in the commit, even when something else got
+                    # staged in the meantime (gh-7899)
+                    _partial_commit=bool(explicit and outputs_to_save),
                     recursive=True,
                     message=msg,
                     jobs=jobs,
                     # Only use since= when the command created commits
                     # (in the top-level or any subdataset).  Without
                     # inner commits, use since=None (standard Status path).
-                    since=pre_cmd_hexsha if cmd_made_commits else None,
+                    since=pre_cmd_hexsha if wrap_commits_in_merge else None,
                     # Pass pre-command sub HEADs so Save can detect
                     # subdataset commits on adjusted branches where
                     # diff_dataset can't see them.  Parse from the
                     # lightweight submodule status snapshot.
                     _since_sub_info=_parse_sub_status(
                         pre_cmd_sub_status, ds_path)
-                    if cmd_made_commits and pre_cmd_sub_status
+                    if wrap_commits_in_merge and pre_cmd_sub_status
                     else None,
                     # Message for the auxiliary commit that wraps
                     # uncommitted changes before the run-merge.  Keeps
