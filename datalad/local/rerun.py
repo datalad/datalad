@@ -582,6 +582,15 @@ def _rerun(dset, results, assume_ready=None, explicit=False, jobs=None):
                             # run records outputs relative to the "pwd" field.
                             if op.relpath(p, outputs_dir) not in outputs]
 
+            # a run that recorded a merge has to merge again, otherwise the
+            # command would be re-executed on an entirely different tree
+            merge_info = run_info.get("merge") or {}
+            merge = merge_info.get("commit") or merge_info.get("source")
+            if merge:
+                # the merged state may itself have been recreated by this
+                # replay, in which case that is what to merge now
+                merge = new_bases.get(merge, merge)
+
             message = res["rerun_message"] or res["run_message"]
             for r in run_command(run_info['cmd'],
                                  dataset=dset,
@@ -592,6 +601,8 @@ def _rerun(dset, results, assume_ready=None, explicit=False, jobs=None):
                                  explicit=explicit,
                                  rerun_outputs=auto_outputs,
                                  message=message,
+                                 merge=merge,
+                                 merge_strategy=merge_info.get("strategy"),
                                  jobs=jobs,
                                  rerun_info=run_info):
                 yield r
@@ -706,6 +717,14 @@ def _get_script_handler(script, since, revision):
             commit_descr = ds_repo.describe(res["commit"])
             ofh.write('# (record: {})\n'.format(
                 commit_descr if commit_descr else res["commit"]))
+            merge_info = run_info.get("merge")
+            if merge_info:
+                # the merge is not part of the command, but without it the
+                # command was executed on a different tree -- say so rather
+                # than write a script that silently does something else
+                ofh.write(
+                    '# (ran as part of merging {source} ({commit}), '
+                    'strategy: {strategy})\n'.format(**merge_info))
 
             ofh.write(expanded_cmd + "\n")
         if ofh is not sys.stdout:

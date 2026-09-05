@@ -67,6 +67,7 @@ from datalad.tests.utils_pytest import (
     ok_exists,
     ok_file_has_content,
     patch_config,
+    skip_if_adjusted_branch,
     slow,
     swallow_logs,
     swallow_outputs,
@@ -1292,3 +1293,316 @@ def test_run_merge_subdataset_deletions(path=None):
 
     # super also has merge
     _assert_run_merge(ds)
+
+
+# -- Tests for `run --merge` (recording how a branch is derived) ----------
+
+def _parents(repo, ref="HEAD"):
+    """Return the parent hexshas of `ref`."""
+    return repo.call_git(
+        ['rev-list', '--parents', '-1', ref]).split()[1:]
+
+
+def _setup_incoming(ds, content):
+    """Put `content` on an 'incoming' branch, return to the previous branch.
+
+    Returns the hexsha of the new 'incoming' state.
+    """
+    repo = ds.repo
+    orig_branch = repo.get_active_branch()
+    if 'incoming' in repo.get_branches():
+        repo.checkout('incoming')
+    else:
+        repo.checkout('incoming', options=['-b'])
+    # remove_existing: content of an annexed file must not be written
+    # through its symlink, that would not register as a modification
+    create_tree(ds.path, content, remove_existing=True)
+    ds.save(message="incoming update")
+    incoming = repo.get_hexsha()
+    repo.checkout(orig_branch)
+    return incoming
+
+
+@with_tempfile(mkdir=True)
+@skip_if_adjusted_branch
+@pytest.mark.ai_generated
+def test_run_merge_theirs(path=None):
+    # the "incoming"/"incoming-processed" workflow: a branch that is built
+    # from another one by a command
+    ds = Dataset(path).create()
+    repo = ds.repo
+    _setup_incoming(ds, {"raw.dat": "one"})
+    # 'processed' starts out from 'incoming'
+    repo.checkout('incoming', options=['-b', 'processed'])
+
+    # first round: 'incoming' is an ancestor, so there is nothing to merge,
+    # but the command still runs on its tree
+    ds.run("{} raw.dat > cooked.dat".format(cat_command),
+           merge='incoming', merge_strategy='theirs')
+    assert_repo_status(ds.path)
+    ok_file_has_content(op.join(path, "cooked.dat"), "one", strip=True)
+
+    # second round: 'incoming' moved on, so a merge is recorded
+    incoming = _setup_incoming(ds, {"raw.dat": "two"})
+    processed_before = repo.get_hexsha()
+    ds.run("{} raw.dat > cooked.dat".format(cat_command),
+           merge='incoming', merge_strategy='theirs')
+    assert_repo_status(ds.path)
+    # exactly the two expected parents, in the documented order
+    eq_(_parents(repo), [processed_before, incoming])
+    # the tree is the one of 'incoming', as processed by the command
+    ok_file_has_content(op.join(path, "raw.dat"), "two", strip=True)
+    ok_file_has_content(op.join(path, "cooked.dat"), "two", strip=True)
+    # and the run record says how it came about
+    _, info = get_run_info(ds, repo.format_commit("%B"))
+    eq_(info["merge"],
+        dict(source='incoming', commit=incoming, strategy='theirs'))
+
+
+@with_tempfile(mkdir=True)
+@skip_if_adjusted_branch
+@pytest.mark.ai_generated
+def test_run_merge_strategy_merge(path=None):
+    # the default strategy is a regular content merge
+    ds = Dataset(path).create()
+    repo = ds.repo
+    create_tree(path, {"base.dat": "base"})
+    ds.save(to_git=True)
+    incoming = _setup_incoming(ds, {"side.dat": "side"})
+    create_tree(path, {"mine.dat": "mine"})
+    ds.save(to_git=True)
+    mine = repo.get_hexsha()
+
+    ds.run(touch_command + 'out.dat', merge='incoming')
+    assert_repo_status(ds.path)
+    eq_(_parents(repo), [mine, incoming])
+    # content of both branches, plus the output of the command
+    for f in ("base.dat", "side.dat", "mine.dat", "out.dat"):
+        ok_exists(op.join(path, f))
+
+
+@with_tempfile(mkdir=True)
+@skip_if_adjusted_branch
+@pytest.mark.ai_generated
+def test_run_merge_strategy_ours(path=None):
+    # 'ours' records the merge, but ignores the content of the merged state
+    ds = Dataset(path).create()
+    repo = ds.repo
+    create_tree(path, {"mine.dat": "mine"})
+    ds.save(to_git=True)
+    incoming = _setup_incoming(ds, {"side.dat": "side"})
+    mine = repo.get_hexsha()
+
+    ds.run(touch_command + 'out.dat',
+           merge='incoming', merge_strategy='ours')
+    assert_repo_status(ds.path)
+    eq_(_parents(repo), [mine, incoming])
+    ok_exists(op.join(path, "mine.dat"))
+    ok_exists(op.join(path, "out.dat"))
+    assert_false(op.exists(op.join(path, "side.dat")))
+
+
+@with_tempfile(mkdir=True)
+@skip_if_adjusted_branch
+@pytest.mark.ai_generated
+def test_run_merge_without_content_change(path=None):
+    # a merge that changes nothing about the content is still worth
+    # recording: it says that this state was derived from the merged one
+    ds = Dataset(path).create()
+    repo = ds.repo
+    incoming = _setup_incoming(ds, {"raw.dat": "one"})
+    mine = repo.get_hexsha()
+
+    res = ds.run("cd .", merge='incoming', merge_strategy='ours')
+    assert_repo_status(ds.path)
+    assert_in_results(res, action='save', status='ok')
+    eq_(_parents(repo), [mine, incoming])
+    _, info = get_run_info(ds, repo.format_commit("%B"))
+    eq_(info["merge"]["commit"], incoming)
+
+
+@with_tempfile(mkdir=True)
+@skip_if_adjusted_branch
+@pytest.mark.ai_generated
+def test_run_merge_conflict(path=None):
+    ds = Dataset(path).create()
+    repo = ds.repo
+    _setup_incoming(ds, {"contested.dat": "theirs"})
+    create_tree(path, {"contested.dat": "ours"})
+    ds.save(to_git=True)
+    head = repo.get_hexsha()
+
+    res = ds.run(touch_command + 'out.dat', merge='incoming',
+                 on_failure='ignore')
+    assert_in_results(res, action='run', status='error')
+    message = res[0]["message"]
+    assert_in("contested.dat", message[0] % message[1:])
+    # no merge state and no modification is left behind
+    eq_(head, repo.get_hexsha())
+    assert_repo_status(ds.path)
+    assert_false((repo.dot_git / 'MERGE_HEAD').exists())
+
+
+@with_tempfile(mkdir=True)
+@skip_if_adjusted_branch
+@pytest.mark.ai_generated
+def test_run_merge_invalid(path=None):
+    ds = Dataset(path).create()
+    _setup_incoming(ds, {"raw.dat": "one"})
+
+    # a strategy without anything to merge
+    assert_in_results(
+        ds.run(touch_command + 'out.dat', merge_strategy='theirs',
+               on_failure='ignore'),
+        action='run', status='impossible')
+    # a revision that does not exist
+    assert_in_results(
+        ds.run(touch_command + 'out.dat', merge='nowhere',
+               on_failure='ignore'),
+        action='run', status='error')
+    # explicit mode cannot make the guarantee it is about
+    assert_in_results(
+        ds.run(touch_command + 'out.dat', merge='incoming', explicit=True,
+               outputs=['out.dat'], on_failure='ignore'),
+        action='run', status='impossible')
+    # nothing of this touched the dataset
+    assert_repo_status(ds.path)
+
+
+@with_tempfile(mkdir=True)
+@skip_if_adjusted_branch
+@pytest.mark.ai_generated
+def test_run_merge_subdataset_refused(path=None):
+    # a merge that would change the state of a subdataset is refused rather
+    # than recorded and then silently undone by the subsequent save
+    ds = Dataset(path).create()
+    sub = ds.create('sub')
+    ds.save()
+    repo = ds.repo
+    orig_branch = repo.get_active_branch()
+    repo.checkout('incoming', options=['-b'])
+    create_tree(sub.path, {"insub.dat": "insub"})
+    sub.save(to_git=True)
+    ds.save()
+    repo.checkout(orig_branch)
+    # checking out a branch does not update the worktree of a subdataset
+    repo.call_git(['submodule', 'update', '--recursive'])
+    head = repo.get_hexsha()
+
+    assert_in_results(
+        ds.run(touch_command + 'out.dat', merge='incoming',
+               on_failure='ignore'),
+        action='run', status='impossible')
+    eq_(head, repo.get_hexsha())
+    assert_repo_status(ds.path)
+
+
+@with_tempfile(mkdir=True)
+@skip_if_adjusted_branch
+@pytest.mark.ai_generated
+def test_run_merge_dry_run(path=None):
+    ds = Dataset(path).create()
+    incoming = _setup_incoming(ds, {"raw.dat": "one"})
+    head = ds.repo.get_hexsha()
+
+    res = ds.run(touch_command + 'out.dat', merge='incoming',
+                 merge_strategy='theirs', dry_run='basic')
+    eq_(res[0]["run_info"]["merge"]["commit"], incoming)
+    # a dry run neither merges nor commits anything
+    eq_(head, ds.repo.get_hexsha())
+    assert_repo_status(ds.path)
+
+
+@with_tempfile(mkdir=True)
+@skip_if_adjusted_branch
+@pytest.mark.ai_generated
+def test_run_merge_theirs_consumes_source(path=None):
+    # the archetypal case: the merged branch holds an archive, the command
+    # unpacks and removes it, so nothing of the merged tree survives as-is
+    ds = Dataset(path).create()
+    repo = ds.repo
+    _setup_incoming(ds, {"archive.dat": "payload"})
+    repo.checkout('incoming', options=['-b', 'processed'])
+    cmd = "{} archive.dat > payload.dat && {} archive.dat".format(
+        cat_command, "del" if on_windows else "rm")
+    ds.run(cmd, merge='incoming', merge_strategy='theirs')
+    _setup_incoming(ds, {"archive.dat": "payload2"})
+    ds.run(cmd, merge='incoming', merge_strategy='theirs')
+
+    # nothing of the merge is left dangling in the index or working tree
+    assert_repo_status(ds.path)
+    assert_false(op.lexists(op.join(path, "archive.dat")))
+    ok_file_has_content(op.join(path, "payload.dat"), "payload2", strip=True)
+    assert_not_in(
+        "archive.dat",
+        repo.call_git(['ls-tree', '--name-only', 'HEAD']).split())
+
+
+@with_tempfile(mkdir=True)
+@skip_if_adjusted_branch
+@pytest.mark.ai_generated
+def test_run_merge_declared_output(path=None):
+    # an output that is unlocked before the command must be unlocked to the
+    # merged state, not to the one the branch had before the merge
+    ds = Dataset(path).create()
+    repo = ds.repo
+    _setup_incoming(ds, {"data.dat": "first"})
+    repo.checkout('incoming', options=['-b', 'processed'])
+    cmd = "{} data.dat > seen.dat".format(cat_command)
+    ds.run(cmd, merge='incoming', merge_strategy='theirs',
+           outputs=['data.dat', 'seen.dat'])
+    _setup_incoming(ds, {"data.dat": "second"})
+
+    ds.run(cmd, merge='incoming', merge_strategy='theirs',
+           outputs=['data.dat', 'seen.dat'])
+    assert_repo_status(ds.path)
+    ok_file_has_content(op.join(path, "data.dat"), "second", strip=True)
+    ok_file_has_content(op.join(path, "seen.dat"), "second", strip=True)
+
+
+@with_tempfile(mkdir=True)
+@skip_if_adjusted_branch
+@pytest.mark.ai_generated
+def test_run_merge_command_commits(path=None):
+    # a command may commit itself, and thereby conclude the prepared merge --
+    # the run record then goes into the commit that wraps what it did
+    ds = Dataset(path).create()
+    repo = ds.repo
+    _setup_incoming(ds, {"raw.dat": "one"})
+    repo.checkout('incoming', options=['-b', 'processed'])
+    create_tree(path, {"processed.dat": "old"})
+    ds.save(to_git=True)
+    incoming = _setup_incoming(ds, {"raw.dat": "two"})
+    processed_before = repo.get_hexsha()
+
+    ds.run("{} raw.dat > cooked.dat && datalad save -m inner".format(
+        cat_command), merge='incoming', merge_strategy='theirs')
+    assert_repo_status(ds.path)
+    # the run record is at the top ...
+    _, info = get_run_info(ds, repo.format_commit("%B"))
+    ok_(info is not None)
+    # ... on a commit that keeps the previous state as its first parent ...
+    eq_(_parents(repo)[0], processed_before)
+    # ... and does not lose track of what was merged
+    ok_(repo.is_ancestor(incoming, "HEAD"))
+    ok_file_has_content(op.join(path, "cooked.dat"), "two", strip=True)
+    assert_false(op.lexists(op.join(path, "processed.dat")))
+
+
+@with_tempfile(mkdir=True)
+@skip_if_adjusted_branch
+@pytest.mark.ai_generated
+def test_run_merge_command_stages(path=None):
+    # a command may stage content without committing it (think
+    # `add-archive-content --no-commit`).  Git refuses a partial commit while
+    # a merge is pending, so this must not trip over the staged content.
+    ds = Dataset(path).create()
+    repo = ds.repo
+    incoming = _setup_incoming(ds, {"raw.dat": "one"})
+    mine = repo.get_hexsha()
+
+    ds.run("{} staged.dat && git add staged.dat".format(touch_command),
+           merge='incoming', merge_strategy='ours')
+    assert_repo_status(ds.path)
+    eq_(_parents(repo), [mine, incoming])
+    ok_exists(op.join(path, "staged.dat"))
