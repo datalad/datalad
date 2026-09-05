@@ -540,10 +540,20 @@ def _rerun(dset, results, assume_ready=None, explicit=False, jobs=None):
             if rerun_action == "run":
                 ds_repo.checkout(parent)
                 head = parent
-            else:
+            elif head != onto:
+                # Non-run commit on a merge side-branch: silent-skip to keep
+                # the original SHA available for the upcoming merge commit.
                 _mark_nonrun_result(res, "skip")
                 yield res
                 continue
+            else:
+                # Leading non-run commit under explicit --since (head still at
+                # onto, no run replay yet).  Previously silent-skipped here,
+                # which left new_bases unpopulated and caused the subsequent
+                # run iteration to checkout the source-branch parent, splicing
+                # source ancestry into the rerun branch.  Fix: record the base
+                # mapping and let skip-or-pick cherry-pick it below.
+                new_bases[parent] = head
         else:
             if parent != head:
                 new_bases[parent] = head
