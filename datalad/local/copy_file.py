@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 import logging
 import os.path as op
 import sys
+from collections.abc import Mapping
 from functools import lru_cache
 from shutil import copyfile
 
@@ -628,7 +629,7 @@ def _copy_file(src, dest, cache):
     # at this point we are copying an annexed file into an annex repo
     res = _place_filekey(
         finfo, str_src, dest, str_dest, dest_repo)
-    if isinstance(res, dict):
+    if isinstance(res, Mapping):
         yield res
         return
     dest_key = res

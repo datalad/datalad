@@ -34,7 +34,10 @@ from datalad.interface.common_opts import (
     recursion_flag,
     recursion_limit,
 )
-from datalad.interface.results import annexjson2result
+from datalad.interface.results import (
+    StatusRecord,
+    annexjson2result,
+)
 from datalad.interface.utils import render_action_summary
 from datalad.log import log_progress
 from datalad.support.annexrepo import AnnexRepo
@@ -213,7 +216,7 @@ class Push(Interface):
             # to enable the use case of pushing to a target that
             # a superdataset doesn't know, but some subdatasets to
             # (in combination with '--on-failure ignore')
-            yield dict(
+            yield StatusRecord.from_kwargs(
                 res_kwargs,
                 status='error',
                 path=ds.path,
@@ -273,7 +276,7 @@ class Push(Interface):
                     potential_remote = potential_remote[0]
                 hint = "{} matches a sibling name and not a path. " \
                       "Forgot --to?".format(potential_remote)
-                yield dict(
+                yield StatusRecord.from_kwargs(
                     res_kwargs,
                     status='notneeded',
                     message=hint,
@@ -284,7 +287,7 @@ class Push(Interface):
                 # there's no matching path and we have generated a hint on
                 # fixing the call - we can return now
                 return
-            yield dict(
+            yield StatusRecord.from_kwargs(
                 res_kwargs,
                 status='notneeded',
                 message='Given constraints did not match any changes to publish',
@@ -459,7 +462,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
             except CommandError as e:
                 if 'Please make sure you have the correct access rights' in e.stderr:
                     # there is a default push target but we have no permission
-                    yield dict(
+                    yield StatusRecord.from_kwargs(
                         res_kwargs,
                         status='impossible',
                         message='Attempt to push to default target resulted in following '
@@ -474,7 +477,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
                 'assume no configuration: %s', e)
             target = set()
         if not len(target):
-            yield dict(
+            yield StatusRecord.from_kwargs(
                 res_kwargs,
                 status='impossible',
                 message='No push target given, and none could be '
@@ -484,7 +487,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
         elif len(target) > 1:
             # dunno if this can ever happen, but if it does, report
             # nicely
-            yield dict(
+            yield StatusRecord.from_kwargs(
                 res_kwargs,
                 status='error',
                 message=(
@@ -500,7 +503,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
 
     if not target:
         if _target not in repo.get_remotes():
-            yield dict(
+            yield StatusRecord.from_kwargs(
                 res_kwargs,
                 status='error',
                 message=(
@@ -585,7 +588,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
             # this is a weird one, let's confess and stop here
             # I don't think we need to support such a scenario
             if not active_branch:
-                yield dict(
+                yield StatusRecord.from_kwargs(
                     res_kwargs,
                     status='impossible',
                     message=
@@ -760,7 +763,7 @@ def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs):
             else 'impossible'
         )
         refspec = '{}:{}'.format(pr['from_ref'], pr['to_ref'])
-        yield dict(
+        yield StatusRecord.from_kwargs(
             res_kwargs,
             status=status,
             target=pr['remote'],
@@ -802,7 +805,7 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
             # still nothing
             # rather than barfing tons of messages for each file, do one
             # for the entire dataset
-            yield dict(
+            yield StatusRecord.from_kwargs(
                 res_kwargs,
                 action='copy',
                 status='impossible'
@@ -848,7 +851,7 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
     ]
     if got_path_arg:
         for c in [c for c in to_transfer if not c.get('has_content', False)]:
-            yield dict(
+            yield StatusRecord.from_kwargs(
                 res_kwargs,
                 type=c['type'],
                 path=c['path'],
@@ -921,7 +924,7 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
 
     for annex_key, paths in repkey_paths.items():
         for path in paths:
-            yield dict(
+            yield StatusRecord.from_kwargs(
                 res_kwargs, action='copy', type='file', status='notneeded',
                 path=path, annexkey=annex_key,
                 message='Another file points to the same key')

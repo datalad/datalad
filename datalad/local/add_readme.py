@@ -11,6 +11,7 @@
 __docformat__ = 'restructuredtext'
 
 import logging
+from collections.abc import Mapping
 
 from datalad.interface.base import (
     Interface,
@@ -259,7 +260,7 @@ def _get_dataset_metadata(dataset):
             return_type='item-or-list',
             result_renderer='disabled',
             on_failure='ignore')
-        if not isinstance(dsinfo, dict) or dsinfo.get('status', None) != 'ok':
+        if not isinstance(dsinfo, Mapping) or dsinfo.get('status', None) != 'ok':
             lgr.warning("Could not obtain dataset metadata, proceeding without")
         else:
             # flatten possibly existing multiple metadata sources

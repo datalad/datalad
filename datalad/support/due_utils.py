@@ -5,6 +5,7 @@ Support functionality for using DueCredit
 """
 
 import logging
+from collections.abc import Mapping
 
 from datalad.support.exceptions import CapturedException
 
@@ -75,8 +76,8 @@ def duecredit_dataset(dataset):
         )
         return
 
-    if not isinstance(res, dict):
-        lgr.debug("Got record which is not a dict, no duecredit for now")
+    if not isinstance(res, Mapping):
+        lgr.debug("Got record which is not a Mapping, no duecredit for now")
         return
 
     metadata = res.get('metadata', {})

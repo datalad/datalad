@@ -41,7 +41,10 @@ from datalad.interface.common_opts import (
     recursion_flag,
     recursion_limit,
 )
-from datalad.interface.results import get_status_dict
+from datalad.interface.results import (
+    StatusRecord,
+    get_status_dict,
+)
 from datalad.interface.utils import generic_result_renderer
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import (
@@ -596,11 +599,12 @@ def _configure_remote(
                         'location={}'.format(remote_url),
                         'autoenable=true'])
                 else:
-                    yield dict(
+                    yield StatusRecord.from_kwargs(
+                        result_props,
                         status='impossible',
                         message='cannot configure as a common data source, '
                                 'URL protocol is not http or https',
-                        **result_props)
+                    )
     #
     # place configure steps that also work for 'here' below
     #
@@ -767,14 +771,14 @@ def _enable_remote(ds, repo, name, res_kwargs, **unused_kwargs):
         **res_kwargs)
 
     if not isinstance(repo, AnnexRepo):
-        yield dict(
+        yield StatusRecord.from_kwargs(
             result_props,
             status='impossible',
             message='cannot enable sibling of non-annex dataset')
         return
 
     if name is None:
-        yield dict(
+        yield StatusRecord.from_kwargs(
             result_props,
             status='error',
             message='require `name` of sibling to enable')
@@ -785,7 +789,7 @@ def _enable_remote(ds, repo, name, res_kwargs, **unused_kwargs):
     remote_info = sp_remotes.get(name, None)
 
     if remote_info is None:
-        yield dict(
+        yield StatusRecord.from_kwargs(
             result_props,
             status='impossible',
             message=("cannot enable sibling '%s', not known", name))
@@ -800,7 +804,7 @@ def _enable_remote(ds, repo, name, res_kwargs, **unused_kwargs):
             # let's consult the credential store
             hostname = urlparse(remote_info.get('url', '')).netloc
             if not hostname:
-                yield dict(
+                yield StatusRecord.from_kwargs(
                     result_props,
                     status='impossible',
                     message="cannot determine remote host, credential lookup for webdav access is not possible, and not credentials were supplied")
@@ -813,7 +817,7 @@ def _enable_remote(ds, repo, name, res_kwargs, **unused_kwargs):
                         password=os.environ.get('WEBDAV_PASSWORD', None))
                 except KeyboardInterrupt:
                     # user hit Ctrl-C
-                    yield dict(
+                    yield StatusRecord.from_kwargs(
                         result_props,
                         status='impossible',
                         message="credentials are required for sibling access, abort")
