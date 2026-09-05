@@ -46,7 +46,10 @@ from datalad.log import (
     logging,
 )
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import AnnexBatchCommandError
+from datalad.support.exceptions import (
+    AnnexBatchCommandError,
+    CapturedException,
+)
 from datalad.support.constraints import (
     EnsureNone,
     EnsureStr,
@@ -83,6 +86,7 @@ def _add_archive_content(
         annex,
         annexarchive,
         key,
+        key_rpath,
         origin,
         archive_path,
         extract_rpath,
@@ -92,7 +96,6 @@ def _add_archive_content(
         strip_leading_dirs=False,
         leading_dirs_depth=None,
         leading_dirs_consider=None,
-        delete=False,
         exclude=None,
         rename=None,
         existing='fail',
@@ -123,6 +126,10 @@ def _add_archive_content(
       URLs for the extracted files.
     key : str
       Annex key of the archive.
+    key_rpath : str
+      Location of the content of `key`, relative to the root of the
+      repository.  Established (and thus verified to be present) by the
+      caller.
     origin : {'archive', 'key'}
       Whether the archive was specified as a file or as an annex key.
     archive_path : Path
@@ -136,7 +143,8 @@ def _add_archive_content(
       Common arguments for the result records.
 
     All other parameters are as described for the `add_archive_content`
-    command.
+    command.  Note that the removal of the original archive (`delete`) is
+    not done here, but by the caller, together for all archives.
 
     Yields
     ------
@@ -144,15 +152,6 @@ def _add_archive_content(
       Result records.
     """
     archive_basename = file_basename(archive)
-
-    try:
-        key_rpath = annex.get_contentlocation(key)
-    except:
-        # the only probable reason for this to fail is that there is no
-        # content present
-        raise RuntimeError(
-            "Content of %s seems to be N/A.  Fetch it first" % key
-        )
 
     # now we simply need to go through every file in that archive and
     lgr.info(
@@ -179,7 +178,7 @@ def _add_archive_content(
         extracted_files = list(earchive.get_extracted_files())
         log_progress(
             lgr.info, pbar_id, 'Extracting archive',
-            label="Extracting archive",
+            label="Extracting %s" % archive_basename,
             unit=' Files',
             total = len(extracted_files),
             noninteractive_level = logging.INFO)
@@ -291,12 +290,15 @@ def _add_archive_content(
                 elif existing == 'fail':
                     message = \
                         "{} exists, but would be overwritten by new file " \
-                        "{}. Consider adjusting --existing".format\
-                        (target_file_path, extracted_file)
+                        "{} of {}. Consider adjusting --existing".format\
+                        (target_file_path, extracted_file, archive)
+                    # point at the archive we are failing on, it is not
+                    # necessarily the only one we were given
                     yield get_status_dict(
                         ds=ds,
                         status='error',
                         message=message,
+                        **_archive_res_kwargs(archive_path, key, origin),
                         **res_kwargs)
                     return
                 elif existing == 'overwrite':
@@ -394,11 +396,6 @@ def _add_archive_content(
             # Done with target_file -- just to have clear end of the loop
             del target_file
 
-        if delete and archive and origin != 'key':
-            lgr.debug("Removing the original archive %s", archive)
-            # force=True since some times might still be staged and fail
-            annex.remove(str(archive_path), force=True)
-
         lgr.info("Finished adding %s: %s", archive, stats.as_str(mode='line'))
 
         total_stats += stats
@@ -438,16 +435,28 @@ def _add_archive_content(
             # it was created under the root of the dataset
             prefix_path = ds.pathobj / prefix_dir
             if lexists(prefix_path):
-                os.rmdir(prefix_path)
+                try:
+                    os.rmdir(prefix_path)
+                except OSError as exc:
+                    # do not mask an exception which brought us here in the
+                    # first place, and which likely explains the leftovers
+                    lgr.warning("Failed to remove temporary directory %s: %s",
+                                prefix_path, CapturedException(exc))
 
-    # the archive itself is the "subject" of this result record, unless we
-    # were given a key, for which there is no path to point to
-    res = get_status_dict(ds=ds, status='ok', **res_kwargs)
+    yield get_status_dict(
+        ds=ds,
+        status='ok',
+        message=("added content of key %s", key) if origin == 'key' else None,
+        **_archive_res_kwargs(archive_path, key, origin),
+        **res_kwargs)
+
+
+def _archive_res_kwargs(archive_path, key, origin):
+    """Result record fields to identify the archive (or key) acted on"""
     if origin == 'key':
-        res['key'] = key
-    else:
-        res.update(path=str(archive_path), type='file')
-    yield res
+        # there is no meaningful path to point to, but the key identifies it
+        return dict(type='key', key=key)
+    return dict(path=str(archive_path), type='file')
 
 
 def _get_commit_message(origin, archives):
@@ -466,13 +475,24 @@ class AddArchiveContent(Interface):
     Given an already annex'ed archive, extract and add its files to the
     dataset, and reference the original archive as a custom special remote.
 
-    Multiple archives can be provided in a single invocation. They are
-    processed in the given order, and their content is added within a single
-    commit, which is substantially faster than invoking the command once per
-    archive. If any of the given archives cannot be used (e.g. it is not
-    tracked by the dataset), nothing is added at all. If adding the content
-    of an archive fails, the remaining archives are not processed, and
-    whatever was added by then is left uncommitted for inspection.
+    Multiple archives can be given in a single invocation. They are processed
+    in the given order, and their content is added within a single commit,
+    which is substantially faster than invoking the command once per archive.
+
+    All given archives are checked before any of them is acted on: if any one
+    of them cannot be used (it is untracked, absent, not under annex control,
+    or its content is not available locally), nothing is added at all.
+    Should adding the content of an archive fail nevertheless, the remaining
+    archives are not processed, and nothing is committed: the content added
+    up to that point is left staged for inspection, and a subsequent
+    invocation will refuse to operate on such a dirty dataset until those
+    changes are dealt with. Original archives are removed
+    ([PY: `delete=True` PY][CMD: --delete CMD]) only once all of them were
+    added successfully.
+
+    .. versionchanged:: 1.7
+       More than one archive can be given. A result record is now yielded for
+       each given archive, in addition to the one for the dataset.
 
     """
     _examples_ = [
@@ -480,7 +500,7 @@ class AddArchiveContent(Interface):
                      keep big_tarball.tar.gz in the index""",
              code_py="add_archive_content(archive='big_tarball.tar.gz')",
              code_cmd="datalad add-archive-content big_tarball.tar.gz"),
-        dict(text="""Add files from the archive 'tarball.tar.gz', and
+        dict(text="""Add files from the archive 'big_tarball.tar.gz', and
                      remove big_tarball.tar.gz from the index""",
              code_py="add_archive_content(archive='big_tarball.tar.gz', delete=True)",
              code_cmd="datalad add-archive-content big_tarball.tar.gz --delete"),
@@ -499,13 +519,14 @@ class AddArchiveContent(Interface):
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
-            doc=""""specify the dataset to save""",
+            doc="""specify the dataset to operate on""",
             constraints=EnsureDataset() | EnsureNone()),
         delete=Parameter(
             args=("-D", "--delete"),
             action="store_true",
-            doc="""delete original archive from the filesystem/Git in current
-            tree. %s""" % _KEY_OPT_NOTE),
+            doc="""delete original archives from the filesystem/Git in current
+            tree, once the content of all of them was added. %s"""
+            % _KEY_OPT_NOTE),
         add_archive_leading_dir=Parameter(
             args=("--add-archive-leading-dir",),
             action="store_true",
@@ -582,9 +603,9 @@ class AddArchiveContent(Interface):
         key=Parameter(
             args=("--key",),
             action="store_true",
-            doc="""signal if provided archive is not actually a filename on its
-            own but an annex key. The archive will be extracted in the current
-            directory."""),
+            doc="""signal that the provided archives are not filenames on
+            their own but annex keys. Such archives are extracted in the
+            current directory."""),
         copy=Parameter(
             args=("--copy",),
             action="store_true",
@@ -611,10 +632,11 @@ class AddArchiveContent(Interface):
         # TODO: interaction with archives cache whenever we make it persistent across runs
         archive=Parameter(
             args=("archive",),
+            metavar='ARCHIVE',
             nargs="+",
-            doc="""archive file or a key (if %s specified). Multiple archives
-            (or keys) could be provided, and their content would be added
-            within a single commit""" % _KEY_OPT,
+            doc="""archive file or a key (if %s specified). More than one can
+            be given; the content of all of them is added within a single
+            commit""" % _KEY_OPT,
             constraints=EnsureStr()),
     )
 
@@ -676,7 +698,11 @@ class AddArchiveContent(Interface):
                 DeprecationWarning)
         annex = ds.repo
 
-        if not archives:
+        # what kind of thing we were given, used for result records and the
+        # commit message
+        origin = 'key' if key else 'archive'
+
+        if not archives or not all(str(a) for a in archives):
             yield get_status_dict(
                 ds=ds,
                 status='impossible',
@@ -690,42 +716,47 @@ class AddArchiveContent(Interface):
         # archives cannot be used.
         problems = False
         # (archive, absolute path) pairs
-        archive_paths = []
-        for a in archives:
-            # get the archive path relative from the ds root
-            archive_path = resolve_path(a, ds=dataset)
-            archive_paths.append((a, archive_path))
-            # let Status decide whether we can act on the given file
-            for s in ds.status(
-                    path=archive_path,
-                    on_failure='ignore',
-                    result_renderer='disabled'):
-                if s['status'] == 'error':
-                    if 'path not underneath the reference dataset %s' in s['message']:
-                        yield get_status_dict(
-                            ds=ds,
-                            status='impossible',
-                            message='Can not add archive outside of the dataset',
-                            **res_kwargs)
-                    else:
-                        # status errored & we haven't anticipated the cause.
-                        # Bubble up
-                        yield s
-                    problems = True
-                    break
-                elif s['state'] == 'untracked':
-                    # we can't act on an untracked file
-                    message = (
-                        "Can not add an untracked archive. "
-                        "Run 'datalad save {}'".format(a)
-                    )
+        archive_paths = [(a, resolve_path(a, ds=dataset)) for a in archives]
+        # let Status decide whether we can act on the given files. A single
+        # query for all of them is substantially cheaper than one per archive
+        status_records = {}
+        for s in ds.status(
+                path=[p for _, p in archive_paths],
+                on_failure='ignore',
+                result_renderer='disabled'):
+            status_records.setdefault(str(s['path']), s)
+        for a, archive_path in archive_paths:
+            s = status_records.get(str(archive_path))
+            if s is None:
+                # `status` has no say about it (e.g. no such file), this is
+                # checked below
+                continue
+            if s['status'] == 'error':
+                if 'path not underneath the reference dataset %s' in s['message']:
                     yield get_status_dict(
-                               ds=ds,
-                               status='impossible',
-                               message=message,
-                               **res_kwargs)
-                    problems = True
-                    break
+                        ds=ds,
+                        status='impossible',
+                        message='Can not add archive outside of the dataset',
+                        **_archive_res_kwargs(archive_path, a, origin),
+                        **res_kwargs)
+                else:
+                    # status errored & we haven't anticipated the cause.
+                    # Bubble up
+                    yield s
+                problems = True
+            elif s.get('state') == 'untracked':
+                # we can't act on an untracked file
+                message = (
+                    "Can not add an untracked archive. "
+                    "Run 'datalad save {}'".format(a)
+                )
+                yield get_status_dict(
+                           ds=ds,
+                           status='impossible',
+                           message=message,
+                           **_archive_res_kwargs(archive_path, a, origin),
+                           **res_kwargs)
+                problems = True
         if problems:
             return
 
@@ -749,173 +780,217 @@ class AddArchiveContent(Interface):
         # figure out our location
         pwd = getpwd()
 
-        # what needs to be done: (archive, path, key, extraction directory)
-        todo = []
-        for a, archive_path in archive_paths:
-            # ensure the archive exists, status doesn't error on a
-            # non-existing file
-            if not key and not lexists(archive_path):
-                yield get_status_dict(
-                    ds=ds,
-                    status='impossible',
-                    message=(
-                        'No such file: {}'.format(archive_path),
-                    ),
-                    **res_kwargs
-                )
-                problems = True
-                continue
-
-            if not key:
-                check_path = archive_path.relative_to(ds.pathobj)
-                # TODO: support adding archives content from outside the annex/repo
-                # can become get_file_annexinfo once #6104 is merged
-                akey = annex.get_file_annexinfo(check_path)['key']
-                if not akey:
-                    # if we didn't manage to get a key, the file must be in Git
-                    raise RuntimeError(
-                        f"Archive must be an annexed file in {ds}")
-                archive_dir = Path(archive_path).parent
-            else:
-                akey = a
-                archive_dir = None
-
-            # are we in a subdirectory of the repository?
-            pwd_in_root = annex.path == archive_dir
-            # then we should add content under that subdirectory,
-            # get the path relative to the repo top
-            if use_current_dir:
-                # extract the archive under the current directory, not the
-                # directory where the archive is located
-                extract_rpath = Path(pwd).relative_to(ds.path) \
-                    if not pwd_in_root \
-                    else None
-            else:
-                extract_rpath = archive_dir.relative_to(ds.path)
-
-            # relpath might return '.' as the relative path to curdir, which
-            # then normalize_paths would take as instructions to really go
-            # from cwd, so we need to sanitize
-            if extract_rpath == curdir:
-                extract_rpath = None
-
-            todo.append((a, archive_path, akey, extract_rpath))
-        if problems:
-            return
-
-        origin = 'key' if key else 'archive'
-
-        from datalad.customremotes.archives import ArchiveAnnexCustomRemote
-
-        # TODO: shouldn't we be able just to pass existing AnnexRepo instance?
-        # TODO: we will use persistent cache so we could just (ab)use possibly extracted archive
-        # OK, let's ignore that the following class is actually a special
-        # remote implementation, and use it only to work with its cache
-        annexarchive = ArchiveAnnexCustomRemote(annex=None,
-                                                path=annex.path,
-                                                persistent_cache=True)
-        # We will move extracted content so it must not exist prior running
-        annexarchive.cache.allow_existing = True
-        # make sure there is an enabled datalad-archives special remote
-        ensure_datalad_remote(ds.repo, remote=ARCHIVES_SPECIAL_REMOTE,
-                              autoenable=True)
-
         precommitted = False
+        failed = False
         old_always_commit = annex.always_commit
         # batch mode is disabled when faking dates, we want to always commit
         annex.always_commit = annex.fake_dates_enabled
-        if annex_options:
-            if isinstance(annex_options, str):
-                annex_options = split_cmdline(annex_options)
-
-        # dedicated stats which would be added to passed in (if any)
-        outside_stats = stats
-        stats = ActivityStats()
-
-        # archives which content was added, to be mentioned in the commit
-        # message
-        added = []
-        failed = False
-        # a progress bar across all archives is only of use if there is more
-        # than a single one, individual archives have their own
-        report_progress = len(todo) > 1
-        pbar_id = f'add-archive-content-{ds.path}'
-        if report_progress:
-            log_progress(
-                lgr.info, pbar_id, 'Adding archives content',
-                label="Adding archives",
-                unit=' Archives',
-                total=len(todo),
-                noninteractive_level=logging.INFO)
+        # the remaining vetting and the actual work rely on batched git-annex
+        # processes, which are closed by the precommit() in the `finally`
         try:
-            for i, (a, archive_path, akey, extract_rpath) in enumerate(todo):
-                for res in _add_archive_content(
-                        a,
+            # what needs to be done:
+            # (archive, path, key, key location, extraction directory)
+            todo = []
+            for a, archive_path in archive_paths:
+                # ensure the archive exists, status doesn't error on a
+                # non-existing file
+                if not key and not lexists(archive_path):
+                    yield get_status_dict(
                         ds=ds,
-                        annex=annex,
-                        annexarchive=annexarchive,
-                        key=akey,
-                        origin=origin,
-                        archive_path=archive_path,
-                        extract_rpath=extract_rpath,
-                        total_stats=stats,
-                        res_kwargs=res_kwargs,
-                        add_archive_leading_dir=add_archive_leading_dir,
-                        strip_leading_dirs=strip_leading_dirs,
-                        leading_dirs_depth=leading_dirs_depth,
-                        leading_dirs_consider=leading_dirs_consider,
-                        delete=delete,
-                        exclude=exclude,
-                        rename=rename,
-                        existing=existing,
-                        annex_options=annex_options,
-                        copy=copy,
-                        drop_after=drop_after,
-                        delete_after=delete_after):
-                    if res['status'] not in ('ok', 'notneeded'):
-                        failed = True
-                    yield res
+                        status='impossible',
+                        message='No such file: {}'.format(archive_path),
+                        **_archive_res_kwargs(archive_path, a, origin),
+                        **res_kwargs
+                    )
+                    problems = True
+                    continue
+
+                if not key:
+                    check_path = archive_path.relative_to(ds.pathobj)
+                    # TODO: support adding archives content from outside the annex/repo
+                    # can become get_file_annexinfo once #6104 is merged
+                    akey = annex.get_file_annexinfo(check_path).get('key')
+                    if not akey:
+                        # if we didn't manage to get a key, the file is in Git
+                        yield get_status_dict(
+                            ds=ds,
+                            status='impossible',
+                            message=(
+                                'Archive must be an annexed file, %s is not',
+                                a),
+                            **_archive_res_kwargs(archive_path, a, origin),
+                            **res_kwargs
+                        )
+                        problems = True
+                        continue
+                    archive_dir = Path(archive_path).parent
+                else:
+                    akey = a
+                    archive_dir = None
+
+                # without the content of the archive we cannot extract it.
+                # Check it here, and not just before extracting it, so that
+                # nothing is added if any of the archives is not around
+                try:
+                    key_rpath = annex.get_contentlocation(akey, batch=True)
+                except Exception as exc:
+                    lgr.debug("Failed to get content location of %s: %s",
+                              akey, CapturedException(exc))
+                    key_rpath = None
+                if not key_rpath:
+                    yield get_status_dict(
+                        ds=ds,
+                        status='impossible',
+                        message=(
+                            'Content of %s is not available, get it first', a),
+                        **_archive_res_kwargs(archive_path, akey, origin),
+                        **res_kwargs
+                    )
+                    problems = True
+                    continue
+
+                # are we in a subdirectory of the repository?
+                pwd_in_root = annex.path == archive_dir
+                # then we should add content under that subdirectory,
+                # get the path relative to the repo top
+                if use_current_dir:
+                    # extract the archive under the current directory, not the
+                    # directory where the archive is located
+                    extract_rpath = Path(pwd).relative_to(ds.path) \
+                        if not pwd_in_root \
+                        else None
+                else:
+                    extract_rpath = archive_dir.relative_to(ds.path)
+
+                # relpath might return '.' as the relative path to curdir,
+                # which then normalize_paths would take as instructions to
+                # really go from cwd, so we need to sanitize
+                if extract_rpath == curdir:
+                    extract_rpath = None
+
+                todo.append(
+                    (a, archive_path, akey, key_rpath, extract_rpath))
+            if problems:
+                return
+
+            from datalad.customremotes.archives import ArchiveAnnexCustomRemote
+
+            # TODO: shouldn't we be able just to pass existing AnnexRepo instance?
+            # TODO: we will use persistent cache so we could just (ab)use possibly extracted archive
+            # OK, let's ignore that the following class is actually a special
+            # remote implementation, and use it only to work with its cache
+            annexarchive = ArchiveAnnexCustomRemote(annex=None,
+                                                    path=annex.path,
+                                                    persistent_cache=True)
+            # We will move extracted content so it must not exist prior running
+            annexarchive.cache.allow_existing = True
+            # make sure there is an enabled datalad-archives special remote
+            ensure_datalad_remote(ds.repo, remote=ARCHIVES_SPECIAL_REMOTE,
+                                  autoenable=True)
+
+            if annex_options:
+                if isinstance(annex_options, str):
+                    annex_options = split_cmdline(annex_options)
+
+            # dedicated stats which would be added to passed in (if any)
+            outside_stats = stats
+            stats = ActivityStats()
+
+            # archives which content was added, to be mentioned in the commit
+            # message
+            added = []
+            # a progress bar across all archives is only of use if there is
+            # more than a single one, individual archives have their own
+            report_progress = len(todo) > 1
+            pbar_id = f'add-archive-content-{ds.path}'
+            if report_progress:
+                log_progress(
+                    lgr.info, pbar_id, 'Adding archives content',
+                    label="Adding archives",
+                    unit=' Archives',
+                    total=len(todo),
+                    noninteractive_level=logging.INFO)
+            try:
+                for i, (a, archive_path, akey, key_rpath, extract_rpath) \
+                        in enumerate(todo):
+                    for res in _add_archive_content(
+                            a,
+                            ds=ds,
+                            annex=annex,
+                            annexarchive=annexarchive,
+                            key=akey,
+                            key_rpath=key_rpath,
+                            origin=origin,
+                            archive_path=archive_path,
+                            extract_rpath=extract_rpath,
+                            total_stats=stats,
+                            res_kwargs=res_kwargs,
+                            add_archive_leading_dir=add_archive_leading_dir,
+                            strip_leading_dirs=strip_leading_dirs,
+                            leading_dirs_depth=leading_dirs_depth,
+                            leading_dirs_consider=leading_dirs_consider,
+                            exclude=exclude,
+                            rename=rename,
+                            existing=existing,
+                            annex_options=annex_options,
+                            copy=copy,
+                            drop_after=drop_after,
+                            delete_after=delete_after):
+                        if res['status'] not in ('ok', 'notneeded'):
+                            failed = True
+                        yield res
+                    if report_progress:
+                        log_progress(
+                            lgr.info, pbar_id,
+                            "Archives left to add %i ", len(todo) - i - 1,
+                            update=1,
+                            increment=True,
+                            noninteractive_level=logging.DEBUG)
+                    if failed:
+                        # do not proceed with the remaining archives, and do
+                        # not commit -- the user should decide how to continue
+                        break
+                    added.append(
+                        akey if origin == 'key'
+                        else archive_path.relative_to(ds.path))
+
+                if not failed:
+                    if delete and origin != 'key':
+                        # only now, when the content of all archives was
+                        # added: a failure should not leave a removal behind,
+                        # and removing tears down the batched processes we
+                        # want to reuse across archives
+                        lgr.debug("Removing the original archives %s", added)
+                        # force=True since some times might still be staged
+                        # and fail
+                        annex.remove(
+                            [str(p) for _, p, _, _, _ in todo], force=True)
+                    if outside_stats:
+                        outside_stats += stats
+                    if commit:
+                        commit_stats = outside_stats if outside_stats else stats
+                        # so batched ones close and files become annex symlinks etc
+                        annex.precommit()
+                        precommitted = True
+                        if any(r.get('state', None) != 'clean'
+                               for p, r in annex.status(untracked='no').items()):
+                            annex.commit(
+                                "%s\n\n%s" % (
+                                    _get_commit_message(origin, added),
+                                    commit_stats.as_str(mode='full')),
+                                _datalad_msg=True
+                            )
+                            commit_stats.reset()
+                    else:
+                        # don't commit upon completion
+                        pass
+            finally:
                 if report_progress:
                     log_progress(
                         lgr.info, pbar_id,
-                        "Archives left to add %i ", len(todo) - i - 1,
-                        update=1,
-                        increment=True,
-                        noninteractive_level=logging.DEBUG)
-                if failed:
-                    # do not proceed with the remaining archives, and do not
-                    # commit -- the user should decide how to continue
-                    break
-                added.append(
-                    akey if origin == 'key'
-                    else archive_path.relative_to(ds.path))
-
-            if not failed:
-                if outside_stats:
-                    outside_stats += stats
-                if commit:
-                    commit_stats = outside_stats if outside_stats else stats
-                    # so batched ones close and files become annex symlinks etc
-                    annex.precommit()
-                    precommitted = True
-                    if any(r.get('state', None) != 'clean'
-                           for p, r in annex.status(untracked='no').items()):
-                        annex.commit(
-                            "%s\n\n%s" % (
-                                _get_commit_message(origin, added),
-                                commit_stats.as_str(mode='full')),
-                            _datalad_msg=True
-                        )
-                        commit_stats.reset()
-                else:
-                    # don't commit upon completion
-                    pass
+                        'Finished adding archives content',
+                        noninteractive_level=logging.INFO)
         finally:
-            if report_progress:
-                log_progress(
-                    lgr.info, pbar_id,
-                    'Finished adding archives content',
-                    noninteractive_level=logging.INFO)
             # since we batched addurl, we should close those batched processes
             # if haven't done yet.  explicitly checked to avoid any possible
             # "double-action"
