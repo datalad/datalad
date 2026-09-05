@@ -102,6 +102,11 @@ def test_invalid_call(origin=None, tdir=None):
         ValueError,
         ds.push, to='target', since='')
 
+    # --set-upstream/-u without --to is not supported, see gh-7917
+    assert_raises(
+        ValueError,
+        ds.push, set_upstream=True)
+
 
 @pytest.mark.ai_generated
 @with_tempfile(mkdir=True)
@@ -304,6 +309,36 @@ def check_push(annex, src_path, dst_path):
 @pytest.mark.parametrize("annex", [False, True])
 def test_push(annex):
     check_push(annex)
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_push_set_upstream(src_path=None, dst_path=None):
+    # gh-7917: -u/--set-upstream should mimic `git push -u`
+    ds = Dataset(src_path).create(annex=False)
+    ds_repo = ds.repo
+    mk_push_target(ds, 'target', dst_path, annex=False)
+
+    # nothing is tracking anything yet
+    eq_(ds_repo.get_tracking_branch(), (None, None))
+
+    res = ds.push(to='target', set_upstream=True, **ckwa)
+    # the branch is pushed for the first time ('ok'), and the extra
+    # up-to-date push done to have git record the tracking
+    # configuration is reported as 'notneeded'
+    assert_status(['ok', 'notneeded'], res)
+
+    # the active branch is now tracking 'target'
+    eq_(
+        ds_repo.get_tracking_branch(),
+        ('target', 'refs/heads/{}'.format(DEFAULT_BRANCH)))
+
+    # and this is not just config bookkeeping -- an argument-less push/pull
+    # now works
+    (ds.pathobj / 'a_file').write_text('some content')
+    ds.save(message="Some content", **ckwa)
+    res = ds.push(**ckwa)
+    assert_in_results(res, action='publish', status='ok', target='target')
 
 
 def check_datasets_order(res, order='bottom-up'):

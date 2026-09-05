@@ -97,6 +97,15 @@ class Push(Interface):
             (i.e. a configured tracking branch, or a single sibling that is
             configured for push)""",
             constraints=EnsureStr() | EnsureNone()),
+        set_upstream=Parameter(
+            args=("-u", "--set-upstream"),
+            action='store_true',
+            doc="""configure the sibling given by [CMD: --to CMD][PY: `to`
+            PY] as the upstream (tracking) remote for the active branch,
+            as `git push -u` would (equivalent to running
+            `git branch --set-upstream-to`). Requires
+            [CMD: --to CMD][PY: `to` PY] to be given; without it, this
+            option errors out."""),
         since=Parameter(
             args=("--since",),
             constraints=EnsureStr() | EnsureNone(),
@@ -180,6 +189,7 @@ class Push(Interface):
             *,
             dataset=None,
             to=None,
+            set_upstream=False,
             since=None,
             data='auto-if-wanted',
             force=None,
@@ -190,6 +200,10 @@ class Push(Interface):
         # behavior. '' was/is (to be deprecated) used in `publish`. Alert user about the mistake
         if since == '':
             raise ValueError("'since' should point to commitish or use '^'.")
+        if set_upstream and not to:
+            raise ValueError(
+                "--set-upstream (-u) requires the target sibling to be "
+                "given via --to")
         # we resolve here, because we need to perform inspection on what was given
         # as an input argument further down
         paths = [resolve_path(p, dataset) for p in ensure_list(path)]
@@ -254,7 +268,8 @@ class Push(Interface):
             pbars = {}
             yield from _push(
                 dspath, dsrecords, to, data, force, jobs, res_kwargs.copy(), pbars,
-                got_path_arg=True if path else False)
+                got_path_arg=True if path else False,
+                set_upstream=set_upstream)
             # take down progress bars for this dataset
             for i, ds in pbars.items():
                 log_progress(lgr.info, i, 'Finished push of %s', ds)
@@ -421,7 +436,7 @@ def _transfer_data(repo, ds, target, content, data, force, jobs, res_kwargs,
 
 
 def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
-          got_path_arg=False):
+          got_path_arg=False, set_upstream=False):
     force_git_push = force in ('all', 'gitpush')
 
     # nothing recursive in here, we only need a repo to work with
@@ -721,6 +736,28 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
         res_kwargs.copy(),
     )
 
+    if set_upstream and active_branch:
+        # mimic `git push -u`: configure `target` as the upstream
+        # (tracking) remote for the active branch. The branch was just
+        # pushed above, so this is a cheap up-to-date push that merely
+        # has git record the tracking configuration -- the same as
+        # `git branch --set-upstream-to` would (but without requiring a
+        # pre-existing remote-tracking ref). Kept as a separate push, so
+        # this does not also mark internal branches (e.g. `git-annex`)
+        # that ride along in `refspecs2push` as tracking `target`.
+        yield from _push_refspecs(
+            repo,
+            target,
+            ['{0}:{0}'.format(active_branch)],
+            False,
+            res_kwargs.copy(),
+            set_upstream=True,
+        )
+        # git wrote the tracking configuration straight to the config
+        # file via the `git push` subprocess above -- make sure our own
+        # in-memory config cache picks it up too
+        repo.config.reload()
+
 
 def _append_branch_to_refspec_if_needed(ds, refspecs, branch):
     # try to anticipate any flavor of an idea of a branch ending up in a refspec
@@ -734,11 +771,17 @@ def _append_branch_to_refspec_if_needed(ds, refspecs, branch):
         )
 
 
-def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs):
+def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs,
+                    set_upstream=False):
+    git_options = []
+    if force_git_push:
+        git_options.append('--force')
+    if set_upstream:
+        git_options.append('--set-upstream')
     push_res = repo.push(
         remote=target,
         refspec=refspecs,
-        git_options=['--force'] if force_git_push else None,
+        git_options=git_options or None,
     )
     # TODO maybe compress into a single message whenever everything is
     # OK?
