@@ -1237,6 +1237,34 @@ def test_run_merge_three_levels(path=None):
 
 @with_tempfile(mkdir=True)
 @pytest.mark.ai_generated
+def test_run_merge_sub_under_plain_dir(path=None, *, request):
+    """Sub nested under a plain directory -> merges in sub and super."""
+    ds = Dataset(path).create()
+    # not a direct child: `derivatives` is a plain directory
+    sub = ds.create(op.join("derivatives", "thing"))
+    assert_repo_status(ds.path)
+
+    ds.run('cd derivatives/thing && ' + touch_command + 'foo'
+           + ' && git add foo && git commit -m "inner"')
+
+    _assert_run_merge(sub)
+    _assert_run_merge(ds)
+    ok_((sub.pathobj / "foo").exists())
+
+    if ds.repo.is_managed_branch():
+        # On adjusted branches `git annex sync` propagates a submodule
+        # pointer update to the corresponding branch only for submodules at
+        # the repo's top level, so the super keeps reporting this one
+        # modified.
+        # https://github.com/datalad/datalad/issues/7905
+        request.node.add_marker(pytest.mark.xfail(
+            strict=True,
+            reason="git-annex: nested submodule pointer not propagated"))
+    assert_repo_status(ds.path)
+
+
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
 def test_run_merge_no_subdataset_change(path=None):
     """Commit only in superdataset -> sub untouched, no spurious merge."""
     ds = Dataset(path).create()

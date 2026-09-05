@@ -65,6 +65,35 @@ def _status_props(result):
     return {k: v for k, v in result.items() if k not in _STATUS_SKIP_KEYS}
 
 
+def _parent_ds_path(path, ds_path):
+    """Nearest ancestor of `path` that is a dataset, at or under `ds_path`
+
+    A subdataset need not be a direct child of its superdataset -- plain
+    directories can sit in between (``study/derivatives/thing``).  Those
+    have no repo, hence no HEAD, and must be skipped rather than treated
+    as datasets.
+
+    Returns None when `path` is not underneath `ds_path` -- which
+    `_parse_sub_status` from ``git submodule status --recursive`` never
+    produces, but a future caller might.  Checked up front, so a stray
+    path that happens to sit inside some *other* dataset does not send
+    the walk climbing an unrelated hierarchy.
+    """
+    if not ut.Path(path).is_relative_to(ds_path):
+        return None
+    parent = ut.Path(path).parent
+    while True:
+        parent_path = str(parent)
+        if parent_path == ds_path:
+            return parent_path
+        if parent == parent.parent:
+            # filesystem root reached without hitting ds_path
+            return None
+        if Dataset(parent_path).repo is not None:
+            return parent_path
+        parent = parent.parent
+
+
 def _inject_sub_info(paths_by_ds, since_map, _since_sub_info, ds_path):
     """Inject changed subdatasets that diff_dataset missed on adjusted branches.
 
@@ -91,22 +120,16 @@ def _inject_sub_info(paths_by_ds, since_map, _since_sub_info, ds_path):
             paths_by_ds[sub_path] = {}
 
         # Walk up to ds_path, registering each child as modified in
-        # its parent and ensuring since_map entries exist at each level.
-        # Termination: normally `parent_path == ds_path`.  Defensive
-        # second termination on `parent_path == child_path` covers the
-        # case where `sub_path` is not a descendant of `ds_path` (which
-        # `_parse_sub_status` from `git submodule status --recursive`
-        # never produces, but a future caller might) — without it,
-        # `Path('/').parent == Path('/')` would loop forever.
+        # its parent dataset and ensuring since_map entries exist at
+        # each level.
         child_path = sub_path
-        while True:
-            parent_path = str(ut.Path(child_path).parent)
-            if parent_path == child_path:
+        while child_path != ds_path:
+            parent_path = _parent_ds_path(child_path, ds_path)
+            if parent_path is None:
                 lgr.debug("sub %s not under ds %s; aborting ancestor walk",
                           sub_path, ds_path)
                 break
-            child_repo = Dataset(child_path).repo
-            child_sha = child_repo.get_hexsha() if child_repo else cur_sha
+            child_sha = Dataset(child_path).repo.get_hexsha()
             child_pre = _since_sub_info.get(child_path, child_sha)
 
             pds_status = paths_by_ds.setdefault(parent_path, {})
@@ -119,8 +142,6 @@ def _inject_sub_info(paths_by_ds, since_map, _since_sub_info, ds_path):
                     parent_path,
                     Dataset(parent_path).repo.get_hexsha())
 
-            if parent_path == ds_path:
-                break
             child_path = parent_path
 
 

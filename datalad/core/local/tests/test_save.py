@@ -21,6 +21,7 @@ from datalad.api import (
     install,
     save,
 )
+from datalad.core.local.save import _parent_ds_path
 from datalad.core.local.tests.test_run import (
     _assert_run_merge,
     _merge_ref,
@@ -1413,3 +1414,27 @@ def test_check_for_openfiles_invalid_config(tmp_path):
     ):
         with assert_raises(ValueError):
             ds.repo._check_for_openfiles({'dummy.txt': {}}, 'bogus')
+
+
+@pytest.mark.ai_generated
+def test_parent_ds_path(tmp_path):
+    """_parent_ds_path finds the nearest dataset ancestor, and stays inside ds"""
+    root = Dataset(str(tmp_path / 'root')).create()
+    # `plaindir` is an ordinary directory, not a dataset
+    mid = root.create(op.join('plaindir', 'mid'))
+    leaf = mid.create('leaf')
+    stray = Dataset(str(tmp_path / 'stray')).create()
+
+    # the plain directory in between is skipped, not mistaken for a dataset
+    eq_(_parent_ds_path(mid.path, root.path), root.path)
+    # a dataset ancestor below the reference dataset is honored
+    eq_(_parent_ds_path(leaf.path, root.path), mid.path)
+    # the reference dataset itself terminates the walk
+    eq_(_parent_ds_path(str(root.pathobj / 'plaindir'), root.path), root.path)
+
+    # a path that is not underneath the reference dataset yields None
+    eq_(_parent_ds_path(str(tmp_path / 'nowhere' / 'leaf'), root.path), None)
+    # ... including when it sits inside some *other* dataset, which must not
+    # send the walk climbing an unrelated hierarchy
+    eq_(_parent_ds_path(str(stray.pathobj / 'plaindir' / 'leaf'), root.path),
+        None)
