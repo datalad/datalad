@@ -704,15 +704,23 @@ def test_concurrent_generator_reading() -> None:
         t.join()
 
     collected_outputs = [
-        output_tuple[1]
-        for output_tuple in output_queue.queue
-        if output_tuple[1] is not None
+        (thread_number, int(output.split("#")[1]))
+        for thread_number, output in output_queue.queue
+        if output is not None
     ]
-    assert len(collected_outputs) == number_of_lines
-    assert collected_outputs == [
-        f"result#{i}"
-        for i in range(number_of_lines)
-    ]
+
+    # The merged order of `output_queue` is not deterministic: a reader
+    # thread can be preempted between `next()` returning and its `put()`,
+    # while other threads receive and enqueue later results (gh-7910).
+    # Assert only what is guaranteed -- every result delivered exactly
+    # once, and each thread's own results in generation order, since
+    # `next()` is serialized by `_ResultGenerator.send_lock`.
+    assert sorted(i for _, i in collected_outputs) == list(range(number_of_lines))
+    last_seen: dict[int, int] = {}
+    for thread_number, i in collected_outputs:
+        assert i > last_seen.get(thread_number, -1), \
+            f"thread {thread_number} received result#{i} out of order"
+        last_seen[thread_number] = i
 
 
 def test_same_thread_reenter_detection() -> None:
