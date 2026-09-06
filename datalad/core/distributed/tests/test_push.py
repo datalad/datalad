@@ -96,6 +96,9 @@ def test_invalid_call(origin=None, tdir=None):
         ValueError,
         ds.push, to='target', since='09320957509720437523')
 
+    # --set-upstream without an explicit --to is ambiguous
+    assert_raises(ValueError, ds.push, set_upstream=True)
+
     # If a publish() user accidentally passes since='', which push() spells as
     # since='^', the call is aborted.
     assert_raises(
@@ -304,6 +307,34 @@ def check_push(annex, src_path, dst_path):
 @pytest.mark.parametrize("annex", [False, True])
 def test_push(annex):
     check_push(annex)
+
+
+@pytest.mark.ai_generated
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_push_set_upstream(src_path=None, dst_path=None):
+    # `src` is annex-enabled (the create() default), so this also covers
+    # that -u/--set-upstream must not leak tracking config onto the
+    # 'git-annex' branch that gets pushed alongside the active one.
+    src = Dataset(src_path).create()
+    src_repo = src.repo
+    mk_push_target(src, 'target', dst_path, annex=True)
+    # no tracking branch configured yet
+    eq_(src_repo.get_tracking_branch(), (None, None))
+    eq_(src_repo.get_tracking_branch('git-annex'), (None, None))
+
+    res = src.push(to='target', set_upstream=True)
+    assert_in_results(
+        res,
+        action='publish', status='ok', target='target',
+        refspec=DEFAULT_REFSPEC,
+        operations=['new-branch'])
+    # now it is, just like after `git push -u`
+    eq_(src_repo.get_tracking_branch(),
+        ('target', 'refs/heads/{}'.format(DEFAULT_BRANCH)))
+    # but the incidentally-pushed 'git-annex' branch must not have been
+    # dragged into tracking by the same -u flag
+    eq_(src_repo.get_tracking_branch('git-annex'), (None, None))
 
 
 def check_datasets_order(res, order='bottom-up'):

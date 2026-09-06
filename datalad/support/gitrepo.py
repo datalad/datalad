@@ -2060,6 +2060,10 @@ class GitRepo(CoreGitRepo):
             and cfg.get_from_source('local', cfg_push_var) is not None:
             lgr.debug("Removing %s variable from local git config after successful push", cfg_push_var)
             cfg.unset(cfg_push_var, 'local')
+        if {'-u', '--set-upstream'}.intersection(git_options):
+            # like checkout(), a push with -u/--set-upstream can (re)write
+            # branch.<name>.remote/.merge -- make sure it is reflected
+            cfg.reload()
         return push_res
 
     def push_(self, remote: Optional[str] = None, refspec: str | list[str] | None = None, all_: bool = False, git_options: Optional[list[str]] =None) -> Iterator[PushInfo]:
