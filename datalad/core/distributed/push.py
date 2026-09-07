@@ -266,8 +266,14 @@ class Push(Interface):
             pbars = {}
             yield from _push(
                 dspath, dsrecords, to, data, force, jobs, res_kwargs.copy(), pbars,
-                got_path_arg=True if path else False,
-                set_upstream=set_upstream)
+                got_path_arg=True if path else False)
+            if set_upstream:
+                # kept as an independent, follow-up step (rather than
+                # threaded through `_push()`/`_push_refspecs()`) so as to
+                # not alter the signature of functions that at least one
+                # widely-used extension (datalad-next) fully replaces --
+                # see gh-7917 discussion.
+                yield from _set_upstream_for_dataset(dspath, to)
             # take down progress bars for this dataset
             for i, ds in pbars.items():
                 log_progress(lgr.info, i, 'Finished push of %s', ds)
@@ -434,7 +440,7 @@ def _transfer_data(repo, ds, target, content, data, force, jobs, res_kwargs,
 
 
 def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
-          got_path_arg=False, set_upstream=False):
+          got_path_arg=False):
     force_git_push = force in ('all', 'gitpush')
 
     # nothing recursive in here, we only need a repo to work with
@@ -621,10 +627,6 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
             "skipping git push dry-run and refspec computation",
             target)
         refspecs2push = []
-        if set_upstream:
-            lgr.warning(
-                "Cannot set up tracking branch: '%s' is not a git remote",
-                target)
 
     # we know what to push and where, now dependency processing first
     for r in publish_depends:
@@ -728,46 +730,22 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
         lgr.debug('No refspecs found that need to be pushed')
         return
 
-    if set_upstream and not active_branch:
-        lgr.warning(
-            "Cannot set up tracking branch: no active branch")
-
-    # git's own -u/--set-upstream applies to *every* branch in a single
-    # push invocation (e.g. also 'git-annex'), not just the one the user
-    # asked to track -- split it off into its own push so only the active
-    # branch's refspec gets it
-    upstream_refspecs, other_refspecs = [], refspecs2push
-    if set_upstream and active_branch:
-        upstream_refspecs = [
-            r for r in refspecs2push
-            if _refspec_targets_branch(r, active_branch)
-        ]
-        other_refspecs = [
-            r for r in refspecs2push if r not in upstream_refspecs]
-
     # and push all relevant branches, plus the git-annex branch to announce
     # local availability info too
-    if upstream_refspecs:
-        yield from _push_refspecs(
-            repo, target, upstream_refspecs, force_git_push, True,
-            res_kwargs.copy())
-    if other_refspecs:
-        yield from _push_refspecs(
-            repo, target, other_refspecs, force_git_push, False,
-            res_kwargs.copy())
-
-
-def _branch_refspec_pattern(branch):
-    # try to anticipate any flavor of an idea of a branch ending up in a refspec
-    return re.compile(r'((^|.*:)refs/heads/|.*:|^){}$'.format(branch))
-
-
-def _refspec_targets_branch(refspec, branch):
-    return bool(_branch_refspec_pattern(branch).match(refspec))
+    yield from _push_refspecs(
+        repo,
+        target,
+        refspecs2push,
+        force_git_push,
+        res_kwargs.copy(),
+    )
 
 
 def _append_branch_to_refspec_if_needed(ds, refspecs, branch):
-    if not any(_refspec_targets_branch(r, branch) for r in refspecs):
+    # try to anticipate any flavor of an idea of a branch ending up in a refspec
+    looks_like_that_branch = re.compile(
+        r'((^|.*:)refs/heads/|.*:|^){}$'.format(branch))
+    if all(not looks_like_that_branch.match(r) for r in refspecs):
         refspecs.append(
             branch
             if ds.config.get('branch.{}.merge'.format(branch), None)
@@ -775,17 +753,16 @@ def _append_branch_to_refspec_if_needed(ds, refspecs, branch):
         )
 
 
-def _push_refspecs(repo, target, refspecs, force_git_push, set_upstream, res_kwargs):
-    git_options = []
-    if force_git_push:
-        git_options.append('--force')
-    if set_upstream:
-        git_options.append('--set-upstream')
+def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs):
     push_res = repo.push(
         remote=target,
         refspec=refspecs,
-        git_options=git_options or None,
+        git_options=['--force'] if force_git_push else None,
     )
+    yield from _pushres_to_results(push_res, res_kwargs)
+
+
+def _pushres_to_results(push_res, res_kwargs):
     # TODO maybe compress into a single message whenever everything is
     # OK?
     for pr in push_res:
@@ -823,6 +800,64 @@ def _push_refspecs(repo, target, refspecs, force_git_push, set_upstream, res_kwa
                 pr['to_ref'],
                 pr['note']),
         )
+
+
+def _set_upstream_for_dataset(dspath, target):
+    """Configure `target` as the tracking sibling for `dspath`'s active branch
+
+    Implemented as an independent, follow-up ``git push --set-upstream``
+    (rather than folded into ``_push()``/``_push_refspecs()``) for two
+    reasons:
+
+    - those two functions' call signatures are relied upon by at least one
+      widely-used extension (datalad-next) that fully replaces them; adding
+      a parameter to either breaks that extension outright (gh-7917).
+    - git's own ``-u``/``--set-upstream`` configures tracking for *every*
+      refspec given to a single ``git push`` invocation, not just one of
+      them. A dedicated call naming only the active branch's refspec avoids
+      also configuring tracking for e.g. the ``git-annex`` branch, which
+      would otherwise happen for any annex repo (both are normally pushed
+      together).
+
+    A push with ``--set-upstream`` for a refspec that was already pushed
+    moments ago by the main push machinery is a safe, idempotent no-op
+    ("everything up-to-date"); it still gets git to write the tracking
+    configuration, which is all this needs to achieve.
+    """
+    ds = Dataset(dspath)
+    repo = ds.repo
+    get_remote_kwargs = {'exclude_special_remotes': False} \
+        if isinstance(repo, AnnexRepo) else {}
+    if target not in repo.get_remotes(**get_remote_kwargs):
+        lgr.warning(
+            "Cannot set up tracking branch: '%s' is unknown to %s",
+            target, ds)
+        return
+    if repo.config.get('remote.{}.url'.format(target), None) is None:
+        lgr.warning(
+            "Cannot set up tracking branch: '%s' is not a git remote",
+            target)
+        return
+    active_branch = repo.get_active_branch()
+    if active_branch and isinstance(repo, AnnexRepo):
+        active_branch = repo.get_corresponding_branch(active_branch) \
+            or active_branch
+    if not active_branch:
+        lgr.warning("Cannot set up tracking branch: no active branch")
+        return
+    res_kwargs = dict(
+        action='publish', refds=ds.path, logger=lgr,
+        type='dataset', path=dspath)
+    yield from _push_set_upstream(repo, target, active_branch, res_kwargs)
+
+
+def _push_set_upstream(repo, target, branch, res_kwargs):
+    push_res = repo.push(
+        remote=target,
+        refspec=['{0}:{0}'.format(branch)],
+        git_options=['--set-upstream'],
+    )
+    yield from _pushres_to_results(push_res, res_kwargs)
 
 
 def _push_data(ds, target, content, data, force, jobs, res_kwargs,
