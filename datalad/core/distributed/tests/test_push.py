@@ -102,6 +102,10 @@ def test_invalid_call(origin=None, tdir=None):
         ValueError,
         ds.push, to='target', since='')
 
+    # --set-upstream/-u requires an unambiguous --to target
+    assert_raises(ValueError, ds.push, set_upstream=True)
+    assert_raises(ValueError, ds.push, set_upstream=True, to=None)
+
 
 @pytest.mark.ai_generated
 @with_tempfile(mkdir=True)
@@ -304,6 +308,42 @@ def check_push(annex, src_path, dst_path):
 @pytest.mark.parametrize("annex", [False, True])
 def test_push(annex):
     check_push(annex)
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_push_set_upstream(src_path=None, dst_path=None):
+    src = Dataset(src_path).create()
+    src_repo = src.repo
+    mk_push_target(src, 'target', dst_path, annex=True)
+
+    # nothing is tracking anything yet
+    eq_(src_repo.get_tracking_branch(), (None, None))
+
+    res = src.push(to='target', set_upstream=True)
+    # the branch is pushed for the first time ('ok'); the extra,
+    # already-up-to-date push done afterwards to have git record the
+    # tracking configuration is reported as 'notneeded'
+    assert_status(['ok', 'notneeded'], res)
+    # `-u`/`--set-upstream` made git-push record 'target' as the
+    # upstream/tracking remote of the current branch, mimicking
+    # `git push -u`
+    eq_(
+        src_repo.get_tracking_branch(),
+        ('target', 'refs/heads/{}'.format(DEFAULT_BRANCH)),
+    )
+    # the git-annex branch, which rode along in the same push, is
+    # deliberately not marked as tracking 'target'
+    eq_(src_repo.get_tracking_branch(branch='git-annex'), (None, None))
+
+    # subsequent pushes no longer need an explicit --to
+    (src.pathobj / 'test_file').write_text('some content')
+    src.save(message='added a file')
+    res = src.push()
+    assert_in_results(
+        res,
+        action='publish', status='ok', target='target',
+        refspec=DEFAULT_REFSPEC)
 
 
 def check_datasets_order(res, order='bottom-up'):

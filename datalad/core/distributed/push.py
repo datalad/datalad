@@ -132,6 +132,13 @@ class Push(Interface):
             combine all force modes ('all').""",
             constraints=EnsureChoice(
                 'all', 'gitpush', 'checkdatapresent', None)),
+        set_upstream=Parameter(
+            args=("-u", "--set-upstream",),
+            action='store_true',
+            doc="""configure the [CMD: --to CMD][PY: `to` PY] sibling as the
+            upstream/tracking branch for the current branch, mimicking `git
+            push -u`. Requires [CMD: --to CMD][PY: `to` PY] to unambiguously
+            name a single sibling."""),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         jobs=jobs_opt,
@@ -183,6 +190,7 @@ class Push(Interface):
             since=None,
             data='auto-if-wanted',
             force=None,
+            set_upstream=False,
             recursive=False,
             recursion_limit=None,
             jobs=None):
@@ -190,6 +198,10 @@ class Push(Interface):
         # behavior. '' was/is (to be deprecated) used in `publish`. Alert user about the mistake
         if since == '':
             raise ValueError("'since' should point to commitish or use '^'.")
+        if set_upstream and not to:
+            raise ValueError(
+                "--set-upstream/-u requires a single target sibling to be "
+                "given via --to")
         # we resolve here, because we need to perform inspection on what was given
         # as an input argument further down
         paths = [resolve_path(p, dataset) for p in ensure_list(path)]
@@ -252,9 +264,20 @@ class Push(Interface):
             matched_anything = True
             lgr.debug('Pushing Dataset at %s', dspath)
             pbars = {}
-            yield from _push(
-                dspath, dsrecords, to, data, force, jobs, res_kwargs.copy(), pbars,
-                got_path_arg=True if path else False)
+            push_ok = True
+            for res in _push(
+                    dspath, dsrecords, to, data, force, jobs, res_kwargs.copy(), pbars,
+                    got_path_arg=True if path else False):
+                if res.get('status') == 'error':
+                    push_ok = False
+                yield res
+            if set_upstream and push_ok:
+                # handled as an independent follow-up, rather than by
+                # threading `set_upstream` through `_push()` itself:
+                # `_push()` is replaced wholesale by some DataLad
+                # extensions (e.g. datalad-next), so changing its call
+                # signature would break them
+                yield from _push_set_upstream(dspath, to, res_kwargs.copy())
             # take down progress bars for this dataset
             for i, ds in pbars.items():
                 log_progress(lgr.info, i, 'Finished push of %s', ds)
@@ -722,6 +745,36 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
     )
 
 
+def _push_set_upstream(dspath, target, res_kwargs):
+    """Configure `target` as the upstream (tracking) remote for the active
+    branch, mimicking `git push -u`.
+
+    Must only be called after a preceding, regular push of the dataset at
+    `dspath` to `target` has already succeeded. The active branch has
+    therefore already reached `target`, so the push below is a cheap,
+    "everything up-to-date" no-op that only serves to have git itself
+    record the tracking configuration -- exactly what `git push -u` does
+    when the branch happens to already be current.
+    """
+    repo = Dataset(dspath).repo
+    active_branch = repo.get_corresponding_branch() or repo.get_active_branch()
+    if not active_branch:
+        # nothing we could sensibly mark as tracking `target`
+        return
+    yield from _push_refspecs(
+        repo,
+        target,
+        ['{0}:{0}'.format(active_branch)],
+        False,
+        res_kwargs,
+        set_upstream=True,
+    )
+    # the `git push` subprocess above wrote branch.<name>.{remote,merge}
+    # straight to the on-disk config -- make our in-memory config cache
+    # pick it up right away, rather than only after the next reload
+    repo.config.reload()
+
+
 def _append_branch_to_refspec_if_needed(ds, refspecs, branch):
     # try to anticipate any flavor of an idea of a branch ending up in a refspec
     looks_like_that_branch = re.compile(
@@ -734,11 +787,19 @@ def _append_branch_to_refspec_if_needed(ds, refspecs, branch):
         )
 
 
-def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs):
+def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs,
+                    set_upstream=False):
+    git_options = []
+    if force_git_push:
+        git_options.append('--force')
+    if set_upstream:
+        # mimic `git push -u`: let git-push itself record `target` as the
+        # upstream/tracking remote for the pushed branch(es)
+        git_options.append('--set-upstream')
     push_res = repo.push(
         remote=target,
         refspec=refspecs,
-        git_options=['--force'] if force_git_push else None,
+        git_options=git_options or None,
     )
     # TODO maybe compress into a single message whenever everything is
     # OK?
