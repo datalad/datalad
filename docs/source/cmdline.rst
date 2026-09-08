@@ -60,6 +60,7 @@ Dataset operations
    datalad install: Install a dataset from a (remote) source <generated/man/datalad-install>
    datalad no-annex: Configure a dataset to never put file content into an annex <generated/man/datalad-no-annex>
    datalad remove: Unlink components from a dataset <generated/man/datalad-remove>
+   datalad reset: Reset a dataset to a target revision, discarding local divergence <generated/man/datalad-reset>
    datalad subdatasets: Query and manipulate subdataset records of a dataset <generated/man/datalad-subdatasets>
    datalad unlock: Make dataset file content editable <generated/man/datalad-unlock>
 
