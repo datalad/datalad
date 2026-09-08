@@ -339,5 +339,9 @@
         "email": "lgray95@alumni.cmu.edu",
         "bio": "Evidence Infrastructure · Extract → Validate → Surface · Data Pipelines | Blockchain/ZK | AI/LLM | Automation · CMU ECE, Qualcomm #2708",
         "blog": "https://liamdgray.com"
+    },
+    "claude": {
+        "name": "Claude",
+        "blog": "https://anthropic.com/claude-code"
     }
 }
