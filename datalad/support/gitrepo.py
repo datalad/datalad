@@ -3905,8 +3905,24 @@ class GitRepo(CoreGitRepo):
 
         # bypass any convenience or safe-manipulator for speed reasons
         # use case: saving many new subdatasets in a single run
+        #
+        # `.git` is not necessarily a directory -- e.g., in a linked
+        # git-worktree checkout it is a "gitlink" file pointing to the
+        # worktree's private git directory, and the shared `config` we need
+        # to append to lives in the worktree's *common* git directory
+        # instead (https://github.com/datalad/datalad/issues/7921).
+        # `git rev-parse --git-common-dir` reports the correct location in
+        # any case (plain repo, submodule, or worktree checkout).
+        git_dir = self.pathobj / '.git'
+        if not git_dir.is_dir():
+            git_dir = ut.Path(
+                self.call_git(
+                    ['rev-parse', '--git-common-dir'], read_only=True
+                ).splitlines()[0])
+            if not git_dir.is_absolute():
+                git_dir = self.pathobj / git_dir
         with (self.pathobj / '.gitmodules').open('a') as gmf, \
-             (self.pathobj / '.git' / 'config').open('a') as gcf:
+             (git_dir / 'config').open('a') as gcf:
             for i in info:
                 # we update the subproject commit unconditionally
                 self.call_git([

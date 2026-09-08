@@ -951,6 +951,30 @@ def test_save_adjusted_partial(path=None):
 
 
 @with_tempfile
+@with_tempfile
+def test_save_subds_in_worktree(path=None, worktree_path=None):
+    # https://github.com/datalad/datalad/issues/7921
+    # `save` must be able to register a new subdataset from within a linked
+    # git-worktree checkout of a plain-git (no annex) superdataset, where
+    # `.git` is a "gitlink" file rather than a directory.
+    ds = Dataset(path).create(annex=False)
+    ds.repo.call_git(['worktree', 'add', '-b', 'wt', worktree_path])
+    wt = Dataset(worktree_path)
+    ok_((wt.pathobj / '.git').is_file())
+    with chpwd(worktree_path):
+        # do not pass `dataset=` explicitly, so that the new subdataset does
+        # not get registered right away, and a subsequent `save()` call is
+        # needed to pick it up -- mirroring the CLI use case reported in the
+        # issue
+        subds = create('sub', annex=False)
+        res = save(message="register sub")
+    assert_status('ok', res)
+    assert_in_results(res, action='add', path=subds.path)
+    assert_repo_status(wt.path)
+    eq_(wt.subdatasets(result_xfm='relpaths'), ['sub'])
+
+
+@with_tempfile
 def test_save_diff_ignore_submodules_config(path=None):
     ds = Dataset(path).create()
     subds = ds.create("sub")
