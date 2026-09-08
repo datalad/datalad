@@ -1360,18 +1360,9 @@ def test_run_explicit_dirty_inputs(path=None):
     # --explicit is for
     assert_in_results(_run(inputs=["data/tracked.dat"]), action='run', status='ok')
 
-    # escape hatch 1: the caller knows what they are doing
+    # the escape hatch: the caller knows what they are doing
     assert_in_results(_run(inputs=["in.dat"], assume_ready="inputs"), action='run', status='ok')
     assert_in_results(_run(inputs=["in.dat"], assume_ready="both"), action='run', status='ok')
-
-    # escape hatch 2: configuration
-    ds.config.set('datalad.run.dirty-inputs', 'ignore', scope='local')
-    assert_in_results(_run(inputs=["in.dat"]), action='run', status='ok')
-    ds.config.set('datalad.run.dirty-inputs', 'warning', scope='local')
-    with swallow_logs(new_level=logging.WARNING) as cml:
-        assert_in_results(_run(inputs=["in.dat"]), action='run', status='ok')
-        assert_in('unsaved modifications', cml.out)
-    ds.config.unset('datalad.run.dirty-inputs', scope='local')
 
     ds.save()
     assert_repo_status(ds.path)

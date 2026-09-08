@@ -483,10 +483,9 @@ class Run(Interface):
             explicit. Don't warn if the repository is dirty, and only save
             modifications to the listed outputs. A declared input with
             unsaved modifications is refused, because the run record could
-            not describe the state the command was given: save it, use
-            [CMD: --assume-ready=inputs CMD][PY: `assume_ready='inputs'` PY],
-            or set the configuration variable 'datalad.run.dirty-inputs' to
-            'warning' or 'ignore' to proceed regardless."""),
+            not describe the state the command was given: save it, or use
+            [CMD: --assume-ready=inputs CMD][PY: `assume_ready='inputs'` PY]
+            to proceed regardless."""),
         message=save_message_opt,
         sidecar=Parameter(
             args=('--sidecar',),
@@ -1179,22 +1178,15 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     if explicit and not (inject or dry_run or skip_dirtycheck) \
             and assume_ready not in ('inputs', 'both'):
         dirty_inputs = _get_dirty_inputs(ds, globbed['inputs'], pwd)
-        on_dirty_inputs = ds.config.get(
-            'datalad.run.dirty-inputs', default='error') \
-            if dirty_inputs else 'ignore'
-        if on_dirty_inputs in ('error', 'warning'):
-            dirty_inputs_msg = (
-                'declared inputs have unsaved modifications: %s. '
-                'Save them, run with --assume-ready=inputs, or set config '
-                'datalad.run.dirty-inputs=ignore to proceed anyway',
-                ['{} [{}]'.format(ipath, istate)
-                 for ipath, istate in dirty_inputs])
-            if on_dirty_inputs == 'error':
-                yield get_status_dict(
-                    'run', ds=ds, status='impossible',
-                    message=dirty_inputs_msg)
-                return
-            lgr.warning(dirty_inputs_msg[0], dirty_inputs_msg[1])
+        if dirty_inputs:
+            yield get_status_dict(
+                'run', ds=ds, status='impossible',
+                message=(
+                    'declared inputs have unsaved modifications: %s. '
+                    'Save them, or run with --assume-ready=inputs',
+                    ['{} [{}]'.format(ipath, istate)
+                     for ipath, istate in dirty_inputs]))
+            return
 
     if not (inject or dry_run):
         yield from _prep_worktree(

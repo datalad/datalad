@@ -43,10 +43,12 @@ Untracked content counts only when it *is* a declared input, not when it
 merely sits inside a declared directory.
 
 The check is limited to `--explicit`: without it a dirty dataset is
-refused outright, which subsumes the check.  It is skipped for
-`--assume-ready inputs|both` (the caller asserts the inputs are ready)
-and can be relaxed with the configuration variable
-`datalad.run.dirty-inputs` (`error` — the default, `warning`, `ignore`).
+refused outright, which subsumes the check.  Its only escape hatch is
+`--assume-ready inputs|both`, with which the caller asserts that the
+inputs are ready; no configuration variable relaxes it, because
+`--assume-ready` already covers the case per call and a persistent
+"ignore" setting would silently reintroduce the very records this check
+exists to prevent.
 
 Only `inputs` are checked, not `extra_inputs`: the latter is an unexposed
 implementation detail for wrappers, which have their own notion of what a
@@ -157,7 +159,7 @@ Three independent measures, in the order in which they take effect:
 
 | Test | Purpose |
 | --- | --- |
-| `test_run_explicit_dirty_inputs` | Modified/untracked inputs, both escape hatches, no false positives |
+| `test_run_explicit_dirty_inputs` | Modified/untracked inputs, the `--assume-ready` escape hatch, no false positives |
 | `test_rerun_explicit_dirty_input` | The gh-5312 reproducer, for `rerun` |
 | `test_run_explicit_nested_run` | Nested runs succeed; a plain commit of an undeclared file still fails |
 | `test_run_explicit_nested_run_adjusted` | The same on an adjusted branch, where git-annex commits of its own |
