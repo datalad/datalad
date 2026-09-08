@@ -884,11 +884,6 @@ def _prep_worktree(ds_path, pwd, globbed,
                     yield res
 
 
-def _merge_pending(repo):
-    """Is a merge prepared, but not yet committed, in `repo`?"""
-    return (repo.dot_git / 'MERGE_HEAD').exists()
-
-
 def _merge_changes_subdatasets(repo, source):
     """Would merging `source` change the recorded state of a subdataset?
 
@@ -921,6 +916,15 @@ def _prepare_merge(repo, source, strategy):
     on, and -- unless `source` was already merged -- Git's merge state is set
     up such that the next commit becomes a merge commit with `source` as an
     additional parent.
+
+    This is the second way a run can end up recorded on a merge commit; the
+    other is `save`'s ``since`` (see `_create_merge_commit()`), which wraps
+    commits the command created itself. They compose: a command that commits
+    concludes this merge with its first commit, and the run record then goes
+    into the commit that wraps those. Either way the invariant both maintain
+    holds -- the first parent of the commit carrying the run record is the
+    state the dataset had before the run, so what the run changed is always
+    ``diff <record commit>^1 <record commit>``.
 
     Parameters
     ----------
@@ -972,7 +976,7 @@ def _prepare_merge(repo, source, strategy):
         # anything that is not part of it. Unlike `git checkout`, this leaves
         # HEAD (and hence the first parent of the merge) alone.
         repo.call_git(['read-tree', '-u', '--reset', source])
-    return _merge_pending(repo)
+    return repo.get_merge_head() is not None
 
 
 def _unstage_merge(repo):
@@ -1554,7 +1558,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                     on_failure='ignore'):
                 yield r
 
-    if merge_commit and _merge_pending(ds.repo):
+    if merge_commit and ds.repo.get_merge_head():
         # `save` had nothing to commit -- the command left the tree of the
         # merged revision unchanged, or reproduced the state that is already
         # recorded. The merge itself is still worth recording: it is what says

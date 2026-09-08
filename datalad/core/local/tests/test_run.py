@@ -1606,3 +1606,38 @@ def test_run_merge_command_stages(path=None):
     assert_repo_status(ds.path)
     eq_(_parents(repo), [mine, incoming])
     ok_exists(op.join(path, "staged.dat"))
+
+
+@with_tempfile(mkdir=True)
+@skip_if_adjusted_branch
+@pytest.mark.ai_generated
+def test_run_merge_with_subdataset_commits(path=None):
+    # `--merge` and the merge `save` creates for command-made commits (the
+    # `since` machinery) have to compose: here the command commits in a
+    # subdataset, so the superdataset gets both
+    ds = Dataset(path).create()
+    sub = ds.create('sub')
+    create_tree(path, {"base.dat": "base"})
+    ds.save(to_git=True)
+    repo = ds.repo
+    # an 'incoming' that leaves the subdataset alone
+    incoming = _setup_incoming(ds, {"raw.dat": "one"})
+    pre = repo.get_hexsha()
+
+    ds.run("cd sub && {} insub.dat && datalad save -m insub".format(
+        touch_command), merge='incoming', merge_strategy='theirs')
+
+    assert_repo_status(ds.path)
+    # the run record sits on a commit whose first parent is the pre-run
+    # state, so `diff HEAD^1 HEAD` is what the run did -- as for any run
+    eq_(_parents(repo)[0], pre)
+    _, info = get_run_info(ds, repo.format_commit("%B"))
+    eq_(info["merge"]["commit"], incoming)
+    # ... the merged state did not get lost in the wrapping ...
+    ok_(repo.is_ancestor(incoming, "HEAD"))
+    # ... no merge is left dangling ...
+    assert_false(repo.get_merge_head())
+    # ... and the subdataset carries its own record, as it would without
+    # a merge being involved
+    _assert_run_merge(sub)
+    ok_exists(op.join(sub.path, "insub.dat"))

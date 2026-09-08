@@ -135,6 +135,10 @@ def _create_merge_commit(repo, pre_hexsha, msg):
     On adjusted branches (git-annex), the merge is created on the
     original branch and then propagated back via ``git annex merge``.
 
+    Note that `run` can also record on a merge that Git itself prepared, for
+    ``run --merge`` (see `_prepare_merge()` there). That one is concluded by
+    the ordinary commit below, not here; when both apply, this wraps it.
+
     Raises
     ------
     CommandError
