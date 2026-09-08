@@ -1292,3 +1292,56 @@ def test_run_merge_subdataset_deletions(path=None):
 
     # super also has merge
     _assert_run_merge(ds)
+
+
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_on_cmd_failure(path=None):
+    ds = Dataset(path).create()
+
+    def cmd_failing(name):
+        # a fresh output filename per call -- once annexed, overwriting an
+        # existing output file in place would go through its (root-owned,
+        # so still writable) annex object rather than swapping the symlink,
+        # which git would not pick up as a content change
+        outfile = op.join(path, name)
+        if on_windows:
+            return "echo x>{} & exit /b 3".format(outfile), outfile
+        return "echo x > {} && exit 3".format(outfile), outfile
+
+    # unset (default) and explicit 'error' are equivalent to the
+    # pre-existing behavior: under the default on_failure='stop', the
+    # command-failure result raises before anything gets saved (as in
+    # test_run_failure in test_rerun.py).
+    for name, kwargs in (("a", dict()), ("b", dict(on_cmd_failure="error"))):
+        cmd, outfile = cmd_failing(name)
+        hexsha_before = ds.repo.get_hexsha()
+        with assert_raises(IncompleteResultsError):
+            ds.run(cmd, result_renderer=None, **kwargs)
+        eq_(hexsha_before, ds.repo.get_hexsha())
+        ok_(ds.repo.dirty)
+        ds.save(message="cleanup")
+        assert_repo_status(ds.path)
+        ok_file_has_content(outfile, "x", strip=True)
+
+    # 'save' -- the failing command's output is committed, and the run
+    # result is 'ok' (no exception/error propagated)
+    cmd, outfile = cmd_failing("c")
+    hexsha_before = ds.repo.get_hexsha()
+    res = ds.run(cmd, on_cmd_failure="save", result_renderer=None)
+    assert_result_count(res, 1, action="run", status="ok")
+    assert_result_count(res, 1, action="save", status="ok")
+    assert_repo_status(ds.path)
+    neq_(hexsha_before, ds.repo.get_hexsha())
+    ok_file_has_content(outfile, "x", strip=True)
+
+    # 'all' -- output is committed *and* the failure is still reported,
+    # even under the default on_failure='stop': the save is hoisted to
+    # happen before the (error-status) run result is yielded.
+    cmd, outfile = cmd_failing("d")
+    hexsha_before = ds.repo.get_hexsha()
+    with assert_raises(IncompleteResultsError):
+        ds.run(cmd, on_cmd_failure="all", result_renderer=None)
+    assert_repo_status(ds.path)
+    neq_(hexsha_before, ds.repo.get_hexsha())
+    ok_file_has_content(outfile, "x", strip=True)

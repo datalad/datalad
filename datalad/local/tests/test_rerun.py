@@ -354,6 +354,35 @@ def test_run_failure(path=None):
 
 
 @with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_rerun_on_cmd_failure(path=None):
+    # Rerun.__call__ threads on_cmd_failure through to _rerun(), which must
+    # in turn forward it to the run_command() call that replays the
+    # recorded command -- otherwise the option is silently a no-op on
+    # rerun (gh-7903).
+    if on_windows:
+        raise SkipTest("POSIX-only test command")
+    ds = Dataset(path).create()
+    # As in test_run_failure above: the recorded exit code (0) no longer
+    # matches the one produced on replay (1, since "bar" now exists), so
+    # the rerun is reported as a command failure.
+    ds.run("[ ! -e bar ] && echo c >bar")
+    assert_repo_status(ds.path)
+
+    # Without on_cmd_failure, the mismatched exit code on replay is
+    # reported as an error (as already covered above).
+    res = ds.rerun(result_renderer=None, on_failure="ignore")
+    assert_in_results(res, action="run", status="error")
+
+    # With on_cmd_failure='save' forwarded to the replayed run, the same
+    # mismatched exit code is instead treated as 'ok'. Pre-fix, the
+    # option was silently dropped by _rerun() and this would still be
+    # 'error'.
+    res = ds.rerun(on_cmd_failure="save", result_renderer=None)
+    assert_in_results(res, action="run", status="ok")
+
+
+@with_tempfile(mkdir=True)
 def test_rerun_branch(path=None):
     ds = Dataset(path).create()
     if ds.repo.is_managed_branch():

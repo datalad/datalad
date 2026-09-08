@@ -557,6 +557,7 @@ def _rerun(dset, results, assume_ready=None, explicit=False,
                                  explicit=explicit,
                                  rerun_outputs=auto_outputs,
                                  message=message,
+                                 on_cmd_failure=on_cmd_failure,
                                  jobs=jobs,
                                  rerun_info=run_info):
                 yield r

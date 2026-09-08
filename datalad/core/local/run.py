@@ -1249,10 +1249,12 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     else:
         status = "ok"
 
-    # When save-on-failure is requested, perform the save BEFORE yielding the
-    # run result so that it happens regardless of the caller's on_failure
-    # handling of the (potentially error-status) run result.
-    if cmd_failed and _save_on_cmd_failure and do_save:
+    def _save_remaining_changes():
+        # Factored out since it is needed both for the regular do_save path
+        # below, and (identically) for on_cmd_failure='save'/'all', which
+        # must save *before* yielding the (possibly error-status) run
+        # result so that the save happens regardless of the caller's
+        # on_failure handling of that result.
         with chpwd(pwd):
             for r in Save.__call__(
                     dataset=ds_path,
@@ -1270,6 +1272,12 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                     result_renderer='disabled',
                     on_failure='ignore'):
                 yield r
+
+    # When save-on-failure is requested, perform the save BEFORE yielding the
+    # run result so that it happens regardless of the caller's on_failure
+    # handling of the (potentially error-status) run result.
+    if cmd_failed and _save_on_cmd_failure and do_save:
+        yield from _save_remaining_changes()
         do_save = False
 
     run_result = get_status_dict(
@@ -1305,30 +1313,4 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     yield run_result
 
     if do_save:
-        with chpwd(pwd):
-            for r in Save.__call__(
-                    dataset=ds_path,
-                    path=outputs_to_save,
-                    recursive=True,
-                    message=msg,
-                    jobs=jobs,
-                    # Only use since= when the command created commits
-                    # (in the top-level or any subdataset).  Without
-                    # inner commits, use since=None (standard Status path).
-                    since=pre_cmd_hexsha if cmd_made_commits else None,
-                    # Pass pre-command sub HEADs so Save can detect
-                    # subdataset commits on adjusted branches where
-                    # diff_dataset can't see them.  Parse from the
-                    # lightweight submodule status snapshot.
-                    _since_sub_info=_parse_sub_status(
-                        pre_cmd_sub_status, ds_path)
-                    if cmd_made_commits and pre_cmd_sub_status
-                    else None,
-                    # Message for the auxiliary commit that wraps
-                    # uncommitted changes before the run-merge.  Keeps
-                    # the run-record out of the intermediate commit.
-                    _sub_message="Remaining changes after command execution",
-                    return_type='generator',
-                    result_renderer='disabled',
-                    on_failure='ignore'):
-                yield r
+        yield from _save_remaining_changes()
