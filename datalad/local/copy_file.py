@@ -114,7 +114,11 @@ class _CachedRepo(object):
 
     def get_tmpdir(self):
         if not self._tmpdir:
-            tmploc = self._repo.pathobj / '.git' / 'tmp' / 'datalad-copy'
+            # use `dot_git` rather than a blunt `pathobj / '.git'`: the
+            # latter breaks whenever `.git` is not a directory itself, e.g.
+            # for a submodule, or a linked git-worktree checkout
+            # (https://github.com/datalad/datalad/issues/7921)
+            tmploc = self._repo.dot_git / 'tmp' / 'datalad-copy'
             tmploc.mkdir(exist_ok=True, parents=True)
             # put in cache for later clean/lookup
             self._tmpdir = tmploc

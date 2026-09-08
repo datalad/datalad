@@ -3906,21 +3906,21 @@ class GitRepo(CoreGitRepo):
         # bypass any convenience or safe-manipulator for speed reasons
         # use case: saving many new subdatasets in a single run
         #
-        # `.git` is not necessarily a directory -- e.g., in a linked
-        # git-worktree checkout it is a "gitlink" file pointing to the
-        # worktree's private git directory, and the shared `config` we need
-        # to append to lives in the worktree's *common* git directory
-        # instead (https://github.com/datalad/datalad/issues/7921).
-        # `git rev-parse --git-common-dir` reports the correct location in
-        # any case (plain repo, submodule, or worktree checkout).
-        git_dir = self.pathobj / '.git'
-        if not git_dir.is_dir():
-            git_dir = ut.Path(
-                self.call_git(
-                    ['rev-parse', '--git-common-dir'], read_only=True
-                ).splitlines()[0])
-            if not git_dir.is_absolute():
-                git_dir = self.pathobj / git_dir
+        # `self.dot_git` (unlike a blunt `self.pathobj / '.git'`) already
+        # accounts for `.git` being a "gitlink" file rather than a directory
+        # (as in a submodule, or a linked git-worktree checkout), but for a
+        # worktree checkout it resolves to that worktree's own *private* git
+        # directory, whereas `config` is shared and lives in the *common*
+        # git directory instead (https://github.com/datalad/datalad/issues/7921).
+        # Git records the location of that common directory in a `commondir`
+        # file inside the private one -- read it directly, rather than
+        # shelling out to `git rev-parse --git-common-dir` for it, since for
+        # a plain repository or a submodule `self.dot_git` already *is* the
+        # common directory (no `commondir` file is present there).
+        git_dir = self.dot_git
+        commondir_file = git_dir / 'commondir'
+        if commondir_file.exists():
+            git_dir = (git_dir / commondir_file.read_text().splitlines()[0]).resolve()
         with (self.pathobj / '.gitmodules').open('a') as gmf, \
              (git_dir / 'config').open('a') as gcf:
             for i in info:
