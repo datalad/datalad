@@ -517,18 +517,20 @@ def _get_ncommits(ds):
 
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**multi_tree_args)
-def test_add_archive_content_multiple_unusable(repo_path=None):
-    # if any of the given archives can not be used, nothing is added at all
+def test_add_archive_content_multiple(repo_path=None):
     ds = Dataset(repo_path).create(force=True)
     with swallow_outputs():
-        # 2.tar.gz is left untracked
-        ds.save(['1.tar.gz', '4.tar.gz'], message="added archives")
+        # 2.tar.gz is left untracked, and ingit.tar.gz goes into Git, for the
+        # "unusable archive" checks below
+        ds.save([a for a in ('1.tar.gz', opj('d', '3.tar.gz'), '4.tar.gz',
+                             'c1.tar.gz', 'c2.tar.gz')],
+                message="added archives")
         ds.save('ingit.tar.gz', to_git=True, message="added to git")
-    # and 4.tar.gz has no content around
+    # ... and 4.tar.gz has no content around
     ds.repo.drop('4.tar.gz', options=['--force'])
 
-    def check(archives, **kwargs):
-        """Nothing should be added, and nothing committed"""
+    def check_unusable(archives, **kwargs):
+        """If any archive can not be used, nothing is added or committed"""
         ncommits_prior = _get_ncommits(ds)
         res = add_archive_content(archives, allow_dirty=True,
                                   on_failure='ignore', **kwargs)
@@ -539,7 +541,7 @@ def test_add_archive_content_multiple_unusable(repo_path=None):
     with chpwd(repo_path):
         # an untracked archive
         assert_in_results(
-            check(['1.tar.gz', '2.tar.gz']),
+            check_unusable(['1.tar.gz', '2.tar.gz']),
             action='add-archive-content',
             status='impossible',
             type='file',
@@ -548,14 +550,14 @@ def test_add_archive_content_multiple_unusable(repo_path=None):
                     "Run 'datalad save 2.tar.gz'")
         # an archive which is not there at all
         assert_in_results(
-            check(['1.tar.gz', 'nonexisting.tar.gz']),
+            check_unusable(['1.tar.gz', 'nonexisting.tar.gz']),
             action='add-archive-content',
             status='impossible',
             message='No such file: {}'.format(opj(repo_path,
                                                   'nonexisting.tar.gz')))
         # an archive which is not under annex control
         assert_in_results(
-            check(['1.tar.gz', 'ingit.tar.gz']),
+            check_unusable(['1.tar.gz', 'ingit.tar.gz']),
             action='add-archive-content',
             status='impossible',
             path=opj(repo_path, 'ingit.tar.gz'),
@@ -563,7 +565,7 @@ def test_add_archive_content_multiple_unusable(repo_path=None):
                      'ingit.tar.gz'))
         # an archive the content of which is not available locally
         assert_in_results(
-            check(['1.tar.gz', '4.tar.gz']),
+            check_unusable(['1.tar.gz', '4.tar.gz']),
             action='add-archive-content',
             status='impossible',
             path=opj(repo_path, '4.tar.gz'),
@@ -577,14 +579,8 @@ def test_add_archive_content_multiple_unusable(repo_path=None):
             status='impossible',
             message='No archive was specified')
 
-
-@assert_cwd_unchanged(ok_to_chdir=True)
-@with_tree(**multi_tree_args)
-def test_add_archive_content_multiple(repo_path=None):
-    ds = Dataset(repo_path).create(force=True)
-    with swallow_outputs():
-        ds.save(message="added archives")
-    with chpwd(repo_path):
+        with swallow_outputs():
+            ds.save('2.tar.gz', message="added the remaining archive")
         # a single archive, to have a baseline for the number of times the
         # batched git-annex processes are taken down (see below)
         with patch.object(AnnexRepo, 'precommit', autospec=True,
@@ -628,9 +624,10 @@ def test_add_archive_content_multiple(repo_path=None):
         for archive in archives:
             assert_in(archive, commit_msg)
         assert_in('Files processed: 2', commit_msg)
-        # adding more archives must not cost more take downs of the batched
-        # git-annex processes than adding a single one -- that is what makes
-        # a single invocation faster than one per archive
+        # Performance guard, not a behavioral one: adding more archives must
+        # not cost more take downs of the batched git-annex processes than
+        # adding a single one -- that is what makes a single invocation
+        # faster than one invocation per archive
         assert_equal(precommit.call_count, precommits_single)
 
     # adding multiple archives while being in a subdirectory should not leave
