@@ -132,6 +132,18 @@ class Push(Interface):
             combine all force modes ('all').""",
             constraints=EnsureChoice(
                 'all', 'gitpush', 'checkdatapresent', None)),
+        set_upstream=Parameter(
+            args=("-u", "--set-upstream",),
+            action="store_true",
+            doc="""for each pushed branch, configure the target sibling as
+            its upstream (tracking) remote, equivalent to
+            [CMD: git push --set-upstream CMD][PY: `git push --set-upstream`
+            PY]. Requires [CMD: --to CMD][PY: `to` PY] to be given
+            explicitly, because it would otherwise be ambiguous which
+            sibling to track. Like Git itself, this applies to every branch
+            included in the push, not only the active one -- for an annex
+            repository this includes the ``git-annex`` branch, which will
+            also end up tracking the target sibling."""),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         jobs=jobs_opt,
@@ -183,6 +195,7 @@ class Push(Interface):
             since=None,
             data='auto-if-wanted',
             force=None,
+            set_upstream=False,
             recursive=False,
             recursion_limit=None,
             jobs=None):
@@ -190,6 +203,10 @@ class Push(Interface):
         # behavior. '' was/is (to be deprecated) used in `publish`. Alert user about the mistake
         if since == '':
             raise ValueError("'since' should point to commitish or use '^'.")
+        if set_upstream and not to:
+            raise ValueError(
+                "--set-upstream requires an explicit target sibling, "
+                "specify via --to.")
         # we resolve here, because we need to perform inspection on what was given
         # as an input argument further down
         paths = [resolve_path(p, dataset) for p in ensure_list(path)]
@@ -254,7 +271,8 @@ class Push(Interface):
             pbars = {}
             yield from _push(
                 dspath, dsrecords, to, data, force, jobs, res_kwargs.copy(), pbars,
-                got_path_arg=True if path else False)
+                got_path_arg=True if path else False,
+                set_upstream=set_upstream)
             # take down progress bars for this dataset
             for i, ds in pbars.items():
                 log_progress(lgr.info, i, 'Finished push of %s', ds)
@@ -421,7 +439,7 @@ def _transfer_data(repo, ds, target, content, data, force, jobs, res_kwargs,
 
 
 def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
-          got_path_arg=False):
+          got_path_arg=False, set_upstream=False):
     force_git_push = force in ('all', 'gitpush')
 
     # nothing recursive in here, we only need a repo to work with
@@ -719,6 +737,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
         refspecs2push,
         force_git_push,
         res_kwargs.copy(),
+        set_upstream=set_upstream,
     )
 
 
@@ -734,11 +753,17 @@ def _append_branch_to_refspec_if_needed(ds, refspecs, branch):
         )
 
 
-def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs):
+def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs,
+                    set_upstream=False):
+    git_options = []
+    if force_git_push:
+        git_options.append('--force')
+    if set_upstream:
+        git_options.append('--set-upstream')
     push_res = repo.push(
         remote=target,
         refspec=refspecs,
-        git_options=['--force'] if force_git_push else None,
+        git_options=git_options or None,
     )
     # TODO maybe compress into a single message whenever everything is
     # OK?

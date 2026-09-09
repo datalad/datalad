@@ -2060,6 +2060,16 @@ class GitRepo(CoreGitRepo):
             and cfg.get_from_source('local', cfg_push_var) is not None:
             lgr.debug("Removing %s variable from local git config after successful push", cfg_push_var)
             cfg.unset(cfg_push_var, 'local')
+        if '--dry-run' not in git_options \
+                and any(o in git_options for o in ('-u', '--set-upstream')):
+            # git itself may have updated branch.<name>.{remote,merge} as a
+            # side-effect of this push (e.g. for tracking setup); make sure
+            # our config cache reflects that for any code running in this
+            # same process that queries it right after (e.g. get_tracking_branch()).
+            # No force needed: reload()'s own mtime-based staleness check
+            # (see add_remote()/remove_remote() for the same pattern) will
+            # pick up the change.
+            cfg.reload()
         return push_res
 
     def push_(self, remote: Optional[str] = None, refspec: str | list[str] | None = None, all_: bool = False, git_options: Optional[list[str]] =None) -> Iterator[PushInfo]:

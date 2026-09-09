@@ -102,6 +102,9 @@ def test_invalid_call(origin=None, tdir=None):
         ValueError,
         ds.push, to='target', since='')
 
+    # --set-upstream/-u without an explicit --to target is ambiguous
+    assert_raises(ValueError, ds.push, set_upstream=True)
+
 
 @pytest.mark.ai_generated
 @with_tempfile(mkdir=True)
@@ -304,6 +307,48 @@ def check_push(annex, src_path, dst_path):
 @pytest.mark.parametrize("annex", [False, True])
 def test_push(annex):
     check_push(annex)
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def check_push_set_upstream(annex, src_path, dst_path):
+    src = Dataset(src_path).create(annex=annex)
+    src_repo = src.repo
+    mk_push_target(src, 'target', dst_path, annex=annex)
+
+    # nothing is configured as upstream/tracking remote yet
+    eq_(src_repo.get_tracking_branch(), (None, None))
+
+    # a plain push does not configure tracking
+    res = src.push(to='target')
+    assert_in_results(
+        res, action='publish', status='ok', target='target')
+    eq_(src_repo.get_tracking_branch(), (None, None))
+
+    # --set-upstream (mimicking `git push -u`) does, for a push that
+    # actually transfers something
+    (src.pathobj / 'test_mod_file').write_text("Some additional stuff.")
+    src.save(to_git=True, message="Modified.")
+    res = src.push(to='target', since='^', set_upstream=True)
+    assert_in_results(
+        res, action='publish', status='ok', target='target')
+    eq_(src_repo.get_tracking_branch(),
+        ('target', 'refs/heads/{}'.format(DEFAULT_BRANCH)))
+
+    # and a subsequent push without any explicit target now succeeds,
+    # because a tracking branch is configured
+    (src.pathobj / 'test_mod_file2').write_text("Yet more stuff.")
+    src.save(to_git=True, message="Modified again.")
+    res = src.push()
+    assert_in_results(
+        res,
+        action='publish', status='ok', target='target')
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize("annex", [False, True])
+def test_push_set_upstream(annex):
+    check_push_set_upstream(annex)
 
 
 def check_datasets_order(res, order='bottom-up'):
