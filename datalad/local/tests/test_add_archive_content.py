@@ -28,6 +28,8 @@ from os.path import (
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from datalad.api import (
     Dataset,
     add_archive_content,
@@ -517,6 +519,7 @@ def _get_ncommits(ds):
 
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**multi_tree_args)
+@pytest.mark.ai_generated
 def test_add_archive_content_multiple(repo_path=None):
     ds = Dataset(repo_path).create(force=True)
     with swallow_outputs():
@@ -669,6 +672,7 @@ def test_add_archive_content_multiple(repo_path=None):
 
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**multi_tree_args)
+@pytest.mark.ai_generated
 def test_add_archive_content_multiple_cmdline_and_keys(repo_path=None):
     ds = Dataset(repo_path).create(force=True)
     with swallow_outputs():
