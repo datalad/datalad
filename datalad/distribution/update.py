@@ -485,6 +485,12 @@ def _choose_update_target(repo, branch, remote, cfg_remote):
              f"{repo.get_corresponding_branch(branch) or ''}" "@{upstream}"],
             read_only=True)
     elif branch:
+        # On an adjusted branch the active branch (e.g.
+        # 'adjusted/master(unlocked)') has no remote counterpart; the sibling
+        # tracks the corresponding branch ('master'). Resolve it so the target
+        # becomes e.g. 'origin/master' instead of the nonexistent
+        # 'origin/adjusted/master(unlocked)'.
+        branch = repo.get_corresponding_branch(branch) or branch
         remote_branch = "{}/{}".format(remote, branch)
         if repo.commit_exists(remote_branch):
             target = remote_branch
@@ -572,10 +578,27 @@ def _annex_plain_merge(repo, _, target, opts=None):
 
 
 def _annex_sync(repo, remote, _target, opts=None):
-    yield _try_command(
+    # git-annex-sync creates a synced/<branch> ref. Mirror
+    # AnnexRepo.localsync's delete-if-created hygiene: if this sync created it,
+    # remove it again, so a later git-annex-sync (run internally by save/push)
+    # cannot merge the zombie back and resurrect discarded commits (gh-7772).
+    branch = repo.get_active_branch()
+    branch = repo.get_corresponding_branch(branch) or branch
+    synced_branch = 'synced/{}'.format(branch)
+    had_synced_branch = synced_branch in repo.get_branches()
+    res = _try_command(
         {"action": "update.annex_sync", "message": "Ran git-annex-sync"},
         repo.call_annex,
         ['sync', '--no-push', '--pull', '--no-commit', '--no-content', remote])
+    yield res
+    # Use -D (force): after a --pull sync, synced/<branch> may hold commits not
+    # reachable from the *adjusted* HEAD (they live on the corresponding branch
+    # and remote-tracking ref), so -d would refuse. Force-deleting the ref we
+    # just created loses nothing.
+    if res.get("status") != "error" \
+            and not had_synced_branch \
+            and synced_branch in repo.get_branches():
+        repo.call_git(['branch', '-D', synced_branch])
 
 
 def _annex_merge_target(repo, _remote, target, opts=None):
@@ -616,8 +639,10 @@ def _annex_reset_target(repo, _remote, target, opts=None):
     """Reset an adjusted branch to a specific target revision.
 
     This performs a hard reset on the corresponding branch, then re-adjusts
-    the branch to maintain the adjusted state. This is useful for
-    `how_subds='reset'` on adjusted branches.
+    the branch to maintain the adjusted state. It also resets any
+    ``synced/<branch>`` ref so that a subsequent ``git annex sync`` does not
+    merge the old (pre-reset) state back in — which is the root cause of
+    "zombie commits" on Windows / crippled filesystems (see #7772).
     """
     if repo.dirty:
         yield {"action": "update.reset",
@@ -635,6 +660,11 @@ def _annex_reset_target(repo, _remote, target, opts=None):
         try:
             # Reset to target
             repo.call_git(['reset', '--hard', target])
+            # Also reset synced/<branch> so git-annex-sync won't
+            # resurrect the discarded commits (#7772).
+            synced_branch = 'synced/{}'.format(corr_branch)
+            if synced_branch in repo.get_branches():
+                repo.call_git(['branch', '-f', synced_branch, corr_branch])
             # Re-adjust with --force to overwrite existing adjusted branch
             repo.call_annex(['adjust', adjust_mode, '--force'])
         except Exception:
