@@ -14,3 +14,12 @@ It contains the authoritative project conventions including:
 
 Do NOT guess or assume conventions — read the file. Additional documentation
 may be found under `docs/`.
+
+## Commit authorship
+
+The git **author** of a commit you create is the person you are working for,
+not the assistant — set `user.name`/`user.email` accordingly (e.g.
+`git -c user.name=... -c user.email=... commit`) if the environment's git
+identity says otherwise. Credit the model in the `Co-Authored-By:` trailer
+instead. GitHub counts commit authors, not trailers, towards the repository's
+contributor list; see `CONTRIBUTING.md`, section "Recognizing contributions".
