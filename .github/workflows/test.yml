@@ -42,16 +42,19 @@ jobs:
         id: jobs
         run: |
           echo 'matrix<<EOT' >> "$GITHUB_OUTPUT"
+          # Entries in tools/ci/test-jobs.yml default to Linux; fill in
+          # `os` (the `runs-on` label) for the ones that don't say
+          # otherwise, so the `test` job below can key off it directly.
           if [ "${{ github.event_name == 'schedule' }}" = true ]
           then
-              yq '{"include": .} | to_json' tools/ci/test-jobs.yml >> "$GITHUB_OUTPUT"
+              yq '{"include": [.[] | .os //= "ubuntu-latest"]} | to_json' tools/ci/test-jobs.yml >> "$GITHUB_OUTPUT"
           else
-              yq '{"include": [.[] | select(."cron-only" != true)]} | to_json' tools/ci/test-jobs.yml >> "$GITHUB_OUTPUT"
+              yq '{"include": [.[] | select(."cron-only" != true) | .os //= "ubuntu-latest"]} | to_json' tools/ci/test-jobs.yml >> "$GITHUB_OUTPUT"
           fi
           echo 'EOT' >> "$GITHUB_OUTPUT"
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     needs: filter
     strategy:
       fail-fast: false
@@ -76,22 +79,22 @@ jobs:
         run: git describe
 
       # Just in case we need to check if nfs is there etc
-      - run: sudo lsmod
+      - if: runner.os == 'Linux'
+        run: sudo lsmod
 
-      - name: Install dependencies
+      # OS-specific provisioning (APT/NeuroDebian on Linux, Homebrew on
+      # macOS, long paths/SSH server on Windows) lives in these scripts --
+      # see tools/ci/test-env-*.sh -- rather than inline here, so it can be
+      # shellchecked (.github/workflows/shellcheck.yml) like other tools/ci
+      # scripts.
+      - name: Provision OS-specific test environment
         run: |
-          # The ultimate one-liner setup for NeuroDebian repository
-          bash <(wget -q -O- https://neuro.debian.net/_files/neurodebian-ci-setup.sh)
-          sudo apt-get update -qq
-          sudo apt-get install -y eatmydata  # to speedup some installations
-          tools/ci/prep-travis-forssh.sh
-          tools/ci/debians_disable_outdated_ssl_cert
-          # Install various basic dependencies
-          sudo eatmydata apt-get install -y zip pandoc p7zip-full
-          # needed for tests of patool compression fall-back solution
-          sudo eatmydata apt-get install -y xz-utils
-          sudo eatmydata apt-get install -y shunit2
-          [ -z "$LC_ALL" ] || sudo eatmydata apt-get install -y locales-all
+          case "$RUNNER_OS" in
+            Linux)   tools/ci/test-env-linux.sh ;;
+            macOS)   tools/ci/test-env-macos.sh ;;
+            Windows) tools/ci/test-env-windows.sh ;;
+            *) echo "::error::Unknown RUNNER_OS: $RUNNER_OS"; exit 1 ;;
+          esac
 
       - name: Configure _DL_TMPDIR before installing git-annex
         run: |
@@ -155,14 +158,6 @@ jobs:
         run: |
           git config --global user.email "test@github.land"
           git config --global user.name "GitHub Almighty"
-          # We do `sudo pip install` below, and versioneer needs to run git.
-          # Recent git needs to be made certain it is safe to do
-          sudo git config --global --add safe.directory $PWD
-
-      - name: Configure sudoers
-        # So we could test under sudo -E with PATH pointing to installed
-        # location
-        run: sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
 
       # Now it should be safe to point TMPDIR to a "tricky" setup just for the
       # purpose of testing
@@ -173,7 +168,14 @@ jobs:
           fi
 
       - name: Test installation for user
-        run: sudo pip install --user .
+        run: |
+          # Only Linux's provisioning (tools/ci/test-env-linux.sh) sets up
+          # `sudo` to keep PATH and git's safe.directory happy; elsewhere
+          # there's nothing to elevate for.
+          if [ "$RUNNER_OS" = Linux ]
+          then sudo pip install --user .
+          else pip install --user .
+          fi
 
       - name: Report WTF information using system-wide installed version
         run: |
@@ -199,7 +201,11 @@ jobs:
           # logs.
           set -x
           http_proxy=
-          PATH=$PWD/../tools/coverage-bin:$PATH
+          # The coverage-bin wrapper scripts are bash scripts relying on a
+          # POSIX shebang being honored on exec -- true for Linux/macOS but
+          # not for Windows (this also matches how AppVeyor ran things: its
+          # Windows jobs never used this wrapper either).
+          [ "$RUNNER_OS" = Windows ] || PATH=$PWD/../tools/coverage-bin:$PATH
           $PYTEST_WRAPPER python \
             -m pytest "${PYTEST_OPTS[@]}" \
             -c ../tox.ini \

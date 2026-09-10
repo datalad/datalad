@@ -208,3 +208,67 @@
 #  extra-envs:
 #    DATALAD_TESTS_SSH: "1"
 #    UNSET_S3_SECRETS: "1"
+
+# macOS and Windows jobs.  `os` is the `runs-on` label to use; entries
+# without it default to `ubuntu-latest` (see the `filter` job in test.yml).
+# Each platform is split into three module groups the way AppVeyor's
+# Mac/WinP310core/a1/a2 jobs used to be, to keep any one job comfortably
+# under the runner's timeout; PYTEST_SELECTION is cleared so the full
+# (non-turtle) suite runs on each, matching what those AppVeyor jobs did.
+#
+# TODO: drop `allow-failure` once these have proven themselves stable
+# across a number of runs -- they replace .appveyor.yml, which can then
+# be retired.
+
+- python-version: '3.10'
+  os: macos-latest
+  allow-failure: true
+  extra-envs:
+    PYTEST_SELECTION: ""
+    PYTEST_SELECTION_OP: "not"
+    TESTS_TO_PERFORM: "datalad.core datalad.dataset datalad.runner datalad.support"
+
+- python-version: '3.10'
+  os: macos-latest
+  allow-failure: true
+  extra-envs:
+    PYTEST_SELECTION: ""
+    PYTEST_SELECTION_OP: "not"
+    TESTS_TO_PERFORM: >-
+      datalad.cli datalad.customremotes datalad.distribution
+      datalad.downloaders datalad.interface datalad.tests datalad.ui
+
+- python-version: '3.10'
+  os: macos-latest
+  allow-failure: true
+  extra-envs:
+    PYTEST_SELECTION: ""
+    PYTEST_SELECTION_OP: "not"
+    TESTS_TO_PERFORM: "datalad.local datalad.distributed"
+
+- python-version: '3.10'
+  os: windows-2022
+  allow-failure: true
+  extra-envs:
+    PYTEST_SELECTION: ""
+    PYTEST_SELECTION_OP: "not"
+    TESTS_TO_PERFORM: "datalad.core datalad.dataset datalad.runner"
+
+- python-version: '3.10'
+  os: windows-2022
+  allow-failure: true
+  extra-envs:
+    PYTEST_SELECTION: ""
+    PYTEST_SELECTION_OP: "not"
+    TESTS_TO_PERFORM: >-
+      datalad.cli datalad.customremotes datalad.distribution
+      datalad.distributed datalad.downloaders datalad.interface
+      datalad.tests
+
+- python-version: '3.10'
+  os: windows-2022
+  allow-failure: true
+  extra-envs:
+    PYTEST_SELECTION: ""
+    PYTEST_SELECTION_OP: "not"
+    TESTS_TO_PERFORM: "datalad.local datalad.support datalad.ui"
