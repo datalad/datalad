@@ -1,4 +1,11 @@
 
+<a id='changelog-1.6.2'></a>
+# 1.6.2 (2026-08-13)
+
+## 🧪 Tests
+
+- BF(TST): tolerate chardet 7.5.0/7.5.1 ISO-8859-1 misdetection in test_assure_unicode.  [PR #7898](https://github.com/datalad/datalad/pull/7898) (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.6.1'></a>
 # 1.6.1 (2026-07-23)
 

@@ -307,6 +307,13 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 # So we didn't know if authentication necessary, and it
                 # seems to be necessary, so Let's ask the user to setup
                 # authentication mechanism for this website
+                if not ui.is_interactive:
+                    # no way to prompt, so surface the original failure
+                    # instead of dying inside the credentials dialog
+                    lgr.error(
+                        "Interface is non interactive, so we are "
+                        "reraising: %s", ce)
+                    raise e
                 self._enter_credentials(
                     url,
                     denied_msg=access_denied,
