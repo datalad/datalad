@@ -16,6 +16,7 @@ import os
 import signal
 import sys
 import unittest.mock
+from locale import getpreferredencoding
 from threading import (
     Lock,
     Thread,
@@ -99,6 +100,25 @@ def test_runner_stdout_capture() -> None:
     assert isinstance(res, dict)
     eq_(res['stdout'].rstrip(), test_msg)
     ok_(not res['stderr'])
+
+
+@pytest.mark.ai_generated
+def test_runner_undecodable_output() -> None:
+    # command output is not guaranteed to be valid in the target encoding:
+    # POSIX file names are arbitrary byte strings, and 3rd party libraries
+    # may echo raw bytes into their messages.  Such output must not fail
+    # the command, and must remain recoverable.
+    encoding = getpreferredencoding(do_setlocale=False)
+    payload = b'before \xf1 after'
+    runner = Runner()
+    res = runner.run(py2cmd(
+        'import sys; sys.stdout.buffer.write(%r); sys.stderr.buffer.write(%r)'
+        % (payload, payload)),
+        protocol=StdOutErrCapture,
+    )
+    assert isinstance(res, dict)
+    for stream in ('stdout', 'stderr'):
+        eq_(res[stream].encode(encoding, 'surrogateescape'), payload)
 
 
 def test_runner_failure() -> None:
