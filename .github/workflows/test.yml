@@ -83,18 +83,13 @@ jobs:
         run: sudo lsmod
 
       # OS-specific provisioning (APT/NeuroDebian on Linux, Homebrew on
-      # macOS, long paths/SSH server on Windows) lives in these scripts --
-      # see tools/ci/test-env-*.sh -- rather than inline here, so it can be
-      # shellchecked (.github/workflows/shellcheck.yml) like other tools/ci
-      # scripts.
+      # macOS, long paths/SSH server on Windows) lives in
+      # tools/ci/test-env-{linux,macos,windows}.sh rather than inline here,
+      # so it can be shellchecked (.github/workflows/shellcheck.yml) like
+      # other tools/ci scripts. $RUNNER_OS is 'Linux'/'macOS'/'Windows';
+      # lowercased, that's exactly those three filenames.
       - name: Provision OS-specific test environment
-        run: |
-          case "$RUNNER_OS" in
-            Linux)   tools/ci/test-env-linux.sh ;;
-            macOS)   tools/ci/test-env-macos.sh ;;
-            Windows) tools/ci/test-env-windows.sh ;;
-            *) echo "::error::Unknown RUNNER_OS: $RUNNER_OS"; exit 1 ;;
-          esac
+        run: tools/ci/test-env-"$(echo "$RUNNER_OS" | tr '[:upper:]' '[:lower:]')".sh
 
       - name: Configure _DL_TMPDIR before installing git-annex
         run: |
