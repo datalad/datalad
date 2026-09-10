@@ -658,6 +658,17 @@
             "avatar_url": [
                 "https://avatars.githubusercontent.com/u/3453757?v=4"
             ]
+        },
+        {
+            "login": "claude",
+            "name": "Claude",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://anthropic.com/claude-code",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/81847?v=4"
+            ]
         }
     ],
     "contributorsPerLine": 7
