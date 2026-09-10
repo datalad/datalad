@@ -66,6 +66,11 @@ def test_plugin_markers_work(pytester):
     result = pytester.runpytest_subprocess("-v", "-m", "network")
     result.stdout.fnmatch_lines(["*test_with_network*PASSED*"])
     assert "test_without_marker" not in result.stdout.str()
+    # the versions line comes from our pytest_report_header (gh-7911), and
+    # asserting it on a real session is the only check that the pytest11
+    # entry point is wired up at all.  It must not be asserted on a
+    # `--markers` run: that exits before a session starts, so no header.
+    assert "Versions:" in result.stdout.str()
 
 
 @pytest.mark.ai_generated
