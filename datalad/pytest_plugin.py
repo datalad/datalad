@@ -26,6 +26,21 @@ import re
 from pathlib import Path
 
 
+def pytest_report_header(config) -> list[str]:
+    """Report versions of datalad and its dependencies at session start
+
+    `datalad.conftest` already dumps these at teardown; a CI failure is
+    triaged from the top of the log, so report them there too (gh-7911).
+    """
+    # imported here, not at module level: this plugin is loaded through the
+    # pytest11 entry point, where importing datalad is not free
+    from datalad.support.external_versions import external_versions
+
+    # query datalad's own version so it is included in the dump
+    external_versions['datalad']
+    return [external_versions.dumps(query=True)]
+
+
 def pytest_configure(config):
     """Register datalad custom markers and pytest configuration.
 
