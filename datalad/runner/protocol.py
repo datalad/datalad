@@ -200,10 +200,20 @@ class WitlessProtocol:
             8,
             'Process %i exited with return code %i',
             self.process.pid, return_code)
-        # give captured process output back to the runner as string(s)
+        # give captured process output back to the runner as string(s).
+        # Decode with 'surrogateescape': output of a command is not
+        # guaranteed to be valid in `encoding` -- POSIX file names are
+        # arbitrary byte strings, and 3rd party libraries (e.g. libmagic
+        # used by git-annex) may echo raw bytes into their messages.  A
+        # strict decode would fail the entire command over such output,
+        # even when it is a mere warning on stderr, and would discard the
+        # very output needed to tell what happened.  'surrogateescape'
+        # keeps those bytes recoverable via
+        # `.encode(encoding, 'surrogateescape')`, the same way Python
+        # itself handles undecodable file names.
         results: dict[str, Any] = {
             name: (
-                bytes(byt).decode(self.encoding)
+                bytes(byt).decode(self.encoding, errors='surrogateescape')
                 if byt is not None
                 else '')
             for name, byt in self.fd_infos.values()
