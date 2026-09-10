@@ -46,6 +46,7 @@ from datalad.support.exceptions import (
 )
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.external_versions import external_versions
+from datalad.support.stats import ActivityStats
 from datalad.tests.utils_pytest import (
     assert_cwd_unchanged,
     assert_equal,
@@ -513,6 +514,22 @@ multi_tree_args = dict(
 )
 
 
+overwrite_prior_tree_args = dict(
+    tree={
+        # these two carry the same filename with different content, so
+        # extracting both into the same directory collides
+        'c1.tar.gz': {'c f.txt': 'c1 load'},
+        'c2.tar.gz': {'c f.txt': 'c2 load'},
+        # same filename as c1.tar.gz, and the very same content, so nothing
+        # would be lost by "overwriting" it
+        'c3.tar.gz': {'c f.txt': 'c1 load'},
+        # two members which --rename can collapse onto a single name, to
+        # collide within one and the same archive
+        'm.tar.gz': {'a.txt': 'a load', 'b.txt': 'b load'},
+    }
+)
+
+
 def _get_ncommits(ds):
     return len(list(ds.repo.get_branch_commits_()))
 
@@ -706,6 +723,118 @@ def test_add_archive_content_multiple_cmdline_and_keys(repo_path=None):
         commit_msg = ds.repo.format_commit("%B")
         for key in keys:
             assert_in(key, commit_msg)
+
+
+@assert_cwd_unchanged(ok_to_chdir=True)
+@with_tree(**overwrite_prior_tree_args)
+@pytest.mark.ai_generated
+def test_add_archive_content_overwrite_prior(repo_path=None):
+    ds = Dataset(repo_path).create(force=True)
+    with swallow_outputs():
+        ds.save(message="added archives")
+    base = ds.repo.get_hexsha()
+
+    def start_over():
+        # back to just the archives, so that every scenario below meets the
+        # same dataset -- in particular one where 'c f.txt' is not yet
+        # present, and a collision is thus with a preceding archive rather
+        # than with committed content
+        ds.repo.call_git(['reset', '--hard', base])
+        ds.repo.call_git(['clean', '-fd'])
+
+    with chpwd(repo_path):
+        # 'overwrite' would discard what c1.tar.gz just added, which is an
+        # error by default
+        ncommits_prior = _get_ncommits(ds)
+        res = add_archive_content(['c1.tar.gz', 'c2.tar.gz'],
+                                  strip_leading_dirs=True,
+                                  existing='overwrite',
+                                  on_failure='ignore')
+        assert_result_count(res, 1, status='ok', type='file',
+                            path=opj(repo_path, 'c1.tar.gz'))
+        assert_in_results(res, status='error', type='file',
+                          path=opj(repo_path, 'c2.tar.gz'))
+        # and it errors out *before* destroying anything
+        ok_file_has_content(opj(repo_path, 'c f.txt'), 'c1 load')
+        assert_equal(_get_ncommits(ds), ncommits_prior)
+        assert_true(ds.repo.dirty)
+        start_over()
+
+        # 'stats' permits the overwrite and counts it
+        st = ActivityStats()
+        res = add_archive_content(['c1.tar.gz', 'c2.tar.gz'],
+                                  strip_leading_dirs=True,
+                                  existing='overwrite',
+                                  overwrite_prior_check='stats',
+                                  stats=st)
+        assert_result_count(res, 3, action='add-archive-content', status='ok')
+        # last archive wins
+        ok_file_has_content(opj(repo_path, 'c f.txt'), 'c2 load')
+        # reported in the commit message ...
+        assert_in('overwritten prior: 1', ds.repo.format_commit("%B"))
+        # ... and in the stats handed to us.  Note: the current ones are
+        # reset once committed, the totals are what survives
+        assert_equal(st.get_total().overwritten_prior, 1)
+        start_over()
+
+        # 'ignore' permits it silently, but the plain 'overwritten' count
+        # is a matter of --existing and stays
+        add_archive_content(['c1.tar.gz', 'c2.tar.gz'],
+                            strip_leading_dirs=True,
+                            existing='overwrite',
+                            overwrite_prior_check='ignore')
+        commit_msg = ds.repo.format_commit("%B")
+        assert_not_in('overwritten prior', commit_msg)
+        assert_in('overwritten: 1', commit_msg)
+        start_over()
+
+        # the suffix modes rename the incoming file, so nothing of the
+        # preceding archive is lost and nothing is reported -- despite the
+        # check being at its default 'error'
+        res = add_archive_content(['c1.tar.gz', 'c2.tar.gz'],
+                                  strip_leading_dirs=True,
+                                  existing='archive-suffix')
+        assert_result_count(res, 3, action='add-archive-content', status='ok')
+        ok_file_has_content(opj(repo_path, 'c f.txt'), 'c1 load')
+        ok_file_has_content(opj(repo_path, 'c f-c2.txt'), 'c2 load')
+        assert_not_in('overwritten prior', ds.repo.format_commit("%B"))
+        start_over()
+
+        # identical content is not a loss, so it is no overwrite at all
+        res = add_archive_content(['c1.tar.gz', 'c3.tar.gz'],
+                                  strip_leading_dirs=True,
+                                  existing='overwrite')
+        assert_result_count(res, 3, action='add-archive-content', status='ok')
+        ok_file_has_content(opj(repo_path, 'c f.txt'), 'c1 load')
+        start_over()
+
+        # a single archive is never its own "prior" one: two of its members
+        # renamed onto the same name remain a matter of --existing
+        res = add_archive_content('m.tar.gz', strip_leading_dirs=True,
+                                  rename=[r'/[ab]\.txt/same.txt'],
+                                  existing='overwrite')
+        assert_result_count(res, 2, action='add-archive-content', status='ok')
+        commit_msg = ds.repo.format_commit("%B")
+        assert_in('overwritten: 1', commit_msg)
+        assert_not_in('overwritten prior', commit_msg)
+        start_over()
+
+        # content of an archive added by an *earlier call* is committed
+        # content, and thus --existing territory again
+        add_archive_content('c1.tar.gz', strip_leading_dirs=True)
+        res = add_archive_content('c2.tar.gz', strip_leading_dirs=True,
+                                  existing='overwrite')
+        assert_result_count(res, 2, action='add-archive-content', status='ok')
+        ok_file_has_content(opj(repo_path, 'c f.txt'), 'c2 load')
+        start_over()
+
+        # with --delete-after each archive extracts into its own temporary
+        # directory, so no two of them can collide
+        res = add_archive_content(['c1.tar.gz', 'c2.tar.gz'],
+                                  strip_leading_dirs=True,
+                                  existing='overwrite',
+                                  delete_after=True, drop_after=True)
+        assert_result_count(res, 3, action='add-archive-content', status='ok')
 
 
 class TestAddArchiveOptions():

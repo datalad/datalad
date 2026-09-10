@@ -53,6 +53,7 @@ from datalad.support.exceptions import (
     CapturedException,
 )
 from datalad.support.constraints import (
+    EnsureChoice,
     EnsureNone,
     EnsureStr,
 )
@@ -93,6 +94,7 @@ def _add_archive_content(
         archive_path,
         extract_rpath,
         total_stats,
+        prior_paths,
         res_kwargs,
         add_archive_leading_dir=False,
         strip_leading_dirs=False,
@@ -101,6 +103,7 @@ def _add_archive_content(
         exclude=None,
         rename=None,
         existing='fail',
+        overwrite_prior_check='error',
         annex_options=None,
         copy=False,
         drop_after=False,
@@ -139,6 +142,13 @@ def _add_archive_content(
       `None` stands for the root of the dataset itself.
     total_stats : ActivityStats
       Statistics of this archive are added to this instance.
+    prior_paths : dict
+      Paths added by the archives processed before this one, mapped to the
+      archive each of them came from.  Updated in place with the paths this
+      archive added, but only once all of them were added, so that a
+      collision *within* a single archive is never taken for a collision
+      with a preceding one.  Left empty (and not consulted) whenever the
+      check is not in effect -- see `overwrite_prior_check`.
     res_kwargs : dict
       Common arguments for the result records.
 
@@ -167,6 +177,17 @@ def _add_archive_content(
 
     # dedicated stats for this archive, added to the overall ones at the end
     stats = ActivityStats()
+
+    # paths added by this archive, merged into `prior_paths` only once we are
+    # through with it.  With --delete-after every archive extracts into its own
+    # temporary directory, so no two of them can ever collide and there is
+    # nothing to keep track of.
+    added_paths = {}
+    track_added = overwrite_prior_check != 'ignore' and not delete_after
+    if not track_added:
+        lgr.debug("Not tracking paths added by %s: overwrite_prior_check=%s, "
+                  "delete_after=%s", archive, overwrite_prior_check,
+                  delete_after)
 
     # start a progress bar for extraction
     pbar_id = f'add-archive-{archive_path}'
@@ -273,8 +294,15 @@ def _add_archive_content(
             # when the file already exists...
             if lexists(target_file_path):
                 handle_existing = True
-                if md5sum(str(target_file_path)) == \
-                        md5sum(str(extracted_path)):
+                same_content = md5sum(str(target_file_path)) == \
+                    md5sum(str(extracted_path))
+                # was this very path added by one of the archives which came
+                # before in this same call?  Identical content is not a loss,
+                # so it does not count.  `prior_paths` is empty whenever the
+                # check is not in effect.
+                prior_archive = None if same_content \
+                    else prior_paths.get(str(target_file_path))
+                if same_content:
                     if not annex.is_under_annex(str(extracted_path)):
                         # if under annex -- must be having the same content,
                         # we should just add possibly a new extra URL
@@ -291,6 +319,15 @@ def _add_archive_content(
                         "{} exists, but would be overwritten by new file " \
                         "{} of {}. Consider adjusting --existing".format\
                         (target_file_path, extracted_file, archive)
+                    if prior_archive is not None:
+                        # do not let the advice above lead into data loss:
+                        # 'overwrite' would discard what that archive added
+                        message += \
+                            ". Note that it was added from {} earlier in " \
+                            "this very call, so --existing=overwrite would " \
+                            "lose its content, while " \
+                            "--existing=archive-suffix keeps both".format(
+                                prior_archive)
                     # point at the archive we are failing on, it is not
                     # necessarily the only one we were given
                     yield get_status_dict(
@@ -301,6 +338,27 @@ def _add_archive_content(
                         **res_kwargs)
                     return
                 elif existing == 'overwrite':
+                    # the only branch which actually destroys what is there:
+                    # the suffix ones below rename the incoming file instead
+                    if prior_archive is not None:
+                        if overwrite_prior_check == 'error':
+                            yield get_status_dict(
+                                ds=ds,
+                                status='error',
+                                message=(
+                                    "%s was added from %s earlier in this "
+                                    "very call and would be overwritten by "
+                                    "%s of %s. Use "
+                                    "--existing=archive-suffix to keep both, "
+                                    "or --overwrite-prior-check=stats to "
+                                    "permit the overwrite",
+                                    target_file_path, prior_archive,
+                                    extracted_file, archive),
+                                **_archive_res_kwargs(archive_path, key,
+                                                      origin),
+                                **res_kwargs)
+                            return
+                        stats.overwritten_prior += 1
                     stats.overwritten += 1
                     # to make sure it doesn't conflict -- might have been a
                     # tree
@@ -372,6 +430,11 @@ def _add_archive_content(
                     continue
                 raise
 
+            if track_added:
+                # only what actually landed, so that excluded, gitignored and
+                # otherwise skipped files do not claim a path
+                added_paths[str(target_file_path)] = archive
+
             if 'key' in out_json and out_json['key'] is not None:
                 # annex.is_under_annex(target_file, batch=True):
                 # due to http://git-annex.branchable.com/bugs/annex_drop_is_not___34__in_effect__34___for_load_which_was___34__addurl_--batch__34__ed_but_not_yet_committed/?updated
@@ -398,6 +461,9 @@ def _add_archive_content(
         lgr.info("Finished adding %s: %s", archive, stats.as_str(mode='line'))
 
         total_stats += stats
+        # only now, so that a collision within this very archive stays a
+        # matter of --existing alone
+        prior_paths.update(added_paths)
 
         if delete_after:
             # force since not committed. r=True for -r (passed into git call
@@ -457,6 +523,9 @@ def _add_archives_content(todo, **kwargs):
     `todo` is a list of `_ArchiveSpec` instances, the remaining arguments are
     passed on to `_add_archive_content()`.
     """
+    # paths added by the archives processed so far, mapped to the archive they
+    # came from, so that a later one clobbering any of them can be reported
+    prior_paths = {}
     for spec in todo:
         failed = False
         for res in _add_archive_content(
@@ -465,6 +534,7 @@ def _add_archives_content(todo, **kwargs):
                 key_rpath=spec.key_rpath,
                 archive_path=spec.path,
                 extract_rpath=spec.extract_rpath,
+                prior_paths=prior_paths,
                 **kwargs):
             failed = failed or res['status'] not in ('ok', 'notneeded')
             yield res
@@ -519,9 +589,20 @@ class AddArchiveContent(Interface):
     ([PY: `delete=True` PY][CMD: --delete CMD]) only once all of them were
     added successfully.
 
+    A file which one archive adds and a later one would overwrite is a
+    likely mistake, since the content of the earlier one would be lost.
+    Such an overwrite is only possible with
+    [PY: `existing='overwrite'` PY][CMD: --existing=overwrite CMD], and
+    leads to an error unless
+    [PY: `overwrite_prior_check` PY][CMD: --overwrite-prior-check CMD]
+    says otherwise.
+
     .. versionchanged:: 1.7
        More than one archive can be given. A result record is now yielded for
        each given archive, in addition to the one for the dataset.
+       [PY: `overwrite_prior_check` PY][CMD: --overwrite-prior-check CMD]
+       was added, to guard the content of an archive against the archives
+       which follow it.
 
     """
     _examples_ = [
@@ -599,6 +680,29 @@ class AddArchiveContent(Interface):
             and if that one is present as well, 'numeric-suffix' is in effect in
             addition, when incremental numeric suffix (prefixed with a '.') is
             added until no name collision is longer detected"""
+        ),
+        overwrite_prior_check=Parameter(
+            args=("--overwrite-prior-check",),
+            constraints=EnsureChoice('error', 'stats', 'ignore'),
+            default='error',
+            doc="""how to react when a file extracted from an archive would
+            overwrite a file which one of the *preceding* archives of the same
+            invocation had just added.  Such an overwrite discards the content
+            contributed by that earlier archive, so by default ('error') it
+            leads to an error result, and nothing is committed.  'stats'
+            permits the overwrite and reports the number of files it affected
+            as 'overwritten prior' in the statistics.  'ignore' permits it
+            without keeping track of the paths added, at a marginal saving of
+            memory.  This option is orthogonal to [CMD: --existing CMD][PY:
+            `existing` PY], which governs collisions with content which was
+            already in the dataset: only [CMD: --existing=overwrite CMD][PY:
+            `existing='overwrite'` PY] can discard the contribution of a
+            preceding archive, while the suffix modes rename the incoming file
+            instead and are thus never reported here.  Files with identical
+            content are not overwrites, and are never reported either.  Has no
+            effect if [CMD: --delete-after CMD][PY: `delete_after=True` PY] is
+            given, where each archive is extracted into its own temporary
+            directory and no two of them can collide."""
         ),
         exclude=Parameter(
             args=("-e", "--exclude"),
@@ -687,6 +791,7 @@ class AddArchiveContent(Interface):
             exclude=None,
             rename=None,
             existing='fail',
+            overwrite_prior_check='error',
             annex_options=None,
             copy=False,
             commit=True,
@@ -902,6 +1007,7 @@ class AddArchiveContent(Interface):
                     exclude=exclude,
                     rename=rename,
                     existing=existing,
+                    overwrite_prior_check=overwrite_prior_check,
                     annex_options=annex_options,
                     copy=copy,
                     drop_after=drop_after,

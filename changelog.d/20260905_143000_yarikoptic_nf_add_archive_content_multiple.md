@@ -19,6 +19,17 @@
   `impossible` result records.
   (by [@yarikoptic](https://github.com/yarikoptic))
 
+- `add-archive-content` gained `--overwrite-prior-check`
+  (`error` (default), `stats`, `ignore`), which guards the content one
+  archive added against the archives which follow it in the same
+  invocation.  Discarding it is only possible with
+  `--existing=overwrite`, and now leads to an error unless permitted;
+  `stats` permits it and reports the affected files as
+  `overwritten prior` in the statistics.  Files with identical content,
+  and the `--existing` suffix modes (which rename the incoming file
+  rather than discard anything), are never reported.
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
 ### 🐛 Bug Fixes
 
 - `add-archive-content --delete-after` failed (`git rm` of a non-existing
