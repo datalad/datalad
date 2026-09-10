@@ -682,8 +682,10 @@ def _has_eval_results_call(cls):
 def eval_results(wrapped):
     """Decorator for return value evaluation of datalad commands.
 
-    Note, this decorator is only compatible with commands that return
-    status dict sequences!
+    Note, this decorator is only compatible with commands that yield
+    result records (typed :class:`~datalad.interface.results.StatusRecord`
+    instances are preferred; plain ``dict`` is also accepted and is
+    coerced to ``StatusRecord`` at the central pipeline boundary).
 
     Two basic modes of operation are supported: 1) "generator mode" that
     `yields` individual results, and 2) "list mode" that returns a sequence of

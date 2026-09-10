@@ -33,6 +33,7 @@ from collections.abc import (
     Callable,
     Iterable,
     Iterator,
+    Mapping,
     Sequence,
 )
 from contextlib import contextmanager
@@ -800,16 +801,17 @@ def ensure_list(s: Any, copy: bool=False, iterate: bool=True) -> list:
 def ensure_result_list(r: Any) -> list:
     """Return a list of result records
 
-    Largely same as ensure_list, but special casing a single dict being passed
-    in, which a plain `ensure_list` would iterate over. Hence, this deals with
-    the three ways datalad commands return results:
-    - single dict
-    - list of dicts
+    Largely same as ensure_list, but special casing a single Mapping being
+    passed in (a plain ``dict`` or a ``StatusRecord``), which a plain
+    ``ensure_list`` would iterate over (yielding keys). Hence, this deals
+    with the three ways datalad commands return results:
+    - single result record (``dict`` or ``StatusRecord``)
+    - list of result records
     - generator
 
     Used for result assertion helpers.
     """
-    return [r] if isinstance(r, dict) else ensure_list(r)
+    return [r] if isinstance(r, Mapping) else ensure_list(r)
 
 @overload
 def ensure_list_from_str(s: str, sep: str='\n') -> Optional[list[str]]:

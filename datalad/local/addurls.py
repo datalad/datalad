@@ -32,6 +32,7 @@ from datalad.interface.common_opts import (
     nosave_opt,
 )
 from datalad.interface.results import (
+    StatusRecord,
     annexjson2result,
     get_status_dict,
 )
@@ -927,10 +928,11 @@ class RegisterUrl(object):
                 ek_info = self.examinekey(parsed_key, filename,
                                           migrate=migrate)
                 if not ek_info:
-                    yield dict(self._err_res,
-                               path=row["filename_abs"],
-                               message=("Failed to get information for %s",
-                                        parsed_key))
+                    yield StatusRecord.from_kwargs(
+                        self._err_res,
+                        path=row["filename_abs"],
+                        message=("Failed to get information for %s",
+                                 parsed_key))
                     return
                 key = ek_info["key"]
             else:
@@ -943,10 +945,11 @@ class RegisterUrl(object):
                 res["message"] = "registered URL"
         except CommandError as exc:
             ce = CapturedException(exc)
-            yield dict(self._err_res,
-                       path=row["filename_abs"],
-                       message=str(ce),
-                       exception=ce)
+            yield StatusRecord.from_kwargs(
+                self._err_res,
+                path=row["filename_abs"],
+                message=str(ce),
+                exception=ce)
         else:
             yield res
 
@@ -1355,7 +1358,8 @@ class Addurls(Interface):
         repo = ds.repo
         st_dict = get_status_dict(action="addurls", ds=ds)
         if repo and not isinstance(repo, AnnexRepo):
-            yield dict(st_dict, status="error", message="not an annex repo")
+            yield StatusRecord.from_kwargs(
+                st_dict, status="error", message="not an annex repo")
             return
 
         if isinstance(url_file, str):
@@ -1388,18 +1392,19 @@ class Addurls(Interface):
                                          missing_value)
             except (ValueError, RequestException) as exc:
                 ce = CapturedException(exc)
-                yield dict(st_dict, status="error", message=str(ce),
-                           exception=ce)
+                yield StatusRecord.from_kwargs(
+                    st_dict, status="error", message=str(ce), exception=ce)
                 return
 
         if not rows:
-            yield dict(st_dict, status="notneeded",
-                       message="No rows to process")
+            yield StatusRecord.from_kwargs(
+                st_dict, status="notneeded", message="No rows to process")
             return
 
         collision_err = _handle_collisions(records, rows, on_collision)
         if collision_err:
-            yield dict(st_dict, status="error", message=collision_err)
+            yield StatusRecord.from_kwargs(
+                st_dict, status="error", message=collision_err)
             return
 
         if dry_run:
@@ -1418,7 +1423,8 @@ class Addurls(Interface):
                     lgr.info("Metadata: %s",
                              sorted(u"{}={}".format(k, v)
                                     for k, v in row["meta_args"].items()))
-            yield dict(st_dict, status="ok", message="dry-run finished")
+            yield StatusRecord.from_kwargs(
+                st_dict, status="ok", message="dry-run finished")
             return
 
         if not repo:
