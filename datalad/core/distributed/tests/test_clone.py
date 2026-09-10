@@ -74,7 +74,6 @@ from datalad.tests.utils_pytest import (
     skip_if_adjusted_branch,
     skip_if_no_network,
     skip_if_on_windows,
-    skip_if_url_is_not_available,
     skip_ssh,
     slow,
     swallow_logs,
@@ -1357,13 +1356,12 @@ def test_ria_http_local_store(lcl=None, storepath=None, url=None):
     eq_(riaclone.id, ds.id)
 
 
-@skip_if_no_network
+# an outage of this external service is not a failure of this code base
+# (gh-7912), so gate on it actually answering rather than on network at large.
+@skip_if_no_network(url='http://store.datalad.org/')
 @pytest.mark.flaky(retries=2, delay=5, only_on=[IncompleteResultsError])
 @with_tempfile()
 def test_ria_http_storedataladorg(path=None):
-    # an outage of this external service is not a failure of this code
-    # base (gh-7912)
-    skip_if_url_is_not_available('http://store.datalad.org/')
     ds = clone('ria+http://store.datalad.org#{}'.format(datalad_store_testds_id), path)
     ok_(ds.is_installed())
     eq_(ds.id, datalad_store_testds_id)
