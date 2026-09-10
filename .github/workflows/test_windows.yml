@@ -1,0 +1,145 @@
+name: Test on Windows
+
+# This is the GitHub Actions replacement for the Windows jobs that used to
+# run on AppVeyor (.appveyor.yml), split the same way AppVeyor's
+# WinP310core/WinP310a1/WinP310a2 jobs were (three groups of `datalad`
+# submodules, to keep any single job comfortably under the runner's 6h
+# timeout).  It is intentionally non-blocking (`continue-on-error`) until it
+# has proven itself stable over a number of runs -- once it has, AppVeyor and
+# this escape hatch can both go away.
+#
+# Like test.yml on Linux, most steps run under an *interactive* Git-Bash
+# shell (`-i`), not the GitHub Actions default (`--noprofile --norc`):
+# `datalad-installer -E new.env` always writes POSIX `export`/`source` lines
+# (see its `addenv()`), never cmd/PowerShell syntax, so activating git-annex
+# (and, for the conda scenario, its bundled Python) means sourcing that into
+# ~/.bashrc and relying on it being read on every subsequent bash step, the
+# same way test.yml does on Linux. Steps that need genuine Windows APIs
+# (registry, services, ACLs) opt into `shell: powershell` individually.
+
+on:
+  pull_request:
+  push:
+    branches: ['master', 'maint']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: 'bash -eio pipefail {0}'
+
+env:
+  DATALAD_TESTS_SSH: "1"
+  # conda's git-annex build is the most reliably available one across
+  # platforms/architectures, incl. Windows; see tools/ci/test-jobs.yml for
+  # the same scenario used on Linux.
+  _DL_ANNEX_INSTALL_SCENARIO: "miniconda --channel conda-forge --python-match minor --batch git-annex -m conda"
+
+jobs:
+  test:
+    # Pin the image (rather than windows-latest) to match the Visual Studio
+    # 2022 worker AppVeyor was using -- keeps the two comparable while both
+    # exist, and avoids surprises from an unannounced image bump.
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: core
+            dts: datalad.core datalad.dataset datalad.runner
+          - id: a1
+            dts: >-
+              datalad.cli datalad.customremotes datalad.distribution
+              datalad.distributed datalad.downloaders datalad.interface
+              datalad.tests
+          - id: a2
+            dts: datalad.local datalad.support datalad.ui
+    # TODO: drop once this workflow has been green for a while; see note above.
+    continue-on-error: true
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.10'
+
+      - name: Configure Git
+        run: |
+          git config --global user.email "test@github.land"
+          git config --global user.name "GitHub Almighty"
+
+      - name: Remove Windows' 260-char path length limit
+        shell: powershell
+        run: |
+          Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
+            -Name LongPathsEnabled -Value 1
+
+          # Globally enable git-annex's fast per-file add path on Windows
+          # (needs git-annex >= 8.20211117); see
+          # https://git-annex.branchable.com/bugs/Windows__58___substantial_per-file_cost_for___96__add__96__/
+          git config --system filter.annex.process "git-annex filter-process"
+
+      - name: Point TMP/TEMP at a short scratch path
+        run: |
+          # A short, top-level scratch dir keeps generated test paths well
+          # under Windows' path-length limits even with LongPathsEnabled.
+          mkdir -p /c/DLTMP
+          echo "TMP=C:\\DLTMP" >> "$GITHUB_ENV"
+          echo "TEMP=C:\\DLTMP" >> "$GITHUB_ENV"
+
+      - name: Set up SSH server for DATALAD_TESTS_SSH
+        shell: powershell
+        run: tools\ci\win_ssh_setup.ps1
+
+      - name: Install git-annex
+        run: |
+          pip install datalad-installer
+          eval datalad-installer --sudo ok -E new.env ${_DL_ANNEX_INSTALL_SCENARIO}
+          # Same reasoning as test.yml on Linux: new.env can contain `source`
+          # and `conda activate`, which only a login-ish/interactive bash
+          # (this job's default shell, see `defaults.run.shell` above) will
+          # pick up again on every later step.
+          cat new.env >> ~/.bashrc
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-devel.txt
+
+      - name: Report WTF information
+        run: |
+          datalad wtf
+          python -m pip freeze
+
+      - name: Run tests
+        run: |
+          mkdir __testhome__
+          cd __testhome__
+          python -m pytest -c ../tox.ini -n 2 -v -m "not (turtle)" \
+            --cov=datalad --cov-report=xml \
+            --report-log=pytest-report.jsonl \
+            --pyargs ${{ matrix.dts }}
+
+      - name: Upload pytest report log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pytest-report-windows-${{ matrix.id }}-${{ github.run_id }}
+          path: __testhome__/pytest-report.jsonl
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          directory: __testhome__
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+# vim:set et sts=2:
