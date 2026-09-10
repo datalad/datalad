@@ -381,16 +381,11 @@ def _lock_save(ds):
     ds : Dataset
     """
     lock_path = _save_lock_path(ds)
-    try:
-        lock_path.parent.mkdir(parents=True, exist_ok=True)
-    except OSError as exc:
-        # e.g. a read-only .git -- nothing we could (or need to) fix,
-        # a lock is an optimization of the concurrent case, not a
-        # requirement for the (predominant) serial one
-        lgr.debug('Cannot create %s, proceeding without a lock: %s',
-                  lock_path.parent, CapturedException(exc))
-        yield
-        return
+    # deliberately not guarded: if this directory cannot be created, the
+    # `save` that follows writes the very same `.git` and fails anyway, so
+    # swallowing the error here would only defer the failure and discard
+    # the reason for it
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
     # generous timeouts: the command already ran, so giving up on the lock
     # would mean discarding its results. Wait (with a report on who holds
     # the lock) far longer than any plausible queue of saves, and only
