@@ -7,6 +7,8 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+import pytest
+
 from ...tests.utils_pytest import (
     assert_equal,
     assert_in,
@@ -61,6 +63,15 @@ Branches merged: upstream->master""")
     stats.downloaded += 1
     stats.downloaded_size += 123456789  # will invoke formatter
     assert_in("size: 123.5 MB", stats.as_str())
+
+@pytest.mark.ai_generated
+def test_ActivityStats_overwritten_prior_rendered():
+    # the set of counters and the table which renders them are maintained
+    # separately, so a counter can easily end up incremented but never shown
+    stats = ActivityStats()
+    stats.overwritten_prior += 1
+    assert_in("overwritten prior: 1", stats.as_str())
+
 
 def test_ActivityStats_comparisons():
     stats1 = ActivityStats()

@@ -26,12 +26,16 @@ from os.path import (
     pardir,
 )
 from pathlib import Path
+from unittest.mock import patch
+
+import pytest
 
 from datalad.api import (
     Dataset,
     add_archive_content,
     clean,
 )
+from datalad.cli.tests.test_main import run_main
 from datalad.consts import (
     ARCHIVES_SPECIAL_REMOTE,
     DATALAD_SPECIAL_REMOTES_UUIDS,
@@ -40,7 +44,9 @@ from datalad.support.exceptions import (
     CommandError,
     NoDatasetFound,
 )
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.external_versions import external_versions
+from datalad.support.stats import ActivityStats
 from datalad.tests.utils_pytest import (
     assert_cwd_unchanged,
     assert_equal,
@@ -50,6 +56,7 @@ from datalad.tests.utils_pytest import (
     assert_not_in,
     assert_raises,
     assert_repo_status,
+    assert_result_count,
     assert_result_values_cond,
     assert_true,
     create_tree,
@@ -222,7 +229,9 @@ def test_add_archive_content(path_orig=None, url=None, repo_path=None):
             res,
             action='add-archive-content',
             status='impossible',
-            type="dataset",
+            # the result record points to the archive we could not use,
+            # not to the dataset
+            type="file",
             message="Can not add archive outside of the dataset"
         )
 
@@ -486,6 +495,346 @@ def test_add_archive_single_file(repo_path=None):
             archive_content = os.path.basename(archive_name)
             ds.add_archive_content(archive)
             ok_file_has_content(archive_name, archive_content)
+
+
+multi_tree_args = dict(
+    tree={
+        '1.tar.gz': {'1 f.txt': '1 f load'},
+        '2.tar.gz': {'2 f.txt': '2 f load'},
+        'd': {'3.tar.gz': {'3 f.txt': '3 f load'}},
+        # content of this one gets dropped
+        '4.tar.gz': {'4 f.txt': '4 f load'},
+        # these two carry the same filename, so extracting both into the
+        # same directory collides
+        'c1.tar.gz': {'c f.txt': 'c1 load'},
+        'c2.tar.gz': {'c f.txt': 'c2 load'},
+        # this one is added to Git, not to the annex
+        'ingit.tar.gz': {'g f.txt': 'g f load'},
+    }
+)
+
+
+overwrite_prior_tree_args = dict(
+    tree={
+        # these two carry the same filename with different content, so
+        # extracting both into the same directory collides
+        'c1.tar.gz': {'c f.txt': 'c1 load'},
+        'c2.tar.gz': {'c f.txt': 'c2 load'},
+        # same filename as c1.tar.gz, and the very same content, so nothing
+        # would be lost by "overwriting" it
+        'c3.tar.gz': {'c f.txt': 'c1 load'},
+        # two members which --rename can collapse onto a single name, to
+        # collide within one and the same archive
+        'm.tar.gz': {'a.txt': 'a load', 'b.txt': 'b load'},
+    }
+)
+
+
+def _get_ncommits(ds):
+    return len(list(ds.repo.get_branch_commits_()))
+
+
+@assert_cwd_unchanged(ok_to_chdir=True)
+@with_tree(**multi_tree_args)
+@pytest.mark.ai_generated
+def test_add_archive_content_multiple(repo_path=None):
+    ds = Dataset(repo_path).create(force=True)
+    with swallow_outputs():
+        # 2.tar.gz is left untracked, and ingit.tar.gz goes into Git, for the
+        # "unusable archive" checks below
+        ds.save([a for a in ('1.tar.gz', opj('d', '3.tar.gz'), '4.tar.gz',
+                             'c1.tar.gz', 'c2.tar.gz')],
+                message="added archives")
+        ds.save('ingit.tar.gz', to_git=True, message="added to git")
+    # ... and 4.tar.gz has no content around
+    ds.repo.drop('4.tar.gz', options=['--force'])
+
+    def check_unusable(archives, **kwargs):
+        """If any archive can not be used, nothing is added or committed"""
+        ncommits_prior = _get_ncommits(ds)
+        res = add_archive_content(archives, allow_dirty=True,
+                                  on_failure='ignore', **kwargs)
+        assert_false(exists(opj(repo_path, '1')))
+        assert_equal(_get_ncommits(ds), ncommits_prior)
+        return res
+
+    with chpwd(repo_path):
+        # an untracked archive
+        assert_in_results(
+            check_unusable(['1.tar.gz', '2.tar.gz']),
+            action='add-archive-content',
+            status='impossible',
+            type='file',
+            path=opj(repo_path, '2.tar.gz'),
+            message="Can not add an untracked archive. "
+                    "Run 'datalad save 2.tar.gz'")
+        # an archive which is not there at all
+        assert_in_results(
+            check_unusable(['1.tar.gz', 'nonexisting.tar.gz']),
+            action='add-archive-content',
+            status='impossible',
+            message='No such file: {}'.format(opj(repo_path,
+                                                  'nonexisting.tar.gz')))
+        # an archive which is not under annex control
+        assert_in_results(
+            check_unusable(['1.tar.gz', 'ingit.tar.gz']),
+            action='add-archive-content',
+            status='impossible',
+            path=opj(repo_path, 'ingit.tar.gz'),
+            message=('Archive must be an annexed file, %s is not',
+                     'ingit.tar.gz'))
+        # an archive the content of which is not available locally
+        assert_in_results(
+            check_unusable(['1.tar.gz', '4.tar.gz']),
+            action='add-archive-content',
+            status='impossible',
+            path=opj(repo_path, '4.tar.gz'),
+            message=('Content of %s is not available, get it first',
+                     '4.tar.gz'))
+        # no archive at all (not reachable via the command line, where
+        # argparse would not accept an empty list)
+        assert_in_results(
+            add_archive_content([], on_failure='ignore'),
+            action='add-archive-content',
+            status='impossible',
+            message='No archive was specified')
+
+        with swallow_outputs():
+            ds.save('2.tar.gz', message="added the remaining archive")
+        # a single archive, to have a baseline for the number of times the
+        # batched git-annex processes are taken down (see below)
+        with patch.object(AnnexRepo, 'precommit', autospec=True,
+                          side_effect=AnnexRepo.precommit) as precommit:
+            res = add_archive_content(['1.tar.gz'], delete=True)
+        precommits_single = precommit.call_count
+        # one record for the archive, and one for the dataset
+        assert_result_count(res, 2, action='add-archive-content', status='ok')
+        assert_in_results(res, status='ok', type='file',
+                          path=opj(repo_path, '1.tar.gz'))
+        ok_file_under_git(repo_path, opj('1', '1 f.txt'), annexed=True)
+
+        archives = ['2.tar.gz', opj('d', '3.tar.gz')]
+        ncommits_prior = _get_ncommits(ds)
+        with patch.object(AnnexRepo, 'precommit', autospec=True,
+                          side_effect=AnnexRepo.precommit) as precommit:
+            res = add_archive_content(archives, delete=True)
+        # a result record per archive, and one for the dataset
+        assert_result_count(
+            res, len(archives) + 1, action='add-archive-content', status='ok')
+        for archive in archives:
+            assert_in_results(
+                res,
+                action='add-archive-content',
+                status='ok',
+                type='file',
+                path=opj(repo_path, archive))
+        ok_file_under_git(repo_path, opj('2', '2 f.txt'), annexed=True)
+        # archives within a subdirectory are extracted next to them
+        ok_file_under_git(repo_path, opj('d', '3', '3 f.txt'), annexed=True)
+        ok_archives_caches(repo_path, 0)
+        # --delete removed all of them, and only upon success
+        for archive in archives + ['1.tar.gz']:
+            assert_false(lexists(opj(repo_path, archive)))
+        assert_repo_status(repo_path)
+
+        # all the content ended up in a single commit ...
+        assert_equal(_get_ncommits(ds), ncommits_prior + 1)
+        commit_msg = ds.repo.format_commit("%B")
+        # ... which mentions all archives and the stats across them
+        for archive in archives:
+            assert_in(archive, commit_msg)
+        assert_in('Files processed: 2', commit_msg)
+        # Performance guard, not a behavioral one: adding more archives must
+        # not cost more take downs of the batched git-annex processes than
+        # adding a single one -- that is what makes a single invocation
+        # faster than one invocation per archive
+        assert_equal(precommit.call_count, precommits_single)
+
+    # adding multiple archives while being in a subdirectory should not leave
+    # any temporary directory behind
+    with chpwd(opj(repo_path, 'd')):
+        res = add_archive_content([opj(pardir, 'c1.tar.gz'),
+                                   opj(pardir, 'c2.tar.gz')],
+                                  delete_after=True, drop_after=True)
+        # both archives were processed
+        assert_result_count(res, 3, action='add-archive-content', status='ok')
+    assert_equal(
+        list(find_files(r'\.datalad..*', repo_path, exclude='config',
+                        dirs=True)),
+        [])
+    assert_repo_status(repo_path)
+
+    with chpwd(repo_path):
+        # a failure for one archive stops the processing of the remaining
+        # ones, and nothing is committed
+        ncommits_prior = _get_ncommits(ds)
+        res = add_archive_content(['c1.tar.gz', 'c2.tar.gz'],
+                                  strip_leading_dirs=True, delete=True,
+                                  on_failure='ignore')
+        # the first archive was added, the second one collides with it
+        assert_result_count(res, 1, status='ok', type='file',
+                            path=opj(repo_path, 'c1.tar.gz'))
+        assert_result_count(res, 1, status='error', type='file',
+                            path=opj(repo_path, 'c2.tar.gz'))
+        # no dataset-level 'ok' -- the dataset is not in the desired state
+        assert_result_count(res, 0, status='ok', type='dataset')
+        # nothing was committed, the content added so far is left staged
+        assert_equal(_get_ncommits(ds), ncommits_prior)
+        assert_true(ds.repo.dirty)
+        # and --delete did not remove any archive, since we did not get
+        # through all of them
+        assert_true(lexists(opj(repo_path, 'c1.tar.gz')))
+        assert_true(lexists(opj(repo_path, 'c2.tar.gz')))
+
+
+@assert_cwd_unchanged(ok_to_chdir=True)
+@with_tree(**multi_tree_args)
+@pytest.mark.ai_generated
+def test_add_archive_content_multiple_cmdline_and_keys(repo_path=None):
+    ds = Dataset(repo_path).create(force=True)
+    with swallow_outputs():
+        ds.save(message="added archives")
+    with chpwd(repo_path):
+        # multiple archives could be provided on the command line
+        out, _ = run_main(['add-archive-content', '1.tar.gz', '2.tar.gz'],
+                          expect_stderr=True)
+        # a result was rendered for both of them
+        assert_in('1.tar.gz', out)
+        assert_in('2.tar.gz', out)
+        ok_file_under_git(repo_path, opj('1', '1 f.txt'), annexed=True)
+        ok_file_under_git(repo_path, opj('2', '2 f.txt'), annexed=True)
+        assert_repo_status(repo_path)
+
+        keys = [ds.repo.get_file_annexinfo(a)['key']
+                for a in ('1.tar.gz', '2.tar.gz')]
+    # ... and so could be multiple keys, which are extracted under the
+    # current directory
+    with chpwd(opj(repo_path, 'sub'), mkdir=True):
+        res = add_archive_content(keys, key=True, dataset=ds.path)
+        assert_result_count(
+            res, len(keys) + 1, action='add-archive-content', status='ok')
+        for key in keys:
+            # for a key there is no path to point to, so it identifies the
+            # record instead
+            assert_in_results(res, status='ok', type='key', key=key)
+        ok_file_under_git(repo_path, opj('sub', '1', '1 f.txt'), annexed=True)
+        ok_file_under_git(repo_path, opj('sub', '2', '2 f.txt'), annexed=True)
+        assert_repo_status(repo_path)
+        commit_msg = ds.repo.format_commit("%B")
+        for key in keys:
+            assert_in(key, commit_msg)
+
+
+@assert_cwd_unchanged(ok_to_chdir=True)
+@with_tree(**overwrite_prior_tree_args)
+@pytest.mark.ai_generated
+def test_add_archive_content_overwrite_prior(repo_path=None):
+    ds = Dataset(repo_path).create(force=True)
+    with swallow_outputs():
+        ds.save(message="added archives")
+    base = ds.repo.get_hexsha()
+
+    def start_over():
+        # back to just the archives, so that every scenario below meets the
+        # same dataset -- in particular one where 'c f.txt' is not yet
+        # present, and a collision is thus with a preceding archive rather
+        # than with committed content
+        ds.repo.call_git(['reset', '--hard', base])
+        ds.repo.call_git(['clean', '-fd'])
+
+    with chpwd(repo_path):
+        # 'overwrite' would discard what c1.tar.gz just added, which is an
+        # error by default
+        ncommits_prior = _get_ncommits(ds)
+        res = add_archive_content(['c1.tar.gz', 'c2.tar.gz'],
+                                  strip_leading_dirs=True,
+                                  existing='overwrite',
+                                  on_failure='ignore')
+        assert_result_count(res, 1, status='ok', type='file',
+                            path=opj(repo_path, 'c1.tar.gz'))
+        assert_in_results(res, status='error', type='file',
+                          path=opj(repo_path, 'c2.tar.gz'))
+        # and it errors out *before* destroying anything
+        ok_file_has_content(opj(repo_path, 'c f.txt'), 'c1 load')
+        assert_equal(_get_ncommits(ds), ncommits_prior)
+        assert_true(ds.repo.dirty)
+        start_over()
+
+        # 'stats' permits the overwrite and counts it
+        st = ActivityStats()
+        res = add_archive_content(['c1.tar.gz', 'c2.tar.gz'],
+                                  strip_leading_dirs=True,
+                                  existing='overwrite',
+                                  overwrite_prior_check='stats',
+                                  stats=st)
+        assert_result_count(res, 3, action='add-archive-content', status='ok')
+        # last archive wins
+        ok_file_has_content(opj(repo_path, 'c f.txt'), 'c2 load')
+        # reported in the commit message ...
+        assert_in('overwritten prior: 1', ds.repo.format_commit("%B"))
+        # ... and in the stats handed to us.  Note: the current ones are
+        # reset once committed, the totals are what survives
+        assert_equal(st.get_total().overwritten_prior, 1)
+        start_over()
+
+        # 'ignore' permits it silently, but the plain 'overwritten' count
+        # is a matter of --existing and stays
+        add_archive_content(['c1.tar.gz', 'c2.tar.gz'],
+                            strip_leading_dirs=True,
+                            existing='overwrite',
+                            overwrite_prior_check='ignore')
+        commit_msg = ds.repo.format_commit("%B")
+        assert_not_in('overwritten prior', commit_msg)
+        assert_in('overwritten: 1', commit_msg)
+        start_over()
+
+        # the suffix modes rename the incoming file, so nothing of the
+        # preceding archive is lost and nothing is reported -- despite the
+        # check being at its default 'error'
+        res = add_archive_content(['c1.tar.gz', 'c2.tar.gz'],
+                                  strip_leading_dirs=True,
+                                  existing='archive-suffix')
+        assert_result_count(res, 3, action='add-archive-content', status='ok')
+        ok_file_has_content(opj(repo_path, 'c f.txt'), 'c1 load')
+        ok_file_has_content(opj(repo_path, 'c f-c2.txt'), 'c2 load')
+        assert_not_in('overwritten prior', ds.repo.format_commit("%B"))
+        start_over()
+
+        # identical content is not a loss, so it is no overwrite at all
+        res = add_archive_content(['c1.tar.gz', 'c3.tar.gz'],
+                                  strip_leading_dirs=True,
+                                  existing='overwrite')
+        assert_result_count(res, 3, action='add-archive-content', status='ok')
+        ok_file_has_content(opj(repo_path, 'c f.txt'), 'c1 load')
+        start_over()
+
+        # a single archive is never its own "prior" one: two of its members
+        # renamed onto the same name remain a matter of --existing
+        res = add_archive_content('m.tar.gz', strip_leading_dirs=True,
+                                  rename=[r'/[ab]\.txt/same.txt'],
+                                  existing='overwrite')
+        assert_result_count(res, 2, action='add-archive-content', status='ok')
+        commit_msg = ds.repo.format_commit("%B")
+        assert_in('overwritten: 1', commit_msg)
+        assert_not_in('overwritten prior', commit_msg)
+        start_over()
+
+        # content of an archive added by an *earlier call* is committed
+        # content, and thus --existing territory again
+        add_archive_content('c1.tar.gz', strip_leading_dirs=True)
+        res = add_archive_content('c2.tar.gz', strip_leading_dirs=True,
+                                  existing='overwrite')
+        assert_result_count(res, 2, action='add-archive-content', status='ok')
+        ok_file_has_content(opj(repo_path, 'c f.txt'), 'c2 load')
+        start_over()
+
+        # with --delete-after each archive extracts into its own temporary
+        # directory, so no two of them can collide
+        res = add_archive_content(['c1.tar.gz', 'c2.tar.gz'],
+                                  strip_leading_dirs=True,
+                                  existing='overwrite',
+                                  delete_after=True, drop_after=True)
+        assert_result_count(res, 3, action='add-archive-content', status='ok')
 
 
 class TestAddArchiveOptions():

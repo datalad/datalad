@@ -18,7 +18,7 @@ import humanize
 _COUNTS = (
     'files', 'urls',
     'add_git', 'add_annex', 'dropped',
-    'skipped', 'overwritten', 'renamed', 'removed',
+    'skipped', 'overwritten', 'overwritten_prior', 'renamed', 'removed',
     'downloaded', 'downloaded_size', 'downloaded_time',
     'datasets_crawled',
     'datasets_crawl_failed',
@@ -170,6 +170,7 @@ class ActivityStats(object):
             (" renamed", "renamed"),
             (" removed", "removed"),
             (" overwritten", "overwritten"),
+            (" overwritten prior", "overwritten_prior"),
             (" +git",  "add_git"),
             (" +annex", "add_annex"),
             ("Branches merged", "merges"),
