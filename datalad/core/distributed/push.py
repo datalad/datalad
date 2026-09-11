@@ -132,6 +132,13 @@ class Push(Interface):
             combine all force modes ('all').""",
             constraints=EnsureChoice(
                 'all', 'gitpush', 'checkdatapresent', None)),
+        set_upstream=Parameter(
+            args=("-u", "--set-upstream"),
+            action="store_true",
+            doc="""configure the current branch to track the pushed-to
+            sibling, analogous to 'git push --set-upstream'. Requires
+            [CMD: --to CMD][PY: `to` PY] to unambiguously identify the
+            sibling to track."""),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         jobs=jobs_opt,
@@ -183,6 +190,7 @@ class Push(Interface):
             since=None,
             data='auto-if-wanted',
             force=None,
+            set_upstream=False,
             recursive=False,
             recursion_limit=None,
             jobs=None):
@@ -190,6 +198,10 @@ class Push(Interface):
         # behavior. '' was/is (to be deprecated) used in `publish`. Alert user about the mistake
         if since == '':
             raise ValueError("'since' should point to commitish or use '^'.")
+        if set_upstream and not to:
+            raise ValueError(
+                "--set-upstream/-u requires an explicit sibling to be "
+                "given via --to.")
         # we resolve here, because we need to perform inspection on what was given
         # as an input argument further down
         paths = [resolve_path(p, dataset) for p in ensure_list(path)]
@@ -252,9 +264,18 @@ class Push(Interface):
             matched_anything = True
             lgr.debug('Pushing Dataset at %s', dspath)
             pbars = {}
-            yield from _push(
+            push_results = _push(
                 dspath, dsrecords, to, data, force, jobs, res_kwargs.copy(), pbars,
                 got_path_arg=True if path else False)
+            if set_upstream:
+                dsrepo = Dataset(dspath).repo
+                push_results = _set_upstream_from_push_results(
+                    push_results,
+                    dsrepo,
+                    _get_branch_for_upstream_tracking(dsrepo),
+                    to,
+                    dict(res_kwargs, type='dataset', path=dspath))
+            yield from push_results
             # take down progress bars for this dataset
             for i, ds in pbars.items():
                 log_progress(lgr.info, i, 'Finished push of %s', ds)
@@ -570,15 +591,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
                 'refs/heads/adjusted' not in p['from_ref'])
         ]
         # TODO this is not right with managed branches
-        active_branch = repo.get_active_branch()
-        if active_branch and is_annex_repo:
-            # we could face a managed branch, in which case we need to
-            # determine the actual one and make sure it is sync'ed with the
-            # managed one, and push that one instead. following methods can
-            # be called unconditionally
-            repo.localsync(managed_only=True)
-            active_branch = repo.get_corresponding_branch(
-                active_branch) or active_branch
+        active_branch = _get_branch_for_upstream_tracking(repo)
 
         if not refspecs2push and not active_branch:
             # nothing was set up for push, and we have no active branch
@@ -734,6 +747,57 @@ def _append_branch_to_refspec_if_needed(ds, refspecs, branch):
         )
 
 
+def _get_branch_for_upstream_tracking(repo):
+    """Return the active branch, resolved to its corresponding branch
+    when on an annex-adjusted/managed branch. None if there is no
+    active branch (e.g. detached HEAD)."""
+    active_branch = repo.get_active_branch()
+    if active_branch and isinstance(repo, AnnexRepo):
+        # we could face a managed branch, in which case we need to
+        # determine the actual one and make sure it is sync'ed with the
+        # managed one, and push that one instead. following methods can
+        # be called unconditionally
+        repo.localsync(managed_only=True)
+        active_branch = repo.get_corresponding_branch(
+            active_branch) or active_branch
+    return active_branch
+
+
+def _set_upstream_from_push_results(push_results, repo, branch, target,
+                                     res_kwargs):
+    """Wrap a push-result generator, configuring `branch` to track
+    `target` (mirroring `git push -u`) once it sees `branch` pushed
+    there -- reported as 'impossible' instead if `branch` is falsy
+    (e.g. detached HEAD).
+
+    Kept outside of `_push()`/`_push_refspecs()`, whose signatures are
+    relied upon (and fully replaced) by at least one extension.
+    """
+    if not branch:
+        yield dict(
+            res_kwargs,
+            status='impossible',
+            message=
+            'Cannot configure --set-upstream/-u: there is no active '
+            'branch (detached HEAD)'
+        )
+        yield from push_results
+        return
+    upstream_from_ref = 'refs/heads/{}'.format(branch)
+    matched_refspec_prefix = upstream_from_ref + ':'
+    for res in push_results:
+        if (res.get('status') in ('ok', 'notneeded')
+                and res.get('target') == target
+                and res.get('refspec', '').startswith(
+                    matched_refspec_prefix)):
+            repo.config.set(
+                'branch.{}.remote'.format(branch), target, scope='local')
+            repo.config.set(
+                'branch.{}.merge'.format(branch), upstream_from_ref,
+                scope='local')
+        yield res
+
+
 def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs):
     push_res = repo.push(
         remote=target,
@@ -744,11 +808,12 @@ def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs):
     # OK?
     for pr in push_res:
         ops = pr['operations']
+        is_error = any(o in ops for o in (
+            'error', 'no-match', 'rejected', 'remote-rejected',
+            'remote-failure'))
         status = (
             'error'
-            if any(o in ops for o in (
-                'error', 'no-match', 'rejected', 'remote-rejected',
-                'remote-failure'))
+            if is_error
             else 'notneeded'
             if 'uptodate' in pr['operations']
             else 'ok'

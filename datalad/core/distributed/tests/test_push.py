@@ -16,7 +16,11 @@ import os
 import pytest
 
 from datalad.core.distributed.clone import Clone
-from datalad.core.distributed.push import Push
+from datalad.core.distributed.push import (
+    Push,
+    _get_branch_for_upstream_tracking,
+    _set_upstream_from_push_results,
+)
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
@@ -101,6 +105,13 @@ def test_invalid_call(origin=None, tdir=None):
     assert_raises(
         ValueError,
         ds.push, to='target', since='')
+
+    # --set-upstream/-u without an explicit --to target is not supported,
+    # "upstream" only makes sense relative to one specific sibling
+    # (see https://github.com/datalad/datalad/issues/7917)
+    assert_raises(
+        ValueError,
+        ds.push, set_upstream=True)
 
 
 @pytest.mark.ai_generated
@@ -304,6 +315,131 @@ def check_push(annex, src_path, dst_path):
 @pytest.mark.parametrize("annex", [False, True])
 def test_push(annex):
     check_push(annex)
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def check_push_set_upstream(annex, src_path, dst_path, dst_path2):
+    ds = Dataset(src_path).create(annex=annex)
+    ds_repo = ds.repo
+    # the branch that actually gets its tracking config set is the
+    # *corresponding* branch on annex-adjusted/managed filesystems, not
+    # necessarily the literal active branch -- resolve it the same way
+    # _push() itself does
+    branch = _get_branch_for_upstream_tracking(ds_repo) or DEFAULT_BRANCH
+    mk_push_target(ds, 'target', dst_path, annex=annex)
+    mk_push_target(ds, 'target2', dst_path2, annex=annex)
+
+    # sanity check: no tracking branch is set up yet
+    eq_(ds_repo.get_tracking_branch(branch), (None, None))
+
+    # a plain push (first ever push to 'target') does not set up tracking
+    res = ds.push(to='target', **ckwa)
+    assert_status('ok', res)
+    eq_(ds_repo.get_tracking_branch(branch), (None, None))
+
+    # a fresh push to a different sibling ('target2') with
+    # --set-upstream/-u does set up tracking after a successful push
+    res = ds.push(to='target2', set_upstream=True, **ckwa)
+    assert_status('ok', res)
+    tracking_remote, tracking_branch = ds_repo.get_tracking_branch(branch)
+    eq_(tracking_remote, 'target2')
+    eq_(tracking_branch, 'refs/heads/{}'.format(branch))
+    # and directly via the underlying git config, just like `git push -u`
+    # would leave it
+    eq_(ds_repo.config.get('branch.{}.remote'.format(branch)), 'target2')
+    eq_(ds_repo.config.get('branch.{}.merge'.format(branch)),
+        'refs/heads/{}'.format(branch))
+
+
+@pytest.mark.parametrize("annex", [False, True])
+def test_push_set_upstream(annex):
+    check_push_set_upstream(annex)
+
+
+def test_set_upstream_from_push_results_written_eagerly():
+    # tracking config must be written as each matching result is seen,
+    # not deferred until the generator is fully drained (on_failure='stop'
+    # can stop consumption right after an unrelated, later result errors)
+    calls = []
+
+    class FakeConfig:
+        def set(self, key, value, scope=None):
+            calls.append((key, value, scope))
+
+    class FakeRepo:
+        config = FakeConfig()
+
+    fake_push_results = iter([
+        dict(status='ok', target='target',
+             refspec='refs/heads/{b}:refs/heads/{b}'.format(
+                 b=DEFAULT_BRANCH)),
+        dict(status='error', target='target',
+             refspec='refs/heads/other:refs/heads/other'),
+    ])
+
+    gen = _set_upstream_from_push_results(
+        fake_push_results, FakeRepo(), DEFAULT_BRANCH, 'target', {})
+    # only consume the first (successful) result, mimicking a consumer
+    # that stops right after seeing the second one error out
+    # (on_failure='stop') without ever draining the generator
+    first = next(gen)
+    eq_(first['status'], 'ok')
+    eq_(calls, [
+        ('branch.{}.remote'.format(DEFAULT_BRANCH), 'target', 'local'),
+        ('branch.{}.merge'.format(DEFAULT_BRANCH),
+         'refs/heads/{}'.format(DEFAULT_BRANCH), 'local'),
+    ])
+
+
+def test_set_upstream_from_push_results_no_active_branch():
+    # a falsy `branch` (e.g. detached HEAD) is reported explicitly, and
+    # the underlying push results still come through unchanged
+    fake_push_results = iter([dict(status='ok', target='target',
+                                    refspec='refs/heads/x:refs/heads/x')])
+    gen = _set_upstream_from_push_results(
+        fake_push_results, None, None, 'target', {})
+    first = next(gen)
+    eq_(first['status'], 'impossible')
+    assert_in('detached HEAD', first['message'])
+    # the (unrelated) underlying push result still comes through
+    second = next(gen)
+    eq_(second['status'], 'ok')
+    assert_raises(StopIteration, next, gen)
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_push_set_upstream_detached_head(src_path=None, dst_path=None):
+    # --set-upstream/-u cannot configure tracking without an active
+    # branch (e.g. detached HEAD): this must be reported explicitly to
+    # the user, rather than silently doing nothing
+    ds = Dataset(src_path).create(annex=False)
+    ds_repo = ds.repo
+    branch = ds_repo.get_active_branch() or DEFAULT_BRANCH
+    mk_push_target(ds, 'target', dst_path, annex=False)
+    # establish 'branch' on 'target' first, then advance the local
+    # branch beyond it, so a subsequent dry-run push in 'matching' mode
+    # (which pushes based on existing branch refs, unaffected by
+    # detached HEAD, unlike the 'simple'/'current' defaults) finds
+    # something to push rather than reporting 'uptodate' (which would
+    # be filtered out regardless of the active-branch state, and not
+    # exercise the code path under test)
+    ds.push(to='target', **ckwa)
+    ds_repo.config.set('push.default', 'matching', scope='local')
+    (ds.pathobj / 'f').write_text('more')
+    ds.save(message='more', result_renderer='disabled')
+    ds_repo.call_git(['checkout', ds_repo.get_hexsha()])
+    assert_false(ds_repo.get_active_branch())
+
+    res = ds.push(to='target', set_upstream=True, on_failure='ignore',
+                   **ckwa)
+    impossible = [r for r in res if r['status'] == 'impossible']
+    ok_(impossible)
+    assert_in('detached HEAD', impossible[-1]['message'])
+    # and, as promised, no tracking branch got configured
+    eq_(ds_repo.get_tracking_branch(branch), (None, None))
 
 
 def check_datasets_order(res, order='bottom-up'):
