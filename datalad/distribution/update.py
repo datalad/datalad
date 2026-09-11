@@ -485,6 +485,12 @@ def _choose_update_target(repo, branch, remote, cfg_remote):
              f"{repo.get_corresponding_branch(branch) or ''}" "@{upstream}"],
             read_only=True)
     elif branch:
+        # On an adjusted branch the active branch (e.g.
+        # 'adjusted/master(unlocked)') has no remote counterpart; the sibling
+        # tracks the corresponding branch ('master'). Resolve it so the target
+        # becomes e.g. 'origin/master' instead of the nonexistent
+        # 'origin/adjusted/master(unlocked)'.
+        branch = repo.get_corresponding_branch(branch) or branch
         remote_branch = "{}/{}".format(remote, branch)
         if repo.commit_exists(remote_branch):
             target = remote_branch
