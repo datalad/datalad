@@ -33,6 +33,7 @@ from datalad.cli.main import main
 from datalad.core.local.run import (
     _format_iospecs,
     _get_substitutions,
+    _lock_save,
     _save_lock_path,
     format_command,
     run_command,
@@ -1672,3 +1673,65 @@ def test_run_explicit_no_merge_of_concurrent_commits(path=None, scriptpath=None)
     assert_in("[DATALAD RUNCMD] outer", last_commit_msg(ds.repo))
     # ... but not as a merge that would subsume the concurrent record
     _assert_no_run_merge(ds)
+
+
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_explicit_concurrent_subdataset_only_no_merge(path=None):
+    """No merge when the command's only top-level effect is a subdataset commit
+
+    When a command only commits inside a subdataset, the top-level HEAD
+    never moves during execution, so `cmd_made_commits` above is set True
+    by the subdataset-status check rather than by `_classify_commits()`
+    -- which is only ever asked to look at the (necessarily empty)
+    `pre_cmd_hexsha..post_cmd_hexsha` range in that case. A concurrent
+    `run` can still land its own, unrelated commit at the top level in
+    the window between that check and this run's own save -- serialized
+    only later, by `_lock_save()` -- and deciding the merge from the
+    stale range would silently wrap that commit in (gh-7925 review).
+    """
+    ds = Dataset(path).create()
+    ds.create("sub")
+    assert_repo_status(ds.path)
+
+    # Simulate a concurrent `run`'s commit landing in the window between
+    # this command's own execution finishing and `_lock_save()` being
+    # entered -- the one window the classification above cannot see.
+    def _lock_save_after_concurrent_commit(ds_):
+        (ds.pathobj / "elsewhere").write_text("y")
+        ds.repo.call_git(["add", "elsewhere"])
+        ds.repo.call_git(["commit", "-m",
+                           "[DATALAD RUNCMD] concurrent\n\n"
+                           "=== Do not change lines below ===\n"
+                           '{"cmd": "other", "exit": 0, "chain": [], '
+                           '"inputs": [], "outputs": ["elsewhere"], '
+                           '"pwd": "."}\n'
+                           "^^^ Do not change lines above ^^^\n\n"
+                           "DataLad-Run-Ancestry: "
+                           "0123456789abcdef0123456789abcdef\n"])
+        return _lock_save(ds_)
+
+    # the command's only top-level-visible effect is a subdataset commit,
+    # and its declared output never materializes -- forcing
+    # run_command()'s "force full save" override
+    with patch("datalad.core.local.run._lock_save",
+               side_effect=_lock_save_after_concurrent_commit):
+        res = ds.run(
+            ["git", "-C", "sub", "commit", "--allow-empty", "-m", "inner"],
+            outputs=["ghost"], explicit=True, message="outer",
+            on_failure='ignore', result_renderer='disabled')
+    assert_not_in_results(res, action='run', status='error')
+    assert_repo_status(ds.path)
+    # the outer command is recorded ...
+    assert_in("[DATALAD RUNCMD] outer", last_commit_msg(ds.repo))
+    # ... but not as a merge that would subsume the concurrent record
+    _assert_no_run_merge(ds)
+    # ... and its own commit does not claim the concurrent run's file
+    committed = [
+        str(p.relative_to(ds.pathobj))
+        for p in ds.repo.diff("HEAD^", "HEAD")
+    ]
+    assert_not_in("elsewhere", committed)
+    # the concurrent commit is untouched: a standalone, non-merge parent
+    assert_in("[DATALAD RUNCMD] concurrent",
+               ds.repo.format_commit("%B", "HEAD^"))

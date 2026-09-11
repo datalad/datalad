@@ -1662,6 +1662,31 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         # serialize with any concurrent `run` in this dataset: staging
         # and committing share the Git index (gh-7899)
         with _lock_save(ds), chpwd(pwd):
+            if wrap_commits_in_merge:
+                # `cmd_made_commits`/`concurrent_commits` above were
+                # decided from a snapshot taken right after this
+                # command's own execution -- but a concurrent `run` can
+                # still commit to the top-level dataset in the window
+                # between that snapshot and now (record creation, output
+                # globbing, waiting for this very lock), a range
+                # `_classify_commits()` was never asked to look at. Left
+                # unchecked, the merge below (`since=pre_cmd_hexsha`)
+                # would silently claim that other run's commits -- the
+                # same misattribution gh-7899 is about. Re-classify the
+                # full range now that we hold the lock, so no further
+                # commit can land before our own save/merge decides.
+                current_hexsha = ds.repo.get_hexsha()
+                if current_hexsha != post_cmd_hexsha:
+                    _, concurrent_commits = _classify_commits(
+                        ds.repo, pre_cmd_hexsha, current_hexsha, run_token)
+                    if concurrent_commits:
+                        lgr.info(
+                            'Commits of a concurrent `run` are interleaved '
+                            'with those of this command in %s. Recording '
+                            'the results without a merge commit, so that '
+                            'no record claims the other run\'s commits.',
+                            ds.path)
+                        wrap_commits_in_merge = False
             for r in Save.__call__(
                     dataset=ds_path,
                     path=outputs_to_save,
