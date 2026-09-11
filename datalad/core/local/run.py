@@ -1701,18 +1701,30 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                     recursive=True,
                     message=msg,
                     jobs=jobs,
-                    # Only use since= when the command created commits
-                    # (in the top-level or any subdataset).  Without
-                    # inner commits, use since=None (standard Status path).
-                    since=pre_cmd_hexsha if wrap_commits_in_merge else None,
+                    # Only use since= when the command created commits (in
+                    # the top-level or any subdataset).  Without inner
+                    # commits, use since=None (standard Status path).
+                    # Note this is keyed on cmd_made_commits, not on
+                    # wrap_commits_in_merge: a subdataset-only commit needs
+                    # the diff_dataset-based discovery below (and
+                    # _since_sub_info) to be seen at all on an adjusted
+                    # branch (gh-7925 review) even when a concurrent commit
+                    # means the result must not be wrapped in a merge --
+                    # _no_merge is what suppresses the merge in that case.
+                    since=pre_cmd_hexsha if cmd_made_commits else None,
                     # Pass pre-command sub HEADs so Save can detect
                     # subdataset commits on adjusted branches where
                     # diff_dataset can't see them.  Parse from the
                     # lightweight submodule status snapshot.
                     _since_sub_info=_parse_sub_status(
                         pre_cmd_sub_status, ds_path)
-                    if wrap_commits_in_merge and pre_cmd_sub_status
+                    if cmd_made_commits and pre_cmd_sub_status
                     else None,
+                    # A concurrent run's commit can make `since`-based
+                    # discovery necessary (above) while also making it
+                    # unsafe to wrap the result in a merge -- discover
+                    # through it, but never merge it in (gh-7925 review).
+                    _no_merge=not wrap_commits_in_merge,
                     # Message for the auxiliary commit that wraps
                     # uncommitted changes before the run-merge.  Keeps
                     # the run-record out of the intermediate commit.

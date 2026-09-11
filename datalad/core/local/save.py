@@ -360,6 +360,16 @@ class Save(Interface):
                  # limit the commit to the given `path`s, even when nothing
                  # was staged beforehand (see GitRepo.save())
                  _partial_commit=False,
+                 # use `since` only to discover what changed at `dataset`
+                 # itself (needed to see through the corresponding-branch
+                 # blind spot on adjusted branches, gh-7899/gh-7925), but
+                 # never wrap *that* dataset's result in a merge commit --
+                 # `run` sets this once a concurrent commit lands there,
+                 # making a merge unsafe, while still needing `since`-based
+                 # discovery for a subdataset-only change. Subdatasets are
+                 # unaffected and still merge normally when they have inner
+                 # commits of their own.
+                 _no_merge=False,
                  ):
         if message and message_file:
             raise ValueError(
@@ -553,7 +563,15 @@ class Save(Interface):
                 and any(str(p) in _merged_datasets
                         for p, props in paths.items()
                         if props.get('type') == 'dataset'))
-            will_merge = had_inner or child_merged
+            # `_no_merge` only ever suppresses the merge at the dataset
+            # `run` was invoked in -- an interloping commit there is what
+            # makes merging unsafe (gh-7925 review). A subdataset's own
+            # inner commits are unaffected by that and still get merged
+            # normally, same as without `_no_merge`; that merge also syncs
+            # the subdataset's corresponding branch on an adjusted branch,
+            # which the superdataset's own gitlink update below relies on.
+            will_merge = (had_inner or child_merged) and not (
+                _no_merge and pdspath == ds.path)
 
             if not all(p['state'] == 'clean'
                        for p in pds_status.values()) or \
