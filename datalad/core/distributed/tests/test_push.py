@@ -350,15 +350,15 @@ def test_push_set_upstream(annex):
     check_push_set_upstream(annex)
 
 
-def test_push_refspecs_set_upstream_written_eagerly():
+def test_set_upstream_from_push_results_written_eagerly():
     # regression test: the upstream-tracking config for a --set-upstream
-    # request must be written as soon as the corresponding refspec's own
-    # push result is processed, not deferred until the whole result
-    # generator has been drained. A caller using on_failure='stop' can
-    # stop consuming results as soon as a *different*, later refspec in
-    # the same push errors -- which must not suppress configuring the
-    # tracking branch for an *earlier* refspec that already succeeded.
-    from datalad.core.distributed.push import _push_refspecs
+    # request must be written as soon as the corresponding push result is
+    # processed, not deferred until the whole result generator has been
+    # drained. A caller using on_failure='stop' can stop consuming results
+    # as soon as a *different*, later result in the same push errors --
+    # which must not suppress configuring the tracking branch for an
+    # *earlier* result that already succeeded.
+    from datalad.core.distributed.push import _set_upstream_from_push_results
 
     calls = []
 
@@ -369,21 +369,16 @@ def test_push_refspecs_set_upstream_written_eagerly():
     class FakeRepo:
         config = FakeConfig()
 
-        def push(self, remote, refspec, git_options=None):
-            return iter([
-                dict(from_ref='refs/heads/{}'.format(DEFAULT_BRANCH),
-                     to_ref='refs/heads/{}'.format(DEFAULT_BRANCH),
-                     remote=remote, operations=['fast-forward'], note=''),
-                dict(from_ref='refs/heads/other',
-                     to_ref='refs/heads/other',
-                     remote=remote, operations=['rejected', 'error'],
-                     note=''),
-            ])
+    fake_push_results = iter([
+        dict(status='ok', target='target',
+             refspec='refs/heads/{b}:refs/heads/{b}'.format(
+                 b=DEFAULT_BRANCH)),
+        dict(status='error', target='target',
+             refspec='refs/heads/other:refs/heads/other'),
+    ])
 
-    gen = _push_refspecs(
-        FakeRepo(), 'target',
-        ['{b}:{b}'.format(b=DEFAULT_BRANCH), 'other:other'],
-        False, {}, set_upstream_branch=DEFAULT_BRANCH)
+    gen = _set_upstream_from_push_results(
+        fake_push_results, FakeRepo(), DEFAULT_BRANCH, 'target', {})
     # only consume the first (successful) result, mimicking a consumer
     # that stops right after seeing the second one error out
     # (on_failure='stop') without ever draining the generator
@@ -394,6 +389,25 @@ def test_push_refspecs_set_upstream_written_eagerly():
         ('branch.{}.merge'.format(DEFAULT_BRANCH),
          'refs/heads/{}'.format(DEFAULT_BRANCH), 'local'),
     ])
+
+
+def test_set_upstream_from_push_results_no_active_branch():
+    # a falsy `branch` (e.g. detached HEAD) must be reported explicitly,
+    # rather than silently doing nothing, while still passing the
+    # underlying push results through unchanged
+    from datalad.core.distributed.push import _set_upstream_from_push_results
+
+    fake_push_results = iter([dict(status='ok', target='target',
+                                    refspec='refs/heads/x:refs/heads/x')])
+    gen = _set_upstream_from_push_results(
+        fake_push_results, None, None, 'target', {})
+    first = next(gen)
+    eq_(first['status'], 'impossible')
+    assert_in('detached HEAD', first['message'])
+    # the (unrelated) underlying push result still comes through
+    second = next(gen)
+    eq_(second['status'], 'ok')
+    assert_raises(StopIteration, next, gen)
 
 
 @with_tempfile(mkdir=True)
