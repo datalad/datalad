@@ -1041,6 +1041,57 @@ def test_update_reset_dirty(path=None):
                                  ds_clone_s2.repo.path])
 
 
+@pytest.mark.parametrize("divergence", ["local_discard", "remote_discard"])
+@with_tempfile(mkdir=True)
+def test_update_reset_adjusted(path=None, *, divergence):
+    # gh-7873: the update target was built from the *adjusted* branch name,
+    # giving a nonexistent "<remote>/adjusted/<branch>(unlocked)", so
+    # `update --how=reset` bailed out with "Could not determine update target".
+    path = Path(path)
+
+    ds_src = Dataset(path / "source").create()
+    (ds_src.pathobj / "remote.txt").write_text("base commit")
+    ds_src.save()
+
+    ds_clone = install(source=ds_src.path, path=path / "clone",
+                       result_xfm="datasets")
+    maybe_adjust_repo(ds_clone.repo)
+    if not ds_clone.repo.is_managed_branch():
+        raise SkipTest("test requires an adjusted branch")
+
+    def corr_hexsha(repo):
+        # on an adjusted branch HEAD is git-annex's "adjusting" commit, the
+        # real history is on the corresponding branch
+        return repo.get_hexsha(repo.get_corresponding_branch() or "HEAD")
+
+    if divergence == "local_discard":
+        (ds_clone.pathobj / "local.txt").write_text("to be discarded by reset")
+        ds_clone.save()
+    else:
+        # rewind the branch the clone follows, as a --force push would.
+        # ds_src is itself adjusted whenever the filesystem is crippled.
+        src_branch = (ds_src.repo.get_corresponding_branch()
+                      or ds_src.repo.get_active_branch())
+        ds_src.repo.update_ref(f"refs/heads/{src_branch}",
+                               f"refs/heads/{src_branch}~")
+
+    target_hexsha = corr_hexsha(ds_src.repo)
+    neq_(corr_hexsha(ds_clone.repo), target_hexsha)
+
+    assert_in_results(
+        ds_clone.update(follow="sibling", how="reset"),
+        action="update.reset", status="ok")
+
+    # the corresponding branch is back at the sibling's state ...
+    eq_(corr_hexsha(ds_clone.repo), target_hexsha)
+    # ... the adjusted view was re-anchored onto it, so that the next
+    # `git annex adjust` does not rebuild the view from a stale basis ...
+    adjusted = ds_clone.repo.get_active_branch()
+    eq_(ds_clone.repo.get_hexsha(f"refs/basis/{adjusted}"), target_hexsha)
+    # ... and we are still on the adjusted branch
+    ok_(ds_clone.repo.is_managed_branch())
+
+
 def test_process_how_args():
     # --merge maps onto --how values. It has no equivalent of --how-subds,
     # --which just gets set to --how's value when unspecified.
