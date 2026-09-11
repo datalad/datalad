@@ -2338,6 +2338,31 @@ class GitRepo(CoreGitRepo):
             return any(r.get("state") != "clean" for r in st.values())
         return False
 
+    def get_merge_head(self) -> Optional[str]:
+        """Return the commit of a merge that is prepared but not committed.
+
+        This is the second parent the next commit would get, i.e. what Git
+        records in ``MERGE_HEAD`` between `git merge --no-commit` and the
+        commit that concludes it.
+
+        Note that ``MERGE_HEAD`` is per working tree, and `dot_git` resolves
+        the ``gitdir:`` indirection of a linked working tree (and of a
+        submodule) to that working tree's own Git directory -- so this reports
+        on the working tree this instance is for, not on any other one sharing
+        the repository.
+
+        Returns
+        -------
+        str or None
+          None if no merge is in progress.
+        """
+        try:
+            return (self.dot_git / 'MERGE_HEAD').read_text().strip() or None
+        except FileNotFoundError:
+            # no merge in progress -- the common case, and the only way to
+            # tell without racing against a concurrent commit
+            return None
+
     @property
     def untracked_files(self) -> list[str]:
         """Legacy interface, do not use! Use the status() method instead.
@@ -3476,6 +3501,12 @@ class GitRepo(CoreGitRepo):
 
         staged_paths = self.get_staged_paths()
         need_partial_commit = bool(staged_paths)
+        if need_partial_commit and self.get_merge_head():
+            # a pending merge has its outcome staged. That is not a user's
+            # pre-staged content that a partial commit would have to bypass
+            # -- and Git refuses a partial commit while a merge is pending
+            # anyway.
+            need_partial_commit = False
         if need_partial_commit and hasattr(self, "call_annex"):
             # so we have some staged content. let's check which ones
             # are symlinks -- those could be annex key links that
