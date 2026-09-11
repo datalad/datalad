@@ -236,25 +236,45 @@ def check_not_generatorfunction(func):
                            .format(func.__name__))
 
 
-def skip_if_no_network(func=None):
+def skip_if_no_network(func=None, url=None):
     """Skip test completely in NONETWORK settings
 
     If not used as a decorator, and just a function, could be used at the module level
+
+    Parameters
+    ----------
+    url: str, optional
+      Also skip if this URL cannot be retrieved, so that an outage of a
+      third-party service a test depends on does not turn CI red (gh-7912).
+      `datalad.tests.nonetwork` alone cannot express that: it only says
+      whether there is network at all, not whether this particular host
+      answers.  Given `url`, this must be used as a decorator --
+      `@skip_if_no_network(url=...)` -- since the URL is probed when the
+      test runs, not when the module is imported.
     """
-    check_not_generatorfunction(func)
 
     def check_and_raise():
         if dl_cfg.get('datalad.tests.nonetwork'):
             pytest.skip("Skipping since no network settings", allow_module_level=True)
+        if url is not None:
+            skip_if_url_is_not_available(url)
 
-    if func:
-        @wraps(func)
+    def decorate(func_):
+        check_not_generatorfunction(func_)
+
+        @wraps(func_)
         @attr('network')
         @attr('skip_if_no_network')
         def  _wrap_skip_if_no_network(*args, **kwargs):
             check_and_raise()
-            return func(*args, **kwargs)
+            return func_(*args, **kwargs)
         return  _wrap_skip_if_no_network
+
+    if func:
+        return decorate(func)
+    elif url is not None:
+        # invoked with arguments, so we are the decorator factory
+        return decorate
     else:
         check_and_raise()
 
