@@ -33,6 +33,8 @@ from datalad.cli.main import main
 from datalad.core.local.run import (
     _format_iospecs,
     _get_substitutions,
+    _lock_save,
+    _save_lock_path,
     format_command,
     run_command,
 )
@@ -535,9 +537,11 @@ def test_run_cmdline_disambiguation(path=None):
         with patch("datalad.core.local.run._execute_command") as exec_cmd:
             with assert_raises(SystemExit):
                 main(["datalad", "run", "--", "--message"])
-            exec_cmd.assert_called_once_with(
-                '"--message"' if on_windows else "--message",
-                path)
+            # ATTN: only the positional arguments are of interest here,
+            # `run` also passes an `env` for the command
+            eq_(exec_cmd.call_count, 1)
+            eq_(exec_cmd.call_args.args,
+                ('"--message"' if on_windows else "--message", path))
 
         # Our parser used to mishandle --version (gh-3067),
         # treating 'datalad run CMD --version' as 'datalad --version'.
@@ -547,9 +551,10 @@ def test_run_cmdline_disambiguation(path=None):
             with patch("datalad.core.local.run._execute_command") as exec_cmd:
                 with assert_raises(SystemExit):
                     main(["datalad", "run"] + sep + ["echo", "--version"])
-                exec_cmd.assert_called_once_with(
-                    '"echo" "--version"' if on_windows else "echo --version",
-                    path)
+                eq_(exec_cmd.call_count, 1)
+                eq_(exec_cmd.call_args.args,
+                    ('"echo" "--version"' if on_windows else "echo --version",
+                     path))
 
 
 @with_tempfile(mkdir=True)
@@ -1528,3 +1533,275 @@ def test_run_explicit_nested_run_in_subdataset(path=None, scriptpath=None):
     assert_in_results(res, action='run', status='error')
     ok_(any('not declared as --output' in str(r.get('message', ''))
             for r in res))
+
+
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_explicit_concurrent(path=None):
+    """Concurrent `--explicit` runs record what they produced (gh-7899)"""
+    import subprocess
+    ds = Dataset(path).create()
+    nruns = 3
+    procs = [
+        subprocess.Popen(
+            [sys.executable, "-c",
+             "from datalad.api import run\n"
+             "run(cmd=[%r, '-c', \"open('o%d', 'w').write('x')\"],\n"
+             "    dataset=%r, outputs=['o%d'], explicit=True,\n"
+             "    message='cell %d', result_renderer='disabled')\n"
+             % (sys.executable, i, ds.path, i, i)],
+            # ATTN: paths are resolved against the CWD when the dataset is
+            # given as a path (gh-3435)
+            cwd=ds.path, stderr=subprocess.PIPE)
+        for i in range(nruns)
+    ]
+    errs = [p.communicate()[1].decode() for p in procs]
+    eq_([p.returncode for p in procs], [0] * nruns,
+        msg="concurrent runs failed:\n%s" % "\n".join(errs))
+
+    assert_repo_status(ds.path)
+    # no record went missing...
+    revs = ds.repo.get_revisions(options=["--grep", "DATALAD RUNCMD"])
+    eq_(len(revs), nruns)
+    # ...and none of them claims an output it did not produce
+    for rev in revs:
+        info = get_run_info(ds, ds.repo.format_commit("%B", rev))[1]
+        committed = [
+            str(p.relative_to(ds.pathobj))
+            for p in ds.repo.diff(rev + "^", rev)
+        ]
+        eq_(sorted(committed), sorted(info["outputs"]))
+
+
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_explicit_concurrent_subdataset(path=None):
+    """A run in a subdataset does not race a run in its superdataset
+
+    Saving is recursive, so a `run` in a superdataset writes the index of
+    every subdataset underneath it.  Guarding only the dataset a `run` was
+    invoked in would leave those two writing one index under two different
+    locks (gh-7901 review).
+    """
+    import subprocess
+    ds = Dataset(path).create()
+    sub = ds.create("sub")
+    assert_repo_status(ds.path)
+
+    # one lock governs the whole hierarchy...
+    eq_(_save_lock_path(sub), _save_lock_path(ds))
+
+    # ...so a run in the superdataset that declares an output *in* the
+    # subdataset can run concurrently with a run inside that subdataset
+    def _run_in(dspath, output, message):
+        return subprocess.Popen(
+            [sys.executable, "-c",
+             "from datalad.api import run\n"
+             "run(cmd=[%r, '-c', \"open(%r, 'w').write('x')\"],\n"
+             "    outputs=[%r], explicit=True, message=%r,\n"
+             "    result_renderer='disabled')\n"
+             % (sys.executable, output, output, message)],
+            cwd=dspath, stderr=subprocess.PIPE)
+
+    for trial in range(3):
+        procs = [_run_in(ds.path, "sub/a%d" % trial, "super %d" % trial),
+                 _run_in(sub.path, "b%d" % trial, "sub %d" % trial)]
+        errs = [p.communicate()[1].decode() for p in procs]
+        eq_([p.returncode for p in procs], [0, 0],
+            msg="concurrent super/sub runs failed:\n%s" % "\n".join(errs))
+        # neither run left its declared output behind: both were produced,
+        # both are tracked (the losing run of the race used to leave its
+        # own output untracked and unrecorded), and both are recorded.
+        # ATTN: `git status` is not the check to make here -- on an
+        # adjusted branch git-annex maintains an index state of its own
+        outputs = ["a%d" % trial, "b%d" % trial]
+        for f in outputs:
+            ok_((sub.pathobj / f).exists())
+        eq_(sorted(sub.repo.call_git(["ls-files", "--"] + outputs).split()),
+            outputs)
+        for message in ("super %d" % trial, "sub %d" % trial):
+            ok_(any("[DATALAD RUNCMD] " + message == subject
+                    for subject in sub.repo.call_git(
+                        ["log", "--format=%s"]).splitlines()),
+                msg="no run record for %r in %s" % (message, sub.path))
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_explicit_no_merge_of_concurrent_commits(path=None, scriptpath=None):
+    """A run's merge commit never wraps a concurrent run's commits
+
+    A merge has a single second parent, so once a concurrent run's commits
+    are interleaved with this command's own there is no range that covers
+    only this command.  Recording without a merge is the way out: a merge
+    would claim the other run's commits, and a `rerun` of this record
+    would then re-execute them (gh-7901 review).
+    """
+    ds = Dataset(path).create()
+    # the command commits one declared output itself, and also fabricates
+    # the commit a concurrent `run` would have landed in the meantime --
+    # a run record whose ancestry does not name this run
+    script = op.join(scriptpath, "concurrent.py")
+    with open(script, "w") as f:
+        f.write(
+            "import json, subprocess\n"
+            "open('declared_committed', 'w').write('x')\n"
+            "subprocess.check_call(['git', 'add', 'declared_committed'])\n"
+            "subprocess.check_call(['git', 'commit', '-m', 'own commit'])\n"
+            "open('elsewhere', 'w').write('y')\n"
+            "subprocess.check_call(['git', 'add', 'elsewhere'])\n"
+            "record = json.dumps({'cmd': 'other', 'exit': 0, 'chain': [],\n"
+            "                     'inputs': [], 'outputs': ['elsewhere'],\n"
+            "                     'pwd': '.'})\n"
+            "msg = ('[DATALAD RUNCMD] concurrent\\n\\n'\n"
+            "       '=== Do not change lines below ===\\n'\n"
+            "       + record + '\\n'\n"
+            "       '^^^ Do not change lines above ^^^\\n\\n'\n"
+            "       'DataLad-Run-Ancestry: '\n"
+            "       '0123456789abcdef0123456789abcdef\\n')\n"
+            "subprocess.check_call(['git', 'commit', '-m', msg])\n"
+            "open('declared_left', 'w').write('z')\n")
+
+    res = ds.run([sys.executable, script],
+                 outputs=["declared_committed", "declared_left"],
+                 explicit=True, message="outer",
+                 on_failure='ignore', result_renderer='disabled')
+    assert_not_in_results(res, action='run', status='error')
+    assert_repo_status(ds.path)
+    # the outer command is recorded ...
+    assert_in("[DATALAD RUNCMD] outer", last_commit_msg(ds.repo))
+    # ... but not as a merge that would subsume the concurrent record
+    _assert_no_run_merge(ds)
+
+
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_explicit_concurrent_subdataset_only_no_merge(path=None):
+    """No merge when the command's only top-level effect is a subdataset commit
+
+    When a command only commits inside a subdataset, the top-level HEAD
+    never moves during execution, so `cmd_made_commits` above is set True
+    by the subdataset-status check rather than by `_classify_commits()`
+    -- which is only ever asked to look at the (necessarily empty)
+    `pre_cmd_hexsha..post_cmd_hexsha` range in that case. A concurrent
+    `run` can still land its own, unrelated commit at the top level in
+    the window between that check and this run's own save -- serialized
+    only later, by `_lock_save()` -- and deciding the merge from the
+    stale range would silently wrap that commit in (gh-7925 review).
+    """
+    ds = Dataset(path).create()
+    ds.create("sub")
+    assert_repo_status(ds.path)
+
+    # Simulate a concurrent `run`'s commit landing in the window between
+    # this command's own execution finishing and `_lock_save()` being
+    # entered -- the one window the classification above cannot see.
+    def _lock_save_after_concurrent_commit(ds_):
+        (ds.pathobj / "elsewhere").write_text("y")
+        ds.repo.call_git(["add", "elsewhere"])
+        concurrent_msg = (
+            "[DATALAD RUNCMD] concurrent\n\n"
+            "=== Do not change lines below ===\n"
+            '{"cmd": "other", "exit": 0, "chain": [], '
+            '"inputs": [], "outputs": ["elsewhere"], "pwd": "."}\n'
+            "^^^ Do not change lines above ^^^\n\n"
+            "DataLad-Run-Ancestry: 0123456789abcdef0123456789abcdef\n"
+        )
+        ds.repo.call_git(["commit", "-m", concurrent_msg])
+        return _lock_save(ds_)
+
+    # the command's only top-level-visible effect is a subdataset commit,
+    # and its declared output never materializes -- forcing
+    # run_command()'s "force full save" override
+    with patch("datalad.core.local.run._lock_save",
+               side_effect=_lock_save_after_concurrent_commit):
+        res = ds.run(
+            ["git", "-C", "sub", "commit", "--allow-empty", "-m", "inner"],
+            outputs=["ghost"], explicit=True, message="outer",
+            on_failure='ignore', result_renderer='disabled')
+    assert_not_in_results(res, action='run', status='error')
+    assert_repo_status(ds.path)
+    # the outer command is recorded ...
+    assert_in("[DATALAD RUNCMD] outer", last_commit_msg(ds.repo))
+    # ... but not as a merge that would subsume the concurrent record
+    _assert_no_run_merge(ds)
+    # ... and its own commit does not claim the concurrent run's file
+    committed = [
+        str(p.relative_to(ds.pathobj))
+        for p in ds.repo.diff("HEAD^", "HEAD")
+    ]
+    assert_not_in("elsewhere", committed)
+    # the concurrent commit is untouched: a standalone, non-merge parent
+    parent_msg = ds.repo.format_commit("%B", "HEAD^")
+    assert_in("[DATALAD RUNCMD] concurrent", parent_msg)
+
+
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_explicit_concurrent_no_merge_self_committed(path=None):
+    """The run record survives when the command self-commits and no merge happens
+
+    A command run under `--explicit` may commit its own declared output
+    directly (bypassing datalad's own save), leaving nothing dirty for
+    `run_command()`'s own save step to pick up afterward. When a
+    concurrent `run`'s commit also lands -- in the window `_lock_save()`
+    guards -- and rules out wrapping the result in a merge (the same
+    situation as test_run_explicit_concurrent_subdataset_only_no_merge,
+    but here at the top level, on a normal, non-adjusted filesystem),
+    both routes that would normally carry this run's record -- the merge,
+    and an ordinary dirty-tree commit -- are unavailable. The record must
+    still land somewhere rather than being silently dropped even though
+    `run` reports success (gh-7925 review).
+    """
+    ds = Dataset(path).create()
+
+    # Simulate a concurrent `run`'s commit landing in the window between
+    # this command's own execution finishing and `_lock_save()` being
+    # entered -- same injection technique as
+    # test_run_explicit_concurrent_subdataset_only_no_merge.
+    def _lock_save_after_concurrent_commit(ds_):
+        (ds.pathobj / "elsewhere").write_text("y")
+        ds.repo.call_git(["add", "elsewhere"])
+        concurrent_msg = (
+            "[DATALAD RUNCMD] concurrent\n\n"
+            "=== Do not change lines below ===\n"
+            '{"cmd": "other", "exit": 0, "chain": [], '
+            '"inputs": [], "outputs": ["elsewhere"], "pwd": "."}\n'
+            "^^^ Do not change lines above ^^^\n\n"
+            "DataLad-Run-Ancestry: 0123456789abcdef0123456789abcdef\n"
+        )
+        ds.repo.call_git(["commit", "-m", concurrent_msg])
+        return _lock_save(ds_)
+
+    # The command commits its declared output *itself* (bypassing
+    # datalad's own save) -- nothing is left uncommitted for
+    # run_command()'s own save step to pick up via the ordinary
+    # working-tree diff.
+    cmd = [
+        sys.executable, "-c",
+        "import subprocess; "
+        "open('out', 'w').write('x'); "
+        "subprocess.check_call(['git', 'add', 'out']); "
+        "subprocess.check_call(['git', 'commit', '-m', 'own commit'])"
+    ]
+
+    with patch("datalad.core.local.run._lock_save",
+               side_effect=_lock_save_after_concurrent_commit):
+        res = ds.run(
+            cmd, outputs=["out"], explicit=True, message="outer",
+            on_failure='ignore', result_renderer='disabled')
+    assert_not_in_results(res, action='run', status='error')
+    assert_repo_status(ds.path)
+    # the outer command's record is not silently dropped ...
+    assert_in("[DATALAD RUNCMD] outer", last_commit_msg(ds.repo))
+    # ... but not as a merge that would subsume the concurrent record
+    _assert_no_run_merge(ds)
+    # ... it is its own (auxiliary, empty) commit -- it claims neither
+    # the command's own output (already committed beforehand) nor the
+    # concurrent run's file
+    eq_([str(p.relative_to(ds.pathobj))
+         for p in ds.repo.diff("HEAD^", "HEAD")], [])
+    # the concurrent commit is untouched: a standalone, non-merge parent
+    parent_msg = ds.repo.format_commit("%B", "HEAD^")
+    assert_in("[DATALAD RUNCMD] concurrent", parent_msg)

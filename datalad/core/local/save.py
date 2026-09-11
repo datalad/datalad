@@ -44,6 +44,7 @@ from datalad.support.constraints import (
     EnsureStr,
 )
 from datalad.support.exceptions import CommandError
+from datalad.support.gitrepo import to_options
 from datalad.support.parallel import (
     ProducerConsumerProgressLog,
     no_subds_in_futures,
@@ -357,6 +358,19 @@ class Save(Interface):
                  since=None,
                  _since_sub_info=None,
                  _sub_message=None,
+                 # limit the commit to the given `path`s, even when nothing
+                 # was staged beforehand (see GitRepo.save())
+                 _partial_commit=False,
+                 # use `since` only to discover what changed at `dataset`
+                 # itself (needed to see through the corresponding-branch
+                 # blind spot on adjusted branches, gh-7899/gh-7925), but
+                 # never wrap *that* dataset's result in a merge commit --
+                 # `run` sets this once a concurrent commit lands there,
+                 # making a merge unsafe, while still needing `since`-based
+                 # discovery for a subdataset-only change. Subdatasets are
+                 # unaffected and still merge normally when they have inner
+                 # commits of their own.
+                 _no_merge=False,
                  ):
         if message and message_file:
             raise ValueError(
@@ -550,7 +564,15 @@ class Save(Interface):
                 and any(str(p) in _merged_datasets
                         for p, props in paths.items()
                         if props.get('type') == 'dataset'))
-            will_merge = had_inner or child_merged
+            # `_no_merge` only ever suppresses the merge at the dataset
+            # `run` was invoked in -- an interloping commit there is what
+            # makes merging unsafe (gh-7925 review). A subdataset's own
+            # inner commits are unaffected by that and still get merged
+            # normally, same as without `_no_merge`; that merge also syncs
+            # the subdataset's corresponding branch on an adjusted branch,
+            # which the superdataset's own gitlink update below relies on.
+            will_merge = (had_inner or child_merged) and not (
+                _no_merge and pdspath == ds.path)
 
             if not all(p['state'] == 'clean'
                        for p in pds_status.values()) or \
@@ -576,7 +598,8 @@ class Save(Interface):
                         # detect anything else
                         untracked='no',
                         _status=pds_status,
-                        amend=amend):
+                        amend=amend,
+                        _partial_commit=_partial_commit):
                     for k in ('path', 'refds'):
                         if k in res:
                             res[k] = str(
@@ -598,6 +621,23 @@ class Save(Interface):
                         logger=lgr)
                     return
                 _merged_datasets.add(pdspath)
+            elif (_no_merge and pdspath == ds.path and had_inner
+                    and pds_repo.get_hexsha() == start_commit):
+                # `had_inner` means this dataset had commits of its own
+                # (`run`'s command committing directly, e.g. gh-7925
+                # review) that would normally be wrapped in the merge
+                # above -- but a concurrent commit made that merge unsafe,
+                # so `_no_merge` suppressed it. If the plain save above
+                # also found nothing dirty left to commit (HEAD is still
+                # where it was when this call started), the run's own
+                # record has nowhere to land: it would be silently
+                # dropped even though `run_command()` reported success.
+                # Force a commit -- empty if need be -- carrying the run
+                # message, the same way `message` would otherwise have
+                # ended up on the (now suppressed) merge commit.
+                pds_repo.commit(
+                    msg=message,
+                    options=to_options(allow_empty=True))
 
             # report on the dataset itself
             dsres = dict(
