@@ -1675,6 +1675,10 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 # same misattribution gh-7899 is about. Re-classify the
                 # full range now that we hold the lock, so no further
                 # commit can land before our own save/merge decides.
+                # post_cmd_hexsha is never None here: wrap_commits_in_merge
+                # is only ever True when cmd_made_commits is, which
+                # requires pre_cmd_hexsha (hence post_cmd_hexsha) to be
+                # set -- i.e. not inject=True.
                 current_hexsha = ds.repo.get_hexsha()
                 if current_hexsha != post_cmd_hexsha:
                     _, concurrent_commits = _classify_commits(

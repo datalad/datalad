@@ -1700,15 +1700,15 @@ def test_run_explicit_concurrent_subdataset_only_no_merge(path=None):
     def _lock_save_after_concurrent_commit(ds_):
         (ds.pathobj / "elsewhere").write_text("y")
         ds.repo.call_git(["add", "elsewhere"])
-        ds.repo.call_git(["commit", "-m",
-                           "[DATALAD RUNCMD] concurrent\n\n"
-                           "=== Do not change lines below ===\n"
-                           '{"cmd": "other", "exit": 0, "chain": [], '
-                           '"inputs": [], "outputs": ["elsewhere"], '
-                           '"pwd": "."}\n'
-                           "^^^ Do not change lines above ^^^\n\n"
-                           "DataLad-Run-Ancestry: "
-                           "0123456789abcdef0123456789abcdef\n"])
+        concurrent_msg = (
+            "[DATALAD RUNCMD] concurrent\n\n"
+            "=== Do not change lines below ===\n"
+            '{"cmd": "other", "exit": 0, "chain": [], '
+            '"inputs": [], "outputs": ["elsewhere"], "pwd": "."}\n'
+            "^^^ Do not change lines above ^^^\n\n"
+            "DataLad-Run-Ancestry: 0123456789abcdef0123456789abcdef\n"
+        )
+        ds.repo.call_git(["commit", "-m", concurrent_msg])
         return _lock_save(ds_)
 
     # the command's only top-level-visible effect is a subdataset commit,
@@ -1733,5 +1733,5 @@ def test_run_explicit_concurrent_subdataset_only_no_merge(path=None):
     ]
     assert_not_in("elsewhere", committed)
     # the concurrent commit is untouched: a standalone, non-merge parent
-    assert_in("[DATALAD RUNCMD] concurrent",
-               ds.repo.format_commit("%B", "HEAD^"))
+    parent_msg = ds.repo.format_commit("%B", "HEAD^")
+    assert_in("[DATALAD RUNCMD] concurrent", parent_msg)
