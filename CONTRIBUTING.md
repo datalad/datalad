@@ -476,6 +476,34 @@ which runs automatically on merges to master and updates
 [.zenodo.json][link_zenodo] and [.all-contributorsrc](.all-contributorsrc).
 If you are new, please add yourself to [.zenodo.json][link_zenodo].
 
+### AI assistants are not contributors
+
+Those files credit people, not tools.  con/tributors takes its list from
+GitHub's [contributors API][gh-contributors-api], which attributes a commit to
+the account owning the commit's **author** email and ignores `Co-authored-by:`
+trailers.  Therefore:
+
+- Credit an AI assistant in `Co-authored-by:` trailers (and/or in the pull
+  request description).  That leaves the contributor and citation metadata
+  untouched -- as of this writing datalad has >150 such commits and none of
+  them added an entry.
+- Do *not* let an assistant be the commit **author**; the person running it
+  is the author and is responsible for the change.  Commits authored by e.g.
+  `Claude <noreply@anthropic.com>` are attributed by GitHub to the `claude`
+  account, which con/tributors then proposes to add to [.tributors](.tributors),
+  [.all-contributorsrc](.all-contributorsrc) and the README --
+  [PR #7922](https://github.com/datalad/datalad/pull/7922) is such a proposal.
+
+As a backstop, such accounts are listed in `skip_users` of the
+[update-contributors workflow](.github/workflows/update-contributors.yml).
+`skip_users` only prevents *adding* an entry: con/tributors never prunes, and
+entries already present in `.all-contributorsrc` are copied back into
+`.tributors` regardless of `skip_users`.  A `[tributors]` pull request that
+proposes an AI assistant should therefore be **closed**, not merged and
+cleaned up afterwards.
+
+[gh-contributors-api]: https://docs.github.com/en/rest/repos/repos#list-repository-contributors
+
 ## Useful tools
 
 - While performing IO/net heavy operations use [dool](https://github.com/scottchiefbaker/dool)
