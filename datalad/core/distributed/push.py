@@ -607,6 +607,20 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
                 )
                 return
 
+        if set_upstream and not active_branch:
+            # e.g. detached HEAD -- there is nothing we could meaningfully
+            # configure as an upstream tracking branch. Report this
+            # explicitly, rather than silently ignoring --set-upstream/-u,
+            # and continue with the (still possibly useful) push itself.
+            yield dict(
+                res_kwargs,
+                status='impossible',
+                message=
+                'Cannot configure --set-upstream/-u: there is no active '
+                'branch (detached HEAD)'
+            )
+            set_upstream = False
+
         # make sure that we always push the active branch (the context for
         # the potential path arguments) and the annex branch -- because we
         # claim to know better than any git config
@@ -761,10 +775,16 @@ def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs,
     # TODO maybe compress into a single message whenever everything is
     # OK?
     # ref of `set_upstream_branch`, if any, to recognize the corresponding
-    # push result below and to use as the value for `branch.*.merge`
+    # push result below and to use as the value for `branch.*.merge`.
+    # Note: we deliberately do not pass a `--set-upstream` git_options
+    # flag to `repo.push()` above (unlike `--force`) and instead write
+    # the tracking config ourselves: git's native `--set-upstream`
+    # applies to *every* branch that is up-to-date or successfully
+    # pushed in the same invocation, which here would also cover the
+    # `git-annex` branch (and any other refspec matched in), not just
+    # the one branch the user asked to track.
     upstream_from_ref = 'refs/heads/{}'.format(set_upstream_branch) \
         if set_upstream_branch else None
-    upstream_pushed = False
     for pr in push_res:
         ops = pr['operations']
         is_error = any(o in ops for o in (
@@ -786,8 +806,20 @@ def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs,
         if not is_error and pr['from_ref'] == upstream_from_ref:
             # the branch we were asked to set up as upstream-tracking
             # was pushed (or was already up-to-date) -- same condition
-            # `git push --set-upstream` itself uses
-            upstream_pushed = True
+            # `git push --set-upstream` itself uses.
+            # This must happen here, eagerly, rather than after this
+            # generator is fully drained: a caller using
+            # on_failure='stop' can stop pulling from this generator
+            # as soon as a *different*, later refspec in this same
+            # push errors, which would otherwise silently skip
+            # configuring the tracking branch despite this refspec's
+            # own push having already succeeded.
+            repo.config.set(
+                'branch.{}.remote'.format(set_upstream_branch), target,
+                scope='local')
+            repo.config.set(
+                'branch.{}.merge'.format(set_upstream_branch),
+                upstream_from_ref, scope='local')
         refspec = '{}:{}'.format(pr['from_ref'], pr['to_ref'])
         yield dict(
             res_kwargs,
@@ -806,16 +838,6 @@ def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs,
                 pr['to_ref'],
                 pr['note']),
         )
-
-    if upstream_pushed:
-        # mimic `git push --set-upstream`: point the pushed branch's
-        # tracking configuration at the sibling it was just pushed to
-        repo.config.set(
-            'branch.{}.remote'.format(set_upstream_branch), target,
-            scope='local')
-        repo.config.set(
-            'branch.{}.merge'.format(set_upstream_branch),
-            upstream_from_ref, scope='local')
 
 
 def _push_data(ds, target, content, data, force, jobs, res_kwargs,
