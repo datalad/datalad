@@ -18,6 +18,7 @@ import pytest
 from datalad.core.distributed.clone import Clone
 from datalad.core.distributed.push import (
     Push,
+    _get_branch_for_upstream_tracking,
     _set_upstream_from_push_results,
 )
 from datalad.distribution.dataset import Dataset
@@ -322,7 +323,11 @@ def test_push(annex):
 def check_push_set_upstream(annex, src_path, dst_path, dst_path2):
     ds = Dataset(src_path).create(annex=annex)
     ds_repo = ds.repo
-    branch = ds_repo.get_active_branch() or DEFAULT_BRANCH
+    # the branch that actually gets its tracking config set is the
+    # *corresponding* branch on annex-adjusted/managed filesystems, not
+    # necessarily the literal active branch -- resolve it the same way
+    # _push() itself does
+    branch = _get_branch_for_upstream_tracking(ds_repo) or DEFAULT_BRANCH
     mk_push_target(ds, 'target', dst_path, annex=annex)
     mk_push_target(ds, 'target2', dst_path2, annex=annex)
 
