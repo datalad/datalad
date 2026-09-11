@@ -44,6 +44,7 @@ from datalad.support.constraints import (
     EnsureStr,
 )
 from datalad.support.exceptions import CommandError
+from datalad.support.gitrepo import to_options
 from datalad.support.parallel import (
     ProducerConsumerProgressLog,
     no_subds_in_futures,
@@ -620,6 +621,23 @@ class Save(Interface):
                         logger=lgr)
                     return
                 _merged_datasets.add(pdspath)
+            elif (_no_merge and pdspath == ds.path and had_inner
+                    and pds_repo.get_hexsha() == start_commit):
+                # `had_inner` means this dataset had commits of its own
+                # (`run`'s command committing directly, e.g. gh-7925
+                # review) that would normally be wrapped in the merge
+                # above -- but a concurrent commit made that merge unsafe,
+                # so `_no_merge` suppressed it. If the plain save above
+                # also found nothing dirty left to commit (HEAD is still
+                # where it was when this call started), the run's own
+                # record has nowhere to land: it would be silently
+                # dropped even though `run_command()` reported success.
+                # Force a commit -- empty if need be -- carrying the run
+                # message, the same way `message` would otherwise have
+                # ended up on the (now suppressed) merge commit.
+                pds_repo.commit(
+                    msg=message,
+                    options=to_options(allow_empty=True))
 
             # report on the dataset itself
             dsres = dict(

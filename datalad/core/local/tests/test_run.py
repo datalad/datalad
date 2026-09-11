@@ -1735,3 +1735,73 @@ def test_run_explicit_concurrent_subdataset_only_no_merge(path=None):
     # the concurrent commit is untouched: a standalone, non-merge parent
     parent_msg = ds.repo.format_commit("%B", "HEAD^")
     assert_in("[DATALAD RUNCMD] concurrent", parent_msg)
+
+
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_explicit_concurrent_no_merge_self_committed(path=None):
+    """The run record survives when the command self-commits and no merge happens
+
+    A command run under `--explicit` may commit its own declared output
+    directly (bypassing datalad's own save), leaving nothing dirty for
+    `run_command()`'s own save step to pick up afterward. When a
+    concurrent `run`'s commit also lands -- in the window `_lock_save()`
+    guards -- and rules out wrapping the result in a merge (the same
+    situation as test_run_explicit_concurrent_subdataset_only_no_merge,
+    but here at the top level, on a normal, non-adjusted filesystem),
+    both routes that would normally carry this run's record -- the merge,
+    and an ordinary dirty-tree commit -- are unavailable. The record must
+    still land somewhere rather than being silently dropped even though
+    `run` reports success (gh-7925 review).
+    """
+    ds = Dataset(path).create()
+
+    # Simulate a concurrent `run`'s commit landing in the window between
+    # this command's own execution finishing and `_lock_save()` being
+    # entered -- same injection technique as
+    # test_run_explicit_concurrent_subdataset_only_no_merge.
+    def _lock_save_after_concurrent_commit(ds_):
+        (ds.pathobj / "elsewhere").write_text("y")
+        ds.repo.call_git(["add", "elsewhere"])
+        concurrent_msg = (
+            "[DATALAD RUNCMD] concurrent\n\n"
+            "=== Do not change lines below ===\n"
+            '{"cmd": "other", "exit": 0, "chain": [], '
+            '"inputs": [], "outputs": ["elsewhere"], "pwd": "."}\n'
+            "^^^ Do not change lines above ^^^\n\n"
+            "DataLad-Run-Ancestry: 0123456789abcdef0123456789abcdef\n"
+        )
+        ds.repo.call_git(["commit", "-m", concurrent_msg])
+        return _lock_save(ds_)
+
+    # The command commits its declared output *itself* (bypassing
+    # datalad's own save) -- nothing is left uncommitted for
+    # run_command()'s own save step to pick up via the ordinary
+    # working-tree diff.
+    cmd = [
+        sys.executable, "-c",
+        "import subprocess; "
+        "open('out', 'w').write('x'); "
+        "subprocess.check_call(['git', 'add', 'out']); "
+        "subprocess.check_call(['git', 'commit', '-m', 'own commit'])"
+    ]
+
+    with patch("datalad.core.local.run._lock_save",
+               side_effect=_lock_save_after_concurrent_commit):
+        res = ds.run(
+            cmd, outputs=["out"], explicit=True, message="outer",
+            on_failure='ignore', result_renderer='disabled')
+    assert_not_in_results(res, action='run', status='error')
+    assert_repo_status(ds.path)
+    # the outer command's record is not silently dropped ...
+    assert_in("[DATALAD RUNCMD] outer", last_commit_msg(ds.repo))
+    # ... but not as a merge that would subsume the concurrent record
+    _assert_no_run_merge(ds)
+    # ... it is its own (auxiliary, empty) commit -- it claims neither
+    # the command's own output (already committed beforehand) nor the
+    # concurrent run's file
+    eq_([str(p.relative_to(ds.pathobj))
+         for p in ds.repo.diff("HEAD^", "HEAD")], [])
+    # the concurrent commit is untouched: a standalone, non-merge parent
+    parent_msg = ds.repo.format_commit("%B", "HEAD^")
+    assert_in("[DATALAD RUNCMD] concurrent", parent_msg)
