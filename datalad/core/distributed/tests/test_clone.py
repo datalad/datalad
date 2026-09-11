@@ -1342,10 +1342,26 @@ def test_inherit_src_candidates(lcl=None, storepath=None, url=None):
             'ria+%s#{id}' % url)
 
 
-@skip_if_no_network
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+@serve_path_via_http
+def test_ria_http_local_store(lcl=None, storepath=None, url=None):
+    # hermetic stand-in for test_ria_http_storedataladorg (gh-7912).
+    # test_ria_http covers this too, but is @slow and so deselected by the
+    # default GitHub job's PYTEST_SELECTION.
+    ds = Dataset(op.join(lcl, 'ds')).create()
+    _move2store(Path(storepath), ds)
+    riaclone = clone('ria+{}#{}'.format(url, ds.id), op.join(lcl, 'clone'))
+    ok_(riaclone.is_installed())
+    eq_(riaclone.id, ds.id)
+
+
+# an outage of this external service is not a failure of this code base
+# (gh-7912), so gate on it actually answering rather than on network at large.
+@skip_if_no_network(url='http://store.datalad.org/')
+@pytest.mark.flaky(retries=2, delay=5, only_on=[IncompleteResultsError])
 @with_tempfile()
 def test_ria_http_storedataladorg(path=None):
-    # can we clone from the store w/o any dedicated config
     ds = clone('ria+http://store.datalad.org#{}'.format(datalad_store_testds_id), path)
     ok_(ds.is_installed())
     eq_(ds.id, datalad_store_testds_id)

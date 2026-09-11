@@ -23,7 +23,10 @@ from collections.abc import (
 )
 from itertools import count
 from queue import Queue
-from threading import Thread
+from threading import (
+    Lock,
+    Thread,
+)
 from time import sleep
 from typing import (
     Any,
@@ -681,14 +684,23 @@ def test_concurrent_generator_reading() -> None:
     )
     result_generator = threaded_runner.run()
 
+    # `_ResultGenerator.send()` hands out results in generation order, under
+    # its own lock.  This test used to observe that order in two unlocked
+    # steps -- `next()`, then `put()` -- so a thread preempted between them
+    # let other threads enqueue later results first, and the merged order
+    # drifted by an adjacent swap (gh-7910).  Serializing the observation
+    # with the handout makes `output_queue` reflect the generation order.
+    read_lock = Lock()
+
     def thread_main(thread_number: int, result_generator: Iterator[str], output_queue: Queue[tuple[int, Optional[str]]]) -> None:
         while True:
-            try:
-                output = next(result_generator)
-            except StopIteration:
-                output_queue.put((thread_number, None))
-                break
-            output_queue.put((thread_number, output))
+            with read_lock:
+                try:
+                    output = next(result_generator)
+                except StopIteration:
+                    output_queue.put((thread_number, None))
+                    break
+                output_queue.put((thread_number, output))
 
     caller_threads = []
     for c in range(number_of_threads):
