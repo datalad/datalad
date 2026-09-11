@@ -66,6 +66,7 @@ from datalad.utils import (
     get_dataset_root,
     getpwd,
     join_cmdline,
+    path_is_subpath,
     quote_cmdlinearg,
 )
 
@@ -100,6 +101,184 @@ def _parse_sub_status(sub_status_output, ds_path):
             sha, relpath = parts[0], parts[1]
             result[op.join(ds_path, relpath)] = sha
     return result
+
+
+RUN_COMMIT_MARKER = '[DATALAD RUNCMD]'
+RUN_RECORD_MARKER = '=== Do not change lines below ==='
+# commit message git-annex uses for the commits it makes to maintain an
+# adjusted branch (cf. AnnexRepo._save_post(), which matches it likewise)
+ANNEX_ADJUSTMENT_MESSAGE = 'git-annex adjusted branch'
+
+
+def _is_run_commit_message(message):
+    """Return whether a commit message carries a `run` record"""
+    return message.startswith(RUN_COMMIT_MARKER) \
+        and RUN_RECORD_MARKER in message
+
+
+def _is_annex_adjustment_commit(message):
+    """Return whether a commit is git-annex's own branch adjustment"""
+    return message.strip() == ANNEX_ADJUSTMENT_MESSAGE
+
+
+def _iter_commits(repo, base, head):
+    """Yield ``(hexsha, parents, message)`` for a ``base..head`` chain
+
+    The first-parent chain is followed, which is what makes a "run merge"
+    commit (cf. ``datalad save --since``) represent everything it wraps:
+    its subsumed commits live on the second parent.
+
+    Parameters
+    ----------
+    repo : GitRepo
+    base, head : str
+      Any commit-ish that delimits the range to report on.
+    """
+    # a single git call for all commits and their full messages. A NUL
+    # byte cannot occur in a commit message, so it can delimit both the
+    # fields and the records without any escaping
+    out = repo.call_git(
+        ['log', '--first-parent', '--format=%H%x00%P%x00%B%x00',
+         '{}..{}'.format(base, head)])
+    # ..., git terminates each record with a newline of its own
+    fields = out.split('\0')
+    for hexsha, parents, message in zip(fields[::3], fields[1::3],
+                                        fields[2::3]):
+        hexsha = hexsha.strip('\n')
+        if hexsha:
+            yield hexsha, parents.split(), message
+
+
+def _iter_command_commits(repo, base, head):
+    """Like ``_iter_commits()``, but skipping git-annex's own commits
+
+    On an adjusted branch git-annex maintains the branch with commits of
+    its own. Those re-render content that is committed elsewhere in the
+    chain and are the doing of no command, so they neither need a `run`
+    record nor make one.
+
+    Parameters
+    ----------
+    repo : GitRepo
+    base, head : str
+      Any commit-ish that delimits the range to report on.
+    """
+    for hexsha, parents, message in _iter_commits(repo, base, head):
+        if _is_annex_adjustment_commit(message):
+            lgr.debug('Skipping git-annex adjustment commit %s', hexsha)
+            continue
+        yield hexsha, parents, message
+
+
+def _unrecorded_commit_paths(repo, base, head):
+    """Report paths committed in ``base..head`` without a `run` record
+
+    A commit made by a (nested) `datalad run` documents its own
+    provenance completely, hence the files it contains are not
+    undeclared side-effects of an outer command (gh-7900). Only changes
+    introduced by commits *without* such a record are reported here.
+
+    Parameters
+    ----------
+    repo : GitRepo
+    base, head : str
+      Any commit-ish that delimits the range to report on.
+
+    Returns
+    -------
+    set of Path
+      Absolute paths of the modified content.
+    """
+    unrecorded = set()
+    for hexsha, parents, message in _iter_command_commits(repo, base, head):
+        if _is_run_commit_message(message):
+            continue
+        # a commit without a parent introduced everything it contains
+        unrecorded.update(
+            repo.diff(parents[0] if parents else None, hexsha))
+    return unrecorded
+
+
+def _is_run_recorded_range(repo, base, head):
+    """Return whether ``base..head`` is non-empty and fully `run`-recorded"""
+    if not any(True for _ in _iter_commits(repo, base, head)):
+        return False
+    return all(_is_run_commit_message(m)
+               for _, _, m in _iter_command_commits(repo, base, head))
+
+
+def _is_run_recorded_subds(path, props):
+    """Return whether a subdataset pointer move is covered by `run` commits
+
+    Parameters
+    ----------
+    path : Path
+      Absolute path of the subdataset.
+    props : dict
+      Properties of the respective ``diff()`` report on the subdataset.
+    """
+    if props.get('type') != 'dataset':
+        return False
+    prev_sha = props.get('prev_gitshasum')
+    sha = props.get('gitshasum')
+    if not prev_sha or not sha:
+        return False
+    subrepo = Dataset(str(path)).repo
+    if subrepo is None:
+        # not installed (anymore), we cannot tell
+        lgr.debug('Cannot inspect commits of uninstalled subdataset %s', path)
+        return False
+    return _is_run_recorded_range(subrepo, prev_sha, sha)
+
+
+def _get_dirty_inputs(ds, globbed_inputs, pwd):
+    """Report declared inputs that have unsaved modifications
+
+    Untracked content is only reported when it is a declared input
+    itself, and not when it merely happens to be inside a declared
+    directory.
+
+    Parameters
+    ----------
+    ds : Dataset
+    globbed_inputs : GlobbedPaths
+    pwd : str
+      Absolute path the input specification is relative to.
+
+    Returns
+    -------
+    list of (str, str)
+      Sorted ``(path relative to the dataset, state)`` tuples.
+    """
+    abspaths = [
+        p for p in (op.normpath(op.join(pwd, ip))
+                    for ip in globbed_inputs.expand_strict())
+        # an input that is not in this dataset is not ours to judge, it is
+        # reported by the input preparation instead
+        if p == ds.path or path_is_subpath(p, ds.path)
+    ]
+    if not abspaths:
+        return []
+    declared = {op.relpath(p, ds.path) for p in abspaths}
+    dirty = []
+    for p, props in ds.repo.status(
+            paths=abspaths,
+            untracked='normal',
+            # a comprehensive evaluation of a subdataset worktree could
+            # be arbitrarily expensive, the recorded commit is what a
+            # `rerun` would restore
+            eval_submodule_state='commit').items():
+        state = props.get('state')
+        if state in (None, 'clean'):
+            continue
+        # ATTN: relpath() rather than Path.relative_to(), the status
+        # report is anchored at the repo, which need not be the same
+        # path as the dataset (symlinks)
+        relpath = op.relpath(str(p), ds.repo.pathobj)
+        if state == 'untracked' and relpath not in declared:
+            continue
+        dirty.append((relpath, state))
+    return sorted(dirty)
 
 
 assume_ready_opt = Parameter(
@@ -152,6 +331,18 @@ class Run(Interface):
     interpretable and re-executable in the actual top-level superdataset. For
     this reason the provenance record contains the dataset ID of that
     superdataset.
+
+    *Nested execution*
+
+    || REFLOW >>
+    A command may run `datalad run` itself. Such a nested run records its own
+    provenance completely, hence its commits are not reported as undeclared
+    modifications of the enclosing command, which only needs to declare the
+    outputs it produces itself. Any *other* commit that a command creates in
+    [CMD: --explicit CMD][PY: `explicit` PY] mode must be covered by an output
+    declaration -- set the configuration variable
+    'datalad.run.dirty-committed' to 'ignore' to disable that check.
+    << REFLOW ||
 
     *Command format*
 
@@ -290,7 +481,11 @@ class Run(Interface):
             action="store_true",
             doc="""Consider the specification of inputs and outputs to be
             explicit. Don't warn if the repository is dirty, and only save
-            modifications to the listed outputs."""),
+            modifications to the listed outputs. A declared input with
+            unsaved modifications is refused, because the run record could
+            not describe the state the command was given: save it, or use
+            [CMD: --assume-ready=inputs CMD][PY: `assume_ready='inputs'` PY]
+            to proceed regardless."""),
         message=save_message_opt,
         sidecar=Parameter(
             args=('--sidecar',),
@@ -598,7 +793,9 @@ def _unlock_or_remove(dset_path, paths, remove=False):
                 to_remove.append(res)
                 continue
             elif (
-                res["status"] == "error" and res["error_message"] == "File unknown to git"
+                res["status"] == "error"
+                # not every error result comes with this key
+                and res.get("error_message") == "File unknown to git"
                 and op.isdir(res["path"]) and not os.listdir(res["path"])
             ):
                 lgr.debug("Empty directory %(path)s is not known to git, skipping unlock", res)
@@ -973,6 +1170,24 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 'placeholder: %s', exc))
         return
 
+    # Under --explicit a dirty dataset is acceptable, but a declared
+    # *input* with unsaved modifications is not: the run record would
+    # name an input state that is nowhere recorded, and a `rerun` would
+    # use the committed one instead (gh-5312, gh-3565). Checked before
+    # any worktree preparation, so that a rejected run leaves no trace.
+    if explicit and not (inject or dry_run or skip_dirtycheck) \
+            and assume_ready not in ('inputs', 'both'):
+        dirty_inputs = _get_dirty_inputs(ds, globbed['inputs'], pwd)
+        if dirty_inputs:
+            yield get_status_dict(
+                'run', ds=ds, status='impossible',
+                message=(
+                    'declared inputs have unsaved modifications: %s. '
+                    'Save them, or run with --assume-ready=inputs',
+                    ['{} [{}]'.format(ipath, istate)
+                     for ipath, istate in dirty_inputs]))
+            return
+
     if not (inject or dry_run):
         yield from _prep_worktree(
             ds_path, pwd, globbed,
@@ -1167,8 +1382,15 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     # since there is no declaration to check against.
     if cmd_made_commits and explicit and has_declared_outputs:
         committed_diff = ds.repo.diff(pre_cmd_hexsha, post_cmd_hexsha)
+        # anything that a (nested) `datalad run` committed comes with a
+        # complete provenance record of its own, and is no undeclared
+        # side-effect of this command (gh-7900) -- only consider content
+        # that was committed without such a record
+        unrecorded = _unrecorded_commit_paths(
+            ds.repo, pre_cmd_hexsha, post_cmd_hexsha)
         committed_paths = {
-            str(p.relative_to(ds.pathobj)) for p in committed_diff
+            str(p.relative_to(ds.pathobj)) for p, props in committed_diff.items()
+            if p in unrecorded and not _is_run_recorded_subds(p, props)
         }
         # Normalize declared outputs to relative-to-dataset format
         declared_set = set()

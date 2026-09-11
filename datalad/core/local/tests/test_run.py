@@ -67,6 +67,7 @@ from datalad.tests.utils_pytest import (
     ok_exists,
     ok_file_has_content,
     patch_config,
+    skip_if_adjusted_branch,
     slow,
     swallow_logs,
     swallow_outputs,
@@ -1320,3 +1321,210 @@ def test_run_merge_subdataset_deletions(path=None):
 
     # super also has merge
     _assert_run_merge(ds)
+
+
+# -- Tests for the `--explicit` contract: inputs, outputs, nesting --
+
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_explicit_dirty_inputs(path=None):
+    """`--explicit` must not run with modified declared inputs (gh-5312)"""
+    ds = Dataset(path).create(annex=False)
+    create_tree(ds.path, {"in.dat": "content",
+                          "data": {"tracked.dat": "tracked"}})
+    ds.save()
+    write_cmd = "{} -c \"open('out.dat', 'w').write('x')\"".format(
+        sys.executable)
+
+    def _run(**kwargs):
+        return ds.run(write_cmd, outputs=["out.dat"], explicit=True,
+                      on_failure='ignore', result_renderer='disabled',
+                      **kwargs)
+
+    # a clean input is no problem
+    assert_in_results(_run(inputs=["in.dat"]), action='run', status='ok')
+
+    # ... but a modified one is
+    (ds.pathobj / "in.dat").write_text("modified")
+    hexsha_before = ds.repo.get_hexsha()
+    res = _run(inputs=["in.dat"])
+    assert_in_results(res, action='run', status='impossible')
+    ok_(any('unsaved modifications' in str(r.get('message', ''))
+            for r in res))
+    # the command was not executed and no output was prepared, the only
+    # modification is the one we made ourselves
+    eq_(hexsha_before, ds.repo.get_hexsha())
+    assert_repo_status(ds.path, modified=["in.dat"])
+
+    # an unrelated dirty file is still no problem -- that is what
+    # --explicit is for
+    assert_in_results(_run(inputs=["data/tracked.dat"]), action='run', status='ok')
+
+    # the escape hatch: the caller knows what they are doing
+    assert_in_results(_run(inputs=["in.dat"], assume_ready="inputs"), action='run', status='ok')
+    assert_in_results(_run(inputs=["in.dat"], assume_ready="both"), action='run', status='ok')
+
+    ds.save()
+    assert_repo_status(ds.path)
+
+    # untracked content that is a declared input itself is reported...
+    create_tree(ds.path, {"untracked.dat": "untracked",
+                          "data": {"untracked.dat": "untracked"}})
+    assert_in_results(_run(inputs=["untracked.dat"]),
+                      action='run', status='impossible')
+    # ...but untracked content that merely sits inside a declared
+    # directory is not
+    assert_in_results(_run(inputs=["data"]), action='run', status='ok')
+
+    # inputs declared from a subdirectory are reported relative to the
+    # dataset, and are found in the first place
+    create_tree(ds.path, {"data": {"in.dat": "content"}})
+    ds.save()
+    (ds.pathobj / "data" / "in.dat").write_text("modified")
+    with chpwd(op.join(ds.path, "data")):
+        res = run(write_cmd, outputs=["out.dat"], inputs=["in.dat"],
+                  explicit=True, on_failure='ignore',
+                  result_renderer='disabled')
+    assert_in_results(res, action='run', status='impossible')
+    ok_(any('data/in.dat' in str(r.get('message', '')) for r in res))
+    ds.save()
+
+    # without --explicit nothing changes: any dirty dataset is refused
+    # outright, as before
+    (ds.pathobj / "in.dat").write_text("modified once more")
+    assert_in_results(
+        ds.run(write_cmd, inputs=["in.dat"], outputs=["out.dat"],
+               on_failure='ignore', result_renderer='disabled'),
+        action='run', status='impossible')
+
+
+def _write_sweep_script(scriptpath):
+    """Write a script performing two `run`s of its own, plus a summary"""
+    sweep = op.join(scriptpath, "sweep.py")
+    with open(sweep, "w") as f:
+        f.write(
+            "import sys\n"
+            "from datalad.api import run\n"
+            "for i in ('1', '2'):\n"
+            "    run(cmd=[sys.executable, '-c',\n"
+            "             \"open('o' + %r, 'w').write('x')\" % i],\n"
+            "        outputs=['o' + i], explicit=True,\n"
+            "        message='cell ' + i, result_renderer='disabled')\n"
+            "open('summary.txt', 'w').write('done')\n")
+    return sweep
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_explicit_nested_run(path=None, scriptpath=None):
+    """Commits of a nested `run` are no undeclared side-effect (gh-7900)"""
+    ds = Dataset(path).create()
+    sweep = _write_sweep_script(scriptpath)
+
+    # the outer run declares nothing but its own output
+    res = ds.run([sys.executable, sweep],
+                 outputs=["summary.txt"], explicit=True,
+                 message="sweep",
+                 on_failure='ignore', result_renderer='disabled')
+    assert_not_in_results(res, action='run', status='error')
+    assert_repo_status(ds.path)
+    for f in ("o1", "o2", "summary.txt"):
+        ok_((ds.pathobj / f).exists())
+
+    # every command has a record of its own, the outer one declaring
+    # only what it produced itself
+    records = [
+        get_run_info(ds, ds.repo.format_commit("%B", rev))[1]
+        for rev in ds.repo.get_revisions(options=["--grep", "DATALAD RUNCMD"])
+    ]
+    eq_(len(records), 3)
+    eq_(sorted(r["outputs"][0] for r in records),
+        ["o1", "o2", "summary.txt"])
+    # the outer record wraps the inner commits in a merge
+    _assert_run_merge(ds)
+
+    # a plain commit of an undeclared file is still reported, its
+    # provenance is *not* recorded anywhere
+    res = ds.run(
+        '{} -c "open(\'undeclared\', \'w\').write(\'x\')" '
+        '&& git add undeclared && git commit -m "inner"'.format(
+            sys.executable),
+        outputs=["declared"], explicit=True,
+        on_failure='ignore', result_renderer='disabled')
+    assert_in_results(res, action='run', status='error')
+    ok_(any('not declared as --output' in str(r.get('message', ''))
+            for r in res))
+
+
+@skip_if_adjusted_branch  # a plain branch is adjusted below
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_explicit_nested_run_adjusted(path=None, scriptpath=None):
+    """git-annex's own commits are no undeclared output either
+
+    On an adjusted branch git-annex maintains the branch with commits of
+    its own, which carry no `run` record and re-render the content of the
+    commits they follow.
+    """
+    ds = Dataset(path).create()
+    ds.repo.call_annex(["adjust", "--unlock"])
+    ok_(ds.repo.is_managed_branch())
+
+    res = ds.run([sys.executable, _write_sweep_script(scriptpath)],
+                 outputs=["summary.txt"], explicit=True, message="sweep",
+                 on_failure='ignore', result_renderer='disabled')
+    assert_not_in_results(res, action='run', status='error')
+    assert_repo_status(ds.path)
+    for f in ("o1", "o2", "summary.txt"):
+        ok_((ds.pathobj / f).exists())
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+@pytest.mark.ai_generated
+def test_run_explicit_nested_run_in_subdataset(path=None, scriptpath=None):
+    """A subdataset pointer move is judged by the subdataset's commits"""
+    ds = Dataset(path).create()
+    ds.create("sub")
+    assert_repo_status(ds.path)
+
+    def _cmd(inner):
+        # a command that produces a commit in the subdataset -- by a
+        # nested `run` or a plain one -- and records the new pointer
+        script = op.join(scriptpath, "cmd_%s.py" % inner)
+        with open(script, "w") as f:
+            f.write(
+                "import os, subprocess, sys\n"
+                "top = os.getcwd()\n"
+                "os.chdir('sub')\n"
+                + ("from datalad.api import run\n"
+                   "run(cmd=[sys.executable, '-c',"
+                   " \"open('inner_run', 'w').write('x')\"],\n"
+                   "    outputs=['inner_run'], explicit=True,\n"
+                   "    message='inner', result_renderer='disabled')\n"
+                   if inner == "run" else
+                   "open('inner_plain', 'w').write('x')\n"
+                   "subprocess.check_call(['git', 'add', 'inner_plain'])\n"
+                   "subprocess.check_call("
+                   "['git', 'commit', '-m', 'plain inner commit'])\n")
+                + "os.chdir(top)\n"
+                "subprocess.check_call(['git', 'add', 'sub'])\n"
+                "subprocess.check_call("
+                "['git', 'commit', '-m', 'record sub pointer'])\n"
+                "open('declared', 'w').write(%r)\n" % inner)
+        return ds.run([sys.executable, script], outputs=["declared"],
+                      explicit=True, message="outer",
+                      on_failure='ignore', result_renderer='disabled')
+
+    # the subdataset's new commit has a run record: the pointer move is
+    # recorded provenance, not an undeclared modification
+    assert_not_in_results(_cmd("run"), action='run', status='error')
+    assert_repo_status(ds.path)
+
+    # a plain commit in the subdataset is still reported
+    res = _cmd("plain")
+    assert_in_results(res, action='run', status='error')
+    ok_(any('not declared as --output' in str(r.get('message', ''))
+            for r in res))
