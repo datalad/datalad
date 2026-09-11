@@ -748,14 +748,9 @@ def _append_branch_to_refspec_if_needed(ds, refspecs, branch):
 
 
 def _get_branch_for_upstream_tracking(repo):
-    """Return the branch relevant for `push --set-upstream/-u` bookkeeping
-
-    This is the active branch, resolved to its corresponding branch when
-    on an annex-adjusted/managed branch (mirroring the pre-existing,
-    equally managed-branch-aware resolution used for refspec
-    construction a few lines above in `_push()`). Returns None when
-    there is no active branch (e.g. detached HEAD).
-    """
+    """Return the active branch, resolved to its corresponding branch
+    when on an annex-adjusted/managed branch. None if there is no
+    active branch (e.g. detached HEAD)."""
     active_branch = repo.get_active_branch()
     if active_branch and isinstance(repo, AnnexRepo):
         # we could face a managed branch, in which case we need to
@@ -770,40 +765,13 @@ def _get_branch_for_upstream_tracking(repo):
 
 def _set_upstream_from_push_results(push_results, repo, branch, target,
                                      res_kwargs):
-    """Wrap a `_push()`/`_push_refspecs()` result generator to additionally
-    configure upstream tracking for `branch`, mirroring `git push -u`
+    """Wrap a push-result generator, configuring `branch` to track
+    `target` (mirroring `git push -u`) once it sees `branch` pushed
+    there -- reported as 'impossible' instead if `branch` is falsy
+    (e.g. detached HEAD).
 
-    If `branch` is falsy (e.g. detached HEAD, so there is nothing
-    meaningful to track), this reports that explicitly as an
-    'impossible' result up front, rather than silently ignoring
-    --set-upstream/-u, and otherwise passes `push_results` through
-    unchanged (the push itself still proceeds).
-
-    Otherwise, as soon as a successful (or already up-to-date) push of
-    `branch` to the explicitly requested `target` is seen, the
-    corresponding `branch.<branch>.{remote,merge}` tracking config is
-    written -- eagerly, at the point that particular result is yielded,
-    rather than only once `push_results` is fully drained: a consumer
-    using `on_failure='stop'` can stop pulling further results as soon
-    as a *different*, later refspec in the same push errors, which
-    would otherwise silently skip configuring the tracking branch
-    despite this one having already succeeded.
-
-    Deliberately implemented by inspecting the already-computed push
-    results (rather than passing a native `--set-upstream` flag through
-    to the underlying `git push`, the way `--force` is passed through
-    in `_push_refspecs()`): git's native flag marks *every* branch that
-    is up-to-date or successfully pushed in the same invocation as
-    upstream-tracking, which would also cover the `git-annex` branch
-    (and any other refspec batched into the same push call), not just
-    the one branch the user asked to track.
-
-    This intentionally lives here, wrapping `_push()`'s result stream
-    from the outside in `Push.__call__`, rather than as a parameter
-    threaded through `_push()`/`_push_refspecs()`: those two functions
-    are reused/replaced wholesale by at least one known extension
-    (`datalad-next`'s push-optimization patch), so their call signature
-    needs to stay stable.
+    Kept outside of `_push()`/`_push_refspecs()`, whose signatures are
+    relied upon (and fully replaced) by at least one extension.
     """
     if not branch:
         yield dict(

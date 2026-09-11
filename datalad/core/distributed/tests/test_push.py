@@ -16,7 +16,10 @@ import os
 import pytest
 
 from datalad.core.distributed.clone import Clone
-from datalad.core.distributed.push import Push
+from datalad.core.distributed.push import (
+    Push,
+    _set_upstream_from_push_results,
+)
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
@@ -351,15 +354,9 @@ def test_push_set_upstream(annex):
 
 
 def test_set_upstream_from_push_results_written_eagerly():
-    # regression test: the upstream-tracking config for a --set-upstream
-    # request must be written as soon as the corresponding push result is
-    # processed, not deferred until the whole result generator has been
-    # drained. A caller using on_failure='stop' can stop consuming results
-    # as soon as a *different*, later result in the same push errors --
-    # which must not suppress configuring the tracking branch for an
-    # *earlier* result that already succeeded.
-    from datalad.core.distributed.push import _set_upstream_from_push_results
-
+    # tracking config must be written as each matching result is seen,
+    # not deferred until the generator is fully drained (on_failure='stop'
+    # can stop consumption right after an unrelated, later result errors)
     calls = []
 
     class FakeConfig:
@@ -392,11 +389,8 @@ def test_set_upstream_from_push_results_written_eagerly():
 
 
 def test_set_upstream_from_push_results_no_active_branch():
-    # a falsy `branch` (e.g. detached HEAD) must be reported explicitly,
-    # rather than silently doing nothing, while still passing the
-    # underlying push results through unchanged
-    from datalad.core.distributed.push import _set_upstream_from_push_results
-
+    # a falsy `branch` (e.g. detached HEAD) is reported explicitly, and
+    # the underlying push results still come through unchanged
     fake_push_results = iter([dict(status='ok', target='target',
                                     refspec='refs/heads/x:refs/heads/x')])
     gen = _set_upstream_from_push_results(
