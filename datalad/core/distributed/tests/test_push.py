@@ -102,6 +102,13 @@ def test_invalid_call(origin=None, tdir=None):
         ValueError,
         ds.push, to='target', since='')
 
+    # --set-upstream/-u without an explicit --to target is not supported,
+    # "upstream" only makes sense relative to one specific sibling
+    # (see https://github.com/datalad/datalad/issues/7917)
+    assert_raises(
+        ValueError,
+        ds.push, set_upstream=True)
+
 
 @pytest.mark.ai_generated
 @with_tempfile(mkdir=True)
@@ -304,6 +311,43 @@ def check_push(annex, src_path, dst_path):
 @pytest.mark.parametrize("annex", [False, True])
 def test_push(annex):
     check_push(annex)
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def check_push_set_upstream(annex, src_path, dst_path, dst_path2):
+    ds = Dataset(src_path).create(annex=annex)
+    ds_repo = ds.repo
+    branch = ds_repo.get_active_branch() or DEFAULT_BRANCH
+    mk_push_target(ds, 'target', dst_path, annex=annex)
+    mk_push_target(ds, 'target2', dst_path2, annex=annex)
+
+    # sanity check: no tracking branch is set up yet
+    eq_(ds_repo.get_tracking_branch(branch), (None, None))
+
+    # a plain push (first ever push to 'target') does not set up tracking
+    res = ds.push(to='target', **ckwa)
+    assert_status('ok', res)
+    eq_(ds_repo.get_tracking_branch(branch), (None, None))
+
+    # a fresh push to a different sibling ('target2') with
+    # --set-upstream/-u does set up tracking after a successful push
+    res = ds.push(to='target2', set_upstream=True, **ckwa)
+    assert_status('ok', res)
+    tracking_remote, tracking_branch = ds_repo.get_tracking_branch(branch)
+    eq_(tracking_remote, 'target2')
+    eq_(tracking_branch, 'refs/heads/{}'.format(branch))
+    # and directly via the underlying git config, just like `git push -u`
+    # would leave it
+    eq_(ds_repo.config.get('branch.{}.remote'.format(branch)), 'target2')
+    eq_(ds_repo.config.get('branch.{}.merge'.format(branch)),
+        'refs/heads/{}'.format(branch))
+
+
+@pytest.mark.parametrize("annex", [False, True])
+def test_push_set_upstream(annex):
+    check_push_set_upstream(annex)
 
 
 def check_datasets_order(res, order='bottom-up'):

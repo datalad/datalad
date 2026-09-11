@@ -132,6 +132,13 @@ class Push(Interface):
             combine all force modes ('all').""",
             constraints=EnsureChoice(
                 'all', 'gitpush', 'checkdatapresent', None)),
+        set_upstream=Parameter(
+            args=("-u", "--set-upstream"),
+            action="store_true",
+            doc="""configure the current branch to track the pushed-to
+            sibling, analogous to 'git push --set-upstream'. Requires
+            [CMD: --to CMD][PY: `to` PY] to unambiguously identify the
+            sibling to track."""),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         jobs=jobs_opt,
@@ -183,6 +190,7 @@ class Push(Interface):
             since=None,
             data='auto-if-wanted',
             force=None,
+            set_upstream=False,
             recursive=False,
             recursion_limit=None,
             jobs=None):
@@ -190,6 +198,10 @@ class Push(Interface):
         # behavior. '' was/is (to be deprecated) used in `publish`. Alert user about the mistake
         if since == '':
             raise ValueError("'since' should point to commitish or use '^'.")
+        if set_upstream and not to:
+            raise ValueError(
+                "--set-upstream/-u requires an explicit sibling to be "
+                "given via --to.")
         # we resolve here, because we need to perform inspection on what was given
         # as an input argument further down
         paths = [resolve_path(p, dataset) for p in ensure_list(path)]
@@ -254,7 +266,8 @@ class Push(Interface):
             pbars = {}
             yield from _push(
                 dspath, dsrecords, to, data, force, jobs, res_kwargs.copy(), pbars,
-                got_path_arg=True if path else False)
+                got_path_arg=True if path else False,
+                set_upstream=set_upstream)
             # take down progress bars for this dataset
             for i, ds in pbars.items():
                 log_progress(lgr.info, i, 'Finished push of %s', ds)
@@ -421,7 +434,7 @@ def _transfer_data(repo, ds, target, content, data, force, jobs, res_kwargs,
 
 
 def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
-          got_path_arg=False):
+          got_path_arg=False, set_upstream=False):
     force_git_push = force in ('all', 'gitpush')
 
     # nothing recursive in here, we only need a repo to work with
@@ -719,6 +732,10 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
         refspecs2push,
         force_git_push,
         res_kwargs.copy(),
+        # only the explicitly requested target sibling (not any
+        # publication dependency) gets to become the upstream of the
+        # active branch, mirroring `git push -u`
+        set_upstream_branch=active_branch if set_upstream else None,
     )
 
 
@@ -734,7 +751,8 @@ def _append_branch_to_refspec_if_needed(ds, refspecs, branch):
         )
 
 
-def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs):
+def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs,
+                    set_upstream_branch=None):
     push_res = repo.push(
         remote=target,
         refspec=refspecs,
@@ -742,13 +760,19 @@ def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs):
     )
     # TODO maybe compress into a single message whenever everything is
     # OK?
+    # ref of `set_upstream_branch`, if any, to recognize the corresponding
+    # push result below and to use as the value for `branch.*.merge`
+    upstream_from_ref = 'refs/heads/{}'.format(set_upstream_branch) \
+        if set_upstream_branch else None
+    upstream_pushed = False
     for pr in push_res:
         ops = pr['operations']
+        is_error = any(o in ops for o in (
+            'error', 'no-match', 'rejected', 'remote-rejected',
+            'remote-failure'))
         status = (
             'error'
-            if any(o in ops for o in (
-                'error', 'no-match', 'rejected', 'remote-rejected',
-                'remote-failure'))
+            if is_error
             else 'notneeded'
             if 'uptodate' in pr['operations']
             else 'ok'
@@ -759,6 +783,11 @@ def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs):
             # impossible to achieve
             else 'impossible'
         )
+        if not is_error and pr['from_ref'] == upstream_from_ref:
+            # the branch we were asked to set up as upstream-tracking
+            # was pushed (or was already up-to-date) -- same condition
+            # `git push --set-upstream` itself uses
+            upstream_pushed = True
         refspec = '{}:{}'.format(pr['from_ref'], pr['to_ref'])
         yield dict(
             res_kwargs,
@@ -777,6 +806,16 @@ def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs):
                 pr['to_ref'],
                 pr['note']),
         )
+
+    if upstream_pushed:
+        # mimic `git push --set-upstream`: point the pushed branch's
+        # tracking configuration at the sibling it was just pushed to
+        repo.config.set(
+            'branch.{}.remote'.format(set_upstream_branch), target,
+            scope='local')
+        repo.config.set(
+            'branch.{}.merge'.format(set_upstream_branch),
+            upstream_from_ref, scope='local')
 
 
 def _push_data(ds, target, content, data, force, jobs, res_kwargs,
