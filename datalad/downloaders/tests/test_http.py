@@ -9,11 +9,15 @@
 """Tests for http downloader"""
 
 import builtins
+import errno
 import os
 import re
 import time
 from calendar import timegm
+from http.client import IncompleteRead
 from os.path import join as opj
+
+from urllib3.exceptions import ProtocolError
 
 from datalad.downloaders.providers import Providers
 from datalad.downloaders.tests.utils import get_test_providers
@@ -41,6 +45,7 @@ from ..http import (
     HTTPBaseAuthenticator,
     HTTPBearerTokenAuthenticator,
     HTTPDownloader,
+    HTTPDownloaderSession,
     HTTPTokenAuthenticator,
     process_www_authenticate,
 )
@@ -63,6 +68,7 @@ import pytest
 from ...support.exceptions import (
     AccessDeniedError,
     AnonymousAccessDeniedError,
+    CapturedException,
 )
 from ...support.network import get_url_disposition_filename
 from ...support.status import FileStatus
@@ -76,6 +82,7 @@ from ...tests.utils_pytest import (
     assert_raises,
     known_failure_githubci_win,
     ok_file_has_content,
+    patch_config,
     serve_path_via_http,
     skip_if,
     skip_if_no_network,
@@ -889,6 +896,84 @@ def test_server_error_retry(toppath=None, topurl=None):
     # Ensure test runs fast (sleep is mocked) - fail if implementation changes
     # and starts sleeping for real
     assert elapsed < 1.0, f"Test took {elapsed:.1f}s, expected < 1s (is sleep mocked?)"
+
+
+@with_tree(tree=[('file.dat', 'abc')])
+@serve_path_via_http
+def test_interrupted_transfer_retry(toppath=None, topurl=None):
+    """Test that a transfer interrupted mid-way is retried, unlike a full disk
+
+    See https://github.com/ReproNim/containers/issues/169
+    """
+    furl = "%sfile.dat" % topurl
+    tfpath = opj(toppath, "downloaded.dat")
+    downloader = HTTPDownloader()
+
+    _orig_download = HTTPDownloaderSession.download
+
+    def _failing_download(nfailures, raiser):
+        """Fail `nfailures` transfers mid-way via `raiser`, then succeed"""
+        tried = [0]
+
+        def download(self, f=None, pbar=None, size=None):
+            tried[0] += 1
+            if tried[0] > nfailures:
+                return _orig_download(self, f=f, pbar=pbar, size=size)
+            if f is not None:
+                f.write(b'a')
+            raiser()
+
+        download.tried = tried
+        return download
+
+    def _lose_connection():
+        # this is how urllib3 reports a connection dropped mid-transfer
+        try:
+            raise IncompleteRead(b'a', 2)
+        except IncompleteRead as e:
+            raise ProtocolError("Connection broken: %r" % e, e) from e
+
+    def _run_out_of_space():
+        raise OSError(errno.ENOSPC, "No space left on device")
+
+    # mock time.sleep to not actually wait out the backoff
+    with patch('datalad.downloaders.base.time.sleep') as sleeper:
+        # a couple of dropped connections are ridden out
+        failing = _failing_download(2, _lose_connection)
+        with patch.object(HTTPDownloaderSession, 'download', failing), \
+                swallow_logs():
+            assert_equal(downloader.download(furl, tfpath, overwrite=True),
+                         tfpath)
+        ok_file_has_content(tfpath, 'abc')
+        assert_equal(failing.tried[0], 3)
+        # ... backing off in between, rather than hammering the server
+        assert_greater(sleeper.call_count, 1)
+
+        # but not indefinitely -- datalad.downloaders.retry says how often
+        with patch_config({'datalad.downloaders.retry': '2'}):
+            failing = _failing_download(10, _lose_connection)
+            with patch.object(HTTPDownloaderSession, 'download', failing), \
+                    swallow_logs():
+                with assert_raises(IncompleteDownloadError) as cm:
+                    downloader.download(furl, tfpath, overwrite=True)
+            assert_equal(failing.tried[0], 3)  # initial attempt + 2 retries
+
+        # the report says how far the transfer got and how much room it had,
+        # to tell a truncated response apart from a file system which filled up
+        assert_in("free on the file system", str(cm.value))
+        # and the underlying failure is reported only once, as the cause
+        assert_equal(str(CapturedException(cm.value)).count('-caused by-'), 1)
+
+        # running out of space, on the other hand, is not retried at all:
+        # trying again would not free up any space
+        failing = _failing_download(10, _run_out_of_space)
+        with patch.object(HTTPDownloaderSession, 'download', failing), \
+                swallow_logs():
+            with assert_raises(DownloadError) as cm:
+                downloader.download(furl, tfpath, overwrite=True)
+        assert_equal(failing.tried[0], 1)
+        assert_in("Ran out of space", str(cm.value))
+        assert_false(isinstance(cm.value, IncompleteDownloadError))
 
 
 @with_tree(tree=[('file.dat', 'abc')])
