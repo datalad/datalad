@@ -10,6 +10,7 @@
 
 import builtins
 import errno
+import logging
 import os
 import re
 import time
@@ -196,17 +197,19 @@ def test_HTTPDownloader_basic(toppath=None, topurl=None):
             raise IncompleteDownloadError()
         return _verify_download
 
-    with patch.object(BaseDownloader, '_verify_download', _fail_verify_download(6)), \
-        swallow_logs():
-            # how was before the "fix":
-            #assert_raises(DownloadError, downloader.fetch, furl)
-            #assert_raises(DownloadError, downloader.fetch, furl)
-            # now should download just fine
-            assert_equal(downloader.fetch(furl), 'abc')
-    # but should fail if keeps failing all 5 times and then on 11th should raise DownloadError
-    with patch.object(BaseDownloader, '_verify_download', _fail_verify_download(7)), \
-        swallow_logs():
-            assert_raises(DownloadError, downloader.fetch, furl)
+    # retries back off nowadays, so mock the sleeping away to keep this quick
+    with patch('datalad.downloaders.base.time.sleep'):
+        with patch.object(BaseDownloader, '_verify_download', _fail_verify_download(6)), \
+            swallow_logs():
+                # how was before the "fix":
+                #assert_raises(DownloadError, downloader.fetch, furl)
+                #assert_raises(DownloadError, downloader.fetch, furl)
+                # now should download just fine
+                assert_equal(downloader.fetch(furl), 'abc')
+        # but should fail if keeps failing all 5 times and then on 11th should raise DownloadError
+        with patch.object(BaseDownloader, '_verify_download', _fail_verify_download(7)), \
+            swallow_logs():
+                assert_raises(DownloadError, downloader.fetch, furl)
 
     # TODO: access denied scenario
     # TODO: access denied detection
@@ -942,13 +945,46 @@ def test_interrupted_transfer_retry(toppath=None, topurl=None):
         # a couple of dropped connections are ridden out
         failing = _failing_download(2, _lose_connection)
         with patch.object(HTTPDownloaderSession, 'download', failing), \
+                swallow_logs(new_level=logging.INFO) as cml:
+            assert_equal(downloader.download(furl, tfpath, overwrite=True),
+                         tfpath)
+            # the user is told, rather than left wondering about the pause
+            assert_in("Retrying from the start (1 out of 5)", cml.out)
+        ok_file_has_content(tfpath, 'abc')
+        assert_equal(failing.tried[0], 3)
+        # ... backing off in between, rather than hammering the server,
+        # by a growing amount
+        assert_equal(sleeper.call_count, 2)
+        delays = [call.args[0] for call in sleeper.call_args_list]
+        assert_greater(delays[1], delays[0])
+
+        # a fetch() of the same is retried just the same
+        sleeper.reset_mock()
+        failing = _failing_download(2, _lose_connection)
+        with patch.object(HTTPDownloaderSession, 'download', failing), \
+                swallow_logs():
+            assert_equal(downloader.fetch(furl), 'abc')
+        assert_equal(failing.tried[0], 3)
+
+        # so is a connection which drops while the session is being
+        # established, before any transfer begins
+        connecting = _failing_download(2, _lose_connection)
+        _orig_session = HTTPDownloader.get_downloader_session
+
+        def _failing_session(self, *args, **kwargs):
+            connecting.tried[0] += 1
+            if connecting.tried[0] > 2:
+                return _orig_session(self, *args, **kwargs)
+            raise AccessFailedError(
+                "Failed to establish a new session") from ConnectionResetError(
+                    "reset by peer")
+
+        with patch.object(HTTPDownloader, 'get_downloader_session',
+                          _failing_session), \
                 swallow_logs():
             assert_equal(downloader.download(furl, tfpath, overwrite=True),
                          tfpath)
-        ok_file_has_content(tfpath, 'abc')
-        assert_equal(failing.tried[0], 3)
-        # ... backing off in between, rather than hammering the server
-        assert_greater(sleeper.call_count, 1)
+        assert_equal(connecting.tried[0], 3)
 
         # but not indefinitely -- datalad.downloaders.retry says how often
         with patch_config({'datalad.downloaders.retry': '2'}):
@@ -957,13 +993,28 @@ def test_interrupted_transfer_retry(toppath=None, topurl=None):
                     swallow_logs():
                 with assert_raises(IncompleteDownloadError) as cm:
                     downloader.download(furl, tfpath, overwrite=True)
-            assert_equal(failing.tried[0], 3)  # initial attempt + 2 retries
+                assert_equal(failing.tried[0], 3)  # 1 attempt + 2 retries
+                # the report says how far the transfer got and how much room
+                # it had, to tell a truncated response apart from a file
+                # system which filled up
+                assert_in("free on the file system", str(cm.value))
+                # and it names the target, not the temporary file which is
+                # removed before anyone gets to read this
+                assert_in(tfpath, str(cm.value))
+                assert_not_in("datalad-download-temp", str(cm.value))
+                # the underlying failure is reported once, as the cause
+                assert_equal(
+                    str(CapturedException(cm.value)).count('-caused by-'), 1)
 
-        # the report says how far the transfer got and how much room it had,
-        # to tell a truncated response apart from a file system which filled up
-        assert_in("free on the file system", str(cm.value))
-        # and the underlying failure is reported only once, as the cause
-        assert_equal(str(CapturedException(cm.value)).count('-caused by-'), 1)
+        # ... and 0 turns retrying off altogether
+        with patch_config({'datalad.downloaders.retry': '0'}):
+            failing = _failing_download(10, _lose_connection)
+            with patch.object(HTTPDownloaderSession, 'download', failing), \
+                    swallow_logs():
+                assert_raises(IncompleteDownloadError,
+                              downloader.download, furl, tfpath,
+                              overwrite=True)
+                assert_equal(failing.tried[0], 1)
 
         # running out of space, on the other hand, is not retried at all:
         # trying again would not free up any space
@@ -972,9 +1023,15 @@ def test_interrupted_transfer_retry(toppath=None, topurl=None):
                 swallow_logs():
             with assert_raises(DownloadError) as cm:
                 downloader.download(furl, tfpath, overwrite=True)
-        assert_equal(failing.tried[0], 1)
-        assert_in("Ran out of space", str(cm.value))
-        assert_false(isinstance(cm.value, IncompleteDownloadError))
+            assert_equal(failing.tried[0], 1)
+            assert_in("Ran out of space", str(cm.value))
+            assert_false(isinstance(cm.value, IncompleteDownloadError))
+
+    # a download which cannot possibly fit is called out before it starts
+    with patch('datalad.downloaders.base._get_free_space', return_value=1), \
+            swallow_logs(new_level=logging.WARNING) as cml:
+        downloader.download(furl, tfpath, overwrite=True)
+        assert_in("the download is likely to fail", cml.out)
 
 
 @with_tree(tree=[('file.dat', 'abc')])

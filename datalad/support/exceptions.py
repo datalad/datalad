@@ -94,7 +94,7 @@ class CapturedException(object):
         """
         s = self.name + '(' + self.message + ')'
         if exc_cause := getattr(self.tb, '__cause__', None):
-            s = _append_unique_cause(s, exc_cause)
+            s = _append_unique_cause(s, exc_cause, haystack=self.message)
         return s
 
     def format_with_cause(self):
@@ -179,9 +179,10 @@ def format_oneline_tb(exc, tb=None, limit=None, include_str=True):
     if include_str:
         # try exc message else exception type
         leading = exc.message or exc.name
-        out = "{} ".format(leading)
         if exc_cause := getattr(tb, '__cause__', None):
-            out = _append_unique_cause(out.rstrip(), exc_cause) + ' '
+            leading = _append_unique_cause(leading, exc_cause,
+                                           haystack=exc.message)
+        out = "{} ".format(leading)
     else:
         out = ""
 
@@ -208,7 +209,7 @@ def format_oneline_tb(exc, tb=None, limit=None, include_str=True):
     return out
 
 
-def format_exception_with_cause(e):
+def format_exception_with_cause(e, _seen=None):
     """Helper to recursively format an exception with all underlying causes
 
     For each exception in the chain either the str() of it is taken, or the
@@ -220,28 +221,64 @@ def format_exception_with_cause(e):
     '-caused by-' is used a separator between exceptions to be human-readable
     while being recognizably different from potential exception payload
     messages.
+
+    `_seen` is internal: it carries the identities of the exceptions rendered
+    so far, so that a chain which loops back on itself (`raise e from e` makes
+    one) stops instead of recursing until the interpreter gives up.  Reporting
+    a failure must not become a failure of its own.
     """
-    s = str(e) or \
-        ((e.exc_type.__name__ if sys.version_info < (3, 13) else e.exc_type_str)
-         if isinstance(e, traceback.TracebackException)
-         else e.__class__.__name__)
+    s = str(e) or _exception_type_name(e)
+    _seen = (_seen or frozenset()) | {id(e)}
     exc_cause = getattr(e, '__cause__', None)
-    if exc_cause:
-        s = _append_unique_cause(s, exc_cause)
+    if exc_cause is not None and id(exc_cause) not in _seen:
+        s = _append_unique_cause(s, exc_cause, _seen=_seen)
     return s
 
 
-def _append_unique_cause(s, exc_cause):
+def _exception_type_name(e):
+    """Class name of `e`, which may be an exception or a TracebackException"""
+    if isinstance(e, traceback.TracebackException):
+        return e.exc_type.__name__ if sys.version_info < (3, 13) \
+            else e.exc_type_str
+    return e.__class__.__name__
+
+
+def _append_unique_cause(s, exc_cause, haystack=None, _seen=None):
     """Append a '-caused by-' rendering of `exc_cause` to `s`, unless redundant
 
     Libraries commonly render the exception they are wrapping right into the
-    message of the wrapper -- urllib3's ``ProtocolError`` embeds the
-    ``IncompleteRead`` it was raised for, for example.  Spelling such a cause
-    out a second time only makes an already deep chain harder to read, so it
-    is appended only if it is not already part of `s`.
+    message of the wrapper -- urllib3's ``ProtocolError`` embeds the repr() of
+    the ``IncompleteRead`` it was raised for, for example.  Spelling such a
+    cause out a second time only makes an already deep chain harder to read.
+
+    A cause is dropped only when the text already identifies it *both* by type
+    and by message, and only when it has a message of its own.  Merely sharing
+    a word ("timeout", "not found", ...) must not silently swallow it, and an
+    exception without a message has nothing but its type to go by.  Since the
+    rendering of a cause covers its own causes too, a cause that is already
+    there brings no unreported exception down with it.
+
+    Parameters
+    ----------
+    s: str
+      Text to append to.
+    exc_cause: BaseException or TracebackException
+      The cause to render.
+    haystack: str, optional
+      Text to look for a repetition in, for when `s` carries decoration that a
+      cause could never be a repetition of -- `format_short`'s enclosing
+      ``ClassName(...)``, for one, into which a message-less cause would
+      otherwise vanish.  Defaults to `s`.
+    _seen: frozenset, optional
+      Internal, see `format_exception_with_cause`.
     """
-    cause = format_exception_with_cause(exc_cause)
-    return s if cause and cause in s else f'{s} -caused by- {cause}'
+    if haystack is None:
+        haystack = s
+    cause = format_exception_with_cause(exc_cause, _seen=_seen)
+    if str(exc_cause) and cause in haystack \
+            and _exception_type_name(exc_cause) in haystack:
+        return s
+    return f'{s} -caused by- {cause}'
 
 
 class MissingExternalDependency(RuntimeError):

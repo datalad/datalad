@@ -20,6 +20,7 @@ from datalad.downloaders.base import (
     is_transient_download_error,
 )
 from datalad.support.exceptions import (
+    AccessDeniedError,
     DownloadError,
     IncompleteDownloadError,
 )
@@ -46,12 +47,16 @@ def _oserror(errnum):
     BrokenPipeError("broken pipe"),
     TimeoutError("timed out"),
     IncompleteRead(b'123', 100),
-    _oserror(errno.ECONNRESET),
-    _oserror(errno.ETIMEDOUT),
+    # errnos which python does not give a dedicated OSError subclass
+    _oserror(errno.ENETUNREACH),
+    _oserror(errno.EHOSTUNREACH),
     # 3rd party exceptions are recognized by name, so a stand-in suffices
     type('ProtocolError', (Exception,), {})("Connection broken"),
     type('ChunkedEncodingError', (Exception,), {})("bad chunk"),
     type('EndpointConnectionError', (Exception,), {})("could not connect"),
+    # ... and so are their subclasses, e.g. requests' ProxyError through the
+    # ConnectionError it derives from
+    type('ProxyError', (type('ConnectionError', (Exception,), {}),), {})("no proxy"),
 ])
 def test_is_transient_download_error(exc):
     assert is_transient_download_error(exc)
@@ -67,6 +72,18 @@ def test_is_transient_download_error(exc):
 
 
 @pytest.mark.ai_generated
+def test_is_transient_download_error_requests_subclasses():
+    # the real thing, not a stand-in: these derive from requests' own
+    # ConnectionError/Timeout rather than carrying a name we list
+    from requests.exceptions import (
+        ProxyError,
+        ReadTimeout,
+    )
+    assert is_transient_download_error(ProxyError("proxy went away"))
+    assert is_transient_download_error(ReadTimeout("took too long"))
+
+
+@pytest.mark.ai_generated
 @pytest.mark.parametrize("exc", [
     # retrying will not free up any space
     _oserror(errno.ENOSPC),
@@ -77,6 +94,21 @@ def test_is_transient_download_error(exc):
 ])
 def test_is_not_transient_download_error(exc):
     assert not is_transient_download_error(exc)
+
+
+@pytest.mark.ai_generated
+def test_is_transient_download_error_ignores_context():
+    # only an explicit `raise ... from ...` says that the transient failure
+    # is the reason; a permanent one merely raised while handling it is not
+    # to be retried
+    try:
+        try:
+            raise ConnectionResetError("reset by peer")
+        except ConnectionResetError:
+            raise ValueError("server returned malformed metadata")
+    except ValueError as e:
+        assert e.__context__ is not None  # the chain is there, just not a cause
+        assert not is_transient_download_error(e)
 
 
 @pytest.mark.ai_generated
@@ -137,12 +169,20 @@ def test_get_transfer_error(path=None):
     assert_in(url, str(err))
     assert_in("3 Bytes out of 1.0 kB downloaded", str(err))
 
-    # a full file system is not: retrying would only waste the bandwidth
-    err = get_error(OSError(errno.ENOSPC, "No space left on device"))
-    assert isinstance(err, DownloadError)
-    assert not isinstance(err, IncompleteDownloadError)
-    assert_in("Ran out of space", str(err))
-    assert_in("free on the file system", str(err))
+    # a full file system is not: retrying would only waste the bandwidth.
+    # Same for a quota, which is how a full file system looks on many a
+    # shared cluster
+    for errnum in (errno.ENOSPC, errno.EDQUOT):
+        err = get_error(OSError(errnum, "No space left on device"))
+        assert isinstance(err, DownloadError)
+        assert not isinstance(err, IncompleteDownloadError)
+        assert_in("Ran out of space", str(err))
+        assert_in("free on the file system", str(err))
+
+    # a session which already classified its own failure is handed back
+    # untouched -- access() acts on the type
+    original = AccessDeniedError("credentials went stale")
+    assert get_error(original) is original
 
     # anything else is a plain failure, still with the transfer spelled out
     err = get_error(ValueError("no idea"))

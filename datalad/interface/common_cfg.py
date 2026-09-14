@@ -28,6 +28,7 @@ from datalad.support.constraints import (
     EnsureInt,
     EnsureListOf,
     EnsureNone,
+    EnsureRange,
     EnsureStr,
 )
 from datalad.utils import on_windows
@@ -535,7 +536,7 @@ _definitions = {
                         'not complete, or because the server responded with a '
                         '5xx status. Note that a retry restarts the download '
                         'from the beginning'}),
-        'type': EnsureInt(),
+        'type': EnsureInt() & EnsureRange(min=0),
         'default': 5,
     },
     'datalad.repo.backend': {
