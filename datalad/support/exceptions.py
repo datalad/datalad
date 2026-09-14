@@ -94,7 +94,7 @@ class CapturedException(object):
         """
         s = self.name + '(' + self.message + ')'
         if exc_cause := getattr(self.tb, '__cause__', None):
-            s = _append_cause(s, exc_cause)
+            s = _append_unique_cause(s, exc_cause)
         return s
 
     def format_with_cause(self):
@@ -181,7 +181,7 @@ def format_oneline_tb(exc, tb=None, limit=None, include_str=True):
         leading = exc.message or exc.name
         out = "{} ".format(leading)
         if exc_cause := getattr(tb, '__cause__', None):
-            out = _append_cause(out.rstrip(), exc_cause) + ' '
+            out = _append_unique_cause(out.rstrip(), exc_cause) + ' '
     else:
         out = ""
 
@@ -227,11 +227,11 @@ def format_exception_with_cause(e):
          else e.__class__.__name__)
     exc_cause = getattr(e, '__cause__', None)
     if exc_cause:
-        s = _append_cause(s, exc_cause)
+        s = _append_unique_cause(s, exc_cause)
     return s
 
 
-def _append_cause(s, exc_cause):
+def _append_unique_cause(s, exc_cause):
     """Append a '-caused by-' rendering of `exc_cause` to `s`, unless redundant
 
     Libraries commonly render the exception they are wrapping right into the

@@ -898,6 +898,7 @@ def test_server_error_retry(toppath=None, topurl=None):
     assert elapsed < 1.0, f"Test took {elapsed:.1f}s, expected < 1s (is sleep mocked?)"
 
 
+@pytest.mark.ai_generated
 @with_tree(tree=[('file.dat', 'abc')])
 @serve_path_via_http
 def test_interrupted_transfer_retry(toppath=None, topurl=None):

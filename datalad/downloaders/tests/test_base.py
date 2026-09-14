@@ -40,6 +40,7 @@ def _oserror(errnum):
     return OSError(errnum, "some message")
 
 
+@pytest.mark.ai_generated
 @pytest.mark.parametrize("exc", [
     ConnectionResetError("reset by peer"),
     BrokenPipeError("broken pipe"),
@@ -65,6 +66,7 @@ def test_is_transient_download_error(exc):
         assert is_transient_download_error(e)
 
 
+@pytest.mark.ai_generated
 @pytest.mark.parametrize("exc", [
     # retrying will not free up any space
     _oserror(errno.ENOSPC),
@@ -77,6 +79,7 @@ def test_is_not_transient_download_error(exc):
     assert not is_transient_download_error(exc)
 
 
+@pytest.mark.ai_generated
 def test_is_transient_download_error_reference_loop():
     # a chain which refers back to itself must not send us spinning
     exc = ValueError("a")
@@ -84,6 +87,7 @@ def test_is_transient_download_error_reference_loop():
     assert not is_transient_download_error(exc)
 
 
+@pytest.mark.ai_generated
 @with_tempfile(content="123")
 def test_describe_transfer(path=None):
     # size of the file on disk is used when not given explicitly
@@ -100,6 +104,7 @@ def test_describe_transfer(path=None):
     assert _describe_transfer(None)
 
 
+@pytest.mark.ai_generated
 @with_tempfile(content="123")
 def test_warn_if_not_enough_space(path=None):
     url = "http://example.com/f.dat"
@@ -117,6 +122,7 @@ def test_warn_if_not_enough_space(path=None):
         assert_equal(cml.out, '')
 
 
+@pytest.mark.ai_generated
 @with_tempfile(content="123")
 def test_get_transfer_error(path=None):
     url = "http://example.com/f.dat"

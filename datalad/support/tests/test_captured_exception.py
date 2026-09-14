@@ -1,6 +1,8 @@
 import sys
 from unittest.mock import patch
 
+import pytest
+
 from datalad import cfg
 from datalad.support.exceptions import (
     CapturedException,
@@ -118,6 +120,9 @@ def test_format_exception_with_cause():
             ce.format_with_cause(),
             'RuntimeError -caused by- ValueError -caused by- Mike')
 
+
+@pytest.mark.ai_generated
+def test_format_exception_with_cause_deduplicates():
     # a cause which the wrapping exception already rendered into its own
     # message is not spelled out a second time
     # (https://github.com/ReproNim/containers/issues/169)
