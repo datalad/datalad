@@ -42,6 +42,7 @@ from _pytest.outcomes import (
 )
 
 from datalad import cfg as dl_cfg
+from datalad.distribution.dataset import Dataset
 from datalad.support import path as op
 from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils_pytest import (
@@ -56,6 +57,7 @@ from datalad.tests.utils_pytest import (
     assert_re_in,
     assert_str_equal,
     assert_true,
+    corresponding_hexsha,
     eq_,
     fs_supports_filename,
     get_most_obscure_supported_name,
@@ -63,6 +65,9 @@ from datalad.tests.utils_pytest import (
     known_failure_githubci_win,
     known_failure_windows,
     local_testrepo_flavors,
+    maybe_adjust_repo,
+    maybe_unadjust_repo,
+    neq_,
     nok_startswith,
     ok_,
     ok_broken_symlink,
@@ -82,6 +87,7 @@ from datalad.tests.utils_pytest import (
     serve_path_via_http,
     signal_timeout,
     skip_if,
+    skip_if_adjusted_branch,
     skip_if_no_module,
     skip_if_no_network,
     skip_if_on_windows,
@@ -771,3 +777,66 @@ def test_signal_timeout_noop_without_sigalrm(monkeypatch):
     # but with SIGALRM removed it must be a pure no-op.
     with signal_timeout(0.001):
         time.sleep(0.05)
+
+
+#
+# Test the adjusted-branch helpers
+#
+
+@with_tempfile(mkdir=True)
+def test_corresponding_hexsha(path=None):
+    ds = Dataset(path).create()
+    maybe_adjust_repo(ds.repo)
+    corr = ds.repo.get_corresponding_branch()
+    old = ds.repo.get_hexsha(corr)
+
+    (ds.pathobj / "new.txt").write_text("NEW")
+    ds.save()
+    new = ds.repo.get_hexsha(corr)
+
+    neq_(old, new)
+    neq_(ds.repo.get_hexsha("HEAD"), new)
+
+    # valid non-HEAD refs that contain "HEAD" in the string
+    ds.repo.call_git(["branch", "myHEAD", new])
+    ds.repo.call_git(["update-ref", "ORIG_HEAD", new])
+
+    eq_(corresponding_hexsha(ds.repo), new)
+    eq_(corresponding_hexsha(ds.repo, corr), new)
+    eq_(corresponding_hexsha(ds.repo, old), old)
+    eq_(corresponding_hexsha(ds.repo, "HEAD~"), old)
+    eq_(corresponding_hexsha(ds.repo, "HEAD^"), old)
+    eq_(corresponding_hexsha(ds.repo, "HEAD@{0}"), new)
+    eq_(corresponding_hexsha(ds.repo, "myHEAD"), new)
+    eq_(corresponding_hexsha(ds.repo, "ORIG_HEAD"), new)
+
+    for bogus in ("bogus", "bogusHEAD", "HEAD~99"):
+        assert_raises(ValueError, corresponding_hexsha, ds.repo, bogus)
+
+
+@skip_if_adjusted_branch
+@with_tempfile(mkdir=True)
+def test_maybe_unadjust_repo_noop(path=None):
+    repo = Dataset(path).create().repo
+    branch, hexsha = repo.get_active_branch(), repo.get_hexsha("HEAD")
+    maybe_unadjust_repo(repo)
+    eq_(repo.get_active_branch(), branch)
+    eq_(repo.get_hexsha("HEAD"), hexsha)
+
+
+@with_tempfile(mkdir=True)
+def test_maybe_unadjust_repo(path=None):
+    ds = Dataset(path).create()
+    maybe_adjust_repo(ds.repo)
+    corr = ds.repo.get_corresponding_branch()
+    corr_hexsha = ds.repo.get_hexsha(corr)
+
+    maybe_unadjust_repo(ds.repo)
+    assert_false(ds.repo.is_managed_branch())
+    eq_(ds.repo.get_active_branch(), corr)
+    eq_(ds.repo.get_hexsha("HEAD"), corr_hexsha)
+
+    # idempotent: a second call is the no-op case
+    maybe_unadjust_repo(ds.repo)
+    eq_(ds.repo.get_active_branch(), corr)
+    eq_(ds.repo.get_hexsha("HEAD"), corr_hexsha)
