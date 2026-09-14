@@ -117,3 +117,24 @@ def test_format_exception_with_cause():
         assert_equal(
             ce.format_with_cause(),
             'RuntimeError -caused by- ValueError -caused by- Mike')
+
+    # a cause which the wrapping exception already rendered into its own
+    # message is not spelled out a second time
+    # (https://github.com/ReproNim/containers/issues/169)
+    try:
+        try:
+            raise ValueError("no more data")
+        except ValueError as e:
+            # this is how urllib3 reports a broken connection
+            raise RuntimeError("Connection broken: %r" % e) from e
+    except Exception as e:
+        assert_equal(
+            format_exception_with_cause(e),
+            "Connection broken: ValueError('no more data')")
+        ce = CapturedException(e)
+        assert_equal(
+            ce.format_with_cause(),
+            "Connection broken: ValueError('no more data')")
+        assert_equal(
+            ce.format_short(),
+            "RuntimeError(Connection broken: ValueError('no more data'))")
