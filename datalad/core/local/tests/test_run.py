@@ -941,6 +941,24 @@ def _assert_run_merge(ds, ref=None):
     return info
 
 
+def _own_commits(repo, n=2):
+    """Return the messages of the topmost `n` commits datalad/the user made
+
+    git-annex's own branch-maintenance commits are skipped, so a caller
+    can talk about "the commit this run recorded" and "the one before it"
+    without caring whether the branch is adjusted.  Newest first.
+    """
+    msgs = []
+    hexsha = repo.get_hexsha()
+    while hexsha and len(msgs) < n:
+        msg = repo.format_commit('%B', hexsha)
+        if msg.strip() != 'git-annex adjusted branch':
+            msgs.append(msg)
+        hexsha = repo.get_hexsha(hexsha + '^') \
+            if repo.commit_exists(hexsha + '^') else None
+    return msgs
+
+
 def _assert_no_run_merge(ds):
     """Assert that no run-info merge commit exists in recent history.
 
@@ -1722,19 +1740,15 @@ def test_run_explicit_concurrent_subdataset_only_no_merge(path=None):
             on_failure='ignore', result_renderer='disabled')
     assert_not_in_results(res, action='run', status='error')
     assert_repo_status(ds.path)
-    # the outer command is recorded ...
-    assert_in("[DATALAD RUNCMD] outer", last_commit_msg(ds.repo))
-    # ... but not as a merge that would subsume the concurrent record
-    _assert_no_run_merge(ds)
-    # ... and its own commit does not claim the concurrent run's file
-    committed = [
-        str(p.relative_to(ds.pathobj))
-        for p in ds.repo.diff("HEAD^", "HEAD")
-    ]
-    assert_not_in("elsewhere", committed)
-    # the concurrent commit is untouched: a standalone, non-merge parent
-    parent_msg = ds.repo.format_commit("%B", "HEAD^")
+    # the outer command is recorded, and the concurrent commit is
+    # untouched right below it -- not subsumed into this run's record
+    # (`_own_commits` looks past git-annex's branch maintenance, so this
+    # reads the same on an adjusted branch)
+    record_msg, parent_msg = _own_commits(ds.repo, 2)
+    assert_in("[DATALAD RUNCMD] outer", record_msg)
     assert_in("[DATALAD RUNCMD] concurrent", parent_msg)
+    # ... and not as a merge that would subsume the concurrent record
+    _assert_no_run_merge(ds)
 
 
 @with_tempfile(mkdir=True)
@@ -1793,15 +1807,12 @@ def test_run_explicit_concurrent_no_merge_self_committed(path=None):
             on_failure='ignore', result_renderer='disabled')
     assert_not_in_results(res, action='run', status='error')
     assert_repo_status(ds.path)
-    # the outer command's record is not silently dropped ...
-    assert_in("[DATALAD RUNCMD] outer", last_commit_msg(ds.repo))
+    # the outer command's record is not silently dropped, and the
+    # concurrent commit is untouched right below it (`_own_commits` looks
+    # past git-annex's branch maintenance, so this reads the same on an
+    # adjusted branch)
+    record_msg, parent_msg = _own_commits(ds.repo, 2)
+    assert_in("[DATALAD RUNCMD] outer", record_msg)
+    assert_in("[DATALAD RUNCMD] concurrent", parent_msg)
     # ... but not as a merge that would subsume the concurrent record
     _assert_no_run_merge(ds)
-    # ... it is its own (auxiliary, empty) commit -- it claims neither
-    # the command's own output (already committed beforehand) nor the
-    # concurrent run's file
-    eq_([str(p.relative_to(ds.pathobj))
-         for p in ds.repo.diff("HEAD^", "HEAD")], [])
-    # the concurrent commit is untouched: a standalone, non-merge parent
-    parent_msg = ds.repo.format_commit("%B", "HEAD^")
-    assert_in("[DATALAD RUNCMD] concurrent", parent_msg)

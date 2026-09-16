@@ -146,6 +146,28 @@ def _inject_sub_info(paths_by_ds, since_map, _since_sub_info, ds_path):
             child_path = parent_path
 
 
+def _carries_message(repo, message):
+    """Return whether `repo`'s topmost own commit carries `message`
+
+    Answers "did the save just performed record `message`?" without
+    comparing hexshas against a pre-save HEAD, which is unreliable on an
+    adjusted branch: git-annex rewrites the branch as it maintains it, so
+    a commit's hexsha need not survive the save even when nothing of ours
+    was committed.  git-annex's own branch-maintenance commits are
+    skipped, the same way `run` skips them when reading a commit chain.
+    """
+    # imported lazily: datalad.core.local.run imports this module
+    from datalad.core.local.run import _is_annex_adjustment_commit
+    hexsha = repo.get_hexsha()
+    while hexsha and _is_annex_adjustment_commit(
+            repo.format_commit('%B', hexsha)):
+        # a root commit has no parent to step back to
+        hexsha = repo.get_hexsha(hexsha + '^') \
+            if repo.commit_exists(hexsha + '^') else None
+    return bool(hexsha) \
+        and repo.format_commit('%B', hexsha).strip() == message.strip()
+
+
 def _create_merge_commit(repo, pre_hexsha, msg):
     """Create a merge commit wrapping command-created commits.
 
@@ -622,14 +644,14 @@ class Save(Interface):
                     return
                 _merged_datasets.add(pdspath)
             elif (_no_merge and pdspath == ds.path and had_inner
-                    and pds_repo.get_hexsha() == start_commit):
+                    and message
+                    and not _carries_message(pds_repo, message)):
                 # `had_inner` means this dataset had commits of its own
                 # (`run`'s command committing directly, e.g. gh-7925
                 # review) that would normally be wrapped in the merge
                 # above -- but a concurrent commit made that merge unsafe,
                 # so `_no_merge` suppressed it. If the plain save above
-                # also found nothing dirty left to commit (HEAD is still
-                # where it was when this call started), the run's own
+                # also found nothing dirty left to commit, the run's own
                 # record has nowhere to land: it would be silently
                 # dropped even though `run_command()` reported success.
                 # Force a commit -- empty if need be -- carrying the run
