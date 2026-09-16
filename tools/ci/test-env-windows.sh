@@ -12,9 +12,9 @@
 # PowerShell cmdlets are used throughout: it keeps this script one
 # ordinary, shellcheck-able bash script instead of a second script in a
 # second language. It mirrors what AppVeyor's Windows workers used to do
-# (tools/ci/appveyor_ssh2localhost.bat), but installs OpenSSH Server via
-# the Windows feature the runner image already carries instead of
-# downloading an old (2018) third-party OpenSSH-Win32 build.
+# (its ssh2localhost.bat, in AppVeyor-era history), but installs OpenSSH
+# Server via the Windows feature the runner image already carries instead
+# of downloading an old (2018) third-party OpenSSH-Win32 build.
 set -eo pipefail
 
 # Remove Windows' 260-char path length limit.
@@ -43,7 +43,7 @@ net start sshd
 mkdir -p ~/.ssh
 ssh-keygen -f ~/.ssh/id_rsa -N ""
 cp ~/.ssh/id_rsa.pub ~/.ssh/authorized_keys
-cp tools/ci/appveyor_ssh_config ~/.ssh/config
+cp tools/ci/ssh_config ~/.ssh/config
 
 # Windows' OpenSSH server refuses an authorized_keys file that is writable
 # by anyone but the owner and Administrators; Git-Bash's HOME is
@@ -55,9 +55,9 @@ icacls "$USERPROFILE\\.ssh" /grant:r \
   "NT AUTHORITY\\SYSTEM:(OI)(CI)F"
 
 # "datalad-test"/"datalad-test2" are the hostnames the test suite connects
-# to (see tools/ci/appveyor_ssh_config and DATALAD_TESTS_SSH); AppVeyor
-# provided these via its `hosts:` config section, GitHub Actions has no
-# equivalent so point them at localhost via the hosts file instead.
+# to (see tools/ci/ssh_config and DATALAD_TESTS_SSH); AppVeyor provided
+# these via its `hosts:` config section, GitHub Actions has no equivalent
+# so point them at localhost via the hosts file instead.
 printf '\n127.0.0.1 datalad-test\n127.0.0.1 datalad-test2\n' \
   >> /c/Windows/System32/drivers/etc/hosts
 

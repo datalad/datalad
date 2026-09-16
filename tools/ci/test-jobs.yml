@@ -217,8 +217,8 @@
 # (non-turtle) suite runs on each, matching what those AppVeyor jobs did.
 #
 # TODO: drop `allow-failure` once these have proven themselves stable
-# across a number of runs -- they replace .appveyor.yml, which can then
-# be retired.
+# across a number of runs (they replace AppVeyor, now retired, so there's
+# no fallback Windows/macOS signal to lean on in the meantime).
 
 - python-version: '3.10'
   os: macos-latest
