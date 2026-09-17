@@ -29,6 +29,8 @@ from datalad.core.local.run import run_command
 from datalad.core.local.tests.test_run import (
     _assert_run_merge,
     _merge_ref,
+    _parents,
+    _setup_incoming,
     last_commit_msg,
 )
 from datalad.distribution.dataset import Dataset
@@ -1096,3 +1098,34 @@ def test_rerun_merge_runs(path=None):
     assert_repo_status(ds.path)
     ok_((ds.pathobj / "normal_file").exists())
     ok_((ds.pathobj / "inner2").exists())
+
+
+@with_tempfile(mkdir=True)
+@skip_if_adjusted_branch
+@pytest.mark.ai_generated
+def test_rerun_merge(path=None):
+    # a run that recorded a merge has to merge again on replay, otherwise
+    # the command would be re-executed on an entirely different tree
+    ds = Dataset(path).create()
+    repo = ds.repo
+    _setup_incoming(ds, {"raw.dat": "one"})
+    repo.checkout('incoming', options=['-b', 'processed'])
+    cmd = "{} raw.dat > cooked.dat".format(cat_command)
+    ds.run(cmd, merge='incoming', merge_strategy='theirs')
+    incoming = _setup_incoming(ds, {"raw.dat": "two"})
+    processed_before = repo.get_hexsha()
+    ds.run(cmd, merge='incoming', merge_strategy='theirs')
+    merge_commit = repo.get_hexsha()
+
+    ds.rerun()
+    assert_repo_status(ds.path)
+    # the replay recreated the merge, rather than re-executing the command
+    # on the state of the previous 'processed' commit
+    eq_(_parents(repo), [processed_before, incoming])
+    # ... with the same outcome
+
+    def tree(ref):
+        return repo.call_git(['rev-parse', ref + '^{tree}']).strip()
+    eq_(tree(merge_commit), tree("HEAD"))
+    _, info = get_run_info(ds, repo.format_commit("%B"))
+    eq_(info["merge"]["commit"], incoming)
