@@ -81,9 +81,12 @@ def run_main(args, exit_code=0, expect_stderr=False):
             with assert_raises(SystemExit) as cm:
                 main(["datalad"] + list(args))
             eq_('cmdline', datalad.get_apimode())
-            assert_equal(cm.value.code, exit_code)
             stdout = cmout.getvalue()
             stderr = cmerr.getvalue()
+            assert_equal(
+                cm.value.code, exit_code,
+                msg="Exit code mismatch.\nstdout:\n%s\nstderr:\n%s"
+                    % (stdout, stderr))
             if expect_stderr is False:
                 assert_equal(stderr, "")
             elif expect_stderr is True:
