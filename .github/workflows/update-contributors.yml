@@ -26,8 +26,18 @@ jobs:
           # Update lookup with GitHub metadata
           update_lookup: github
 
-          # Skip these users (example)
-          skip_users: manbat bhanuprasad14 yetanothertestuser bobknob23987
+          # Skip these users: spam/test accounts, and AI coding agents.
+          # con/tributors only auto-skips accounts GitHub reports as
+          # type "Bot" or whose login contains "[bot]" (dependabot[bot],
+          # github-actions[bot], Copilot, ...).  "claude" (uid 81847) is a
+          # plain "User" account, so it has to be listed here -- see
+          # https://github.com/datalad/datalad/pull/7922 .  GitHub attributes
+          # a commit to the account owning the *author* email, so an agent
+          # only shows up here if it authored (not just co-authored) commits;
+          # see CONTRIBUTING.md:Recognizing contributions.
+          # To extend this list, check for non-human logins in
+          # https://api.github.com/repos/datalad/datalad/contributors
+          skip_users: manbat bhanuprasad14 yetanothertestuser bobknob23987 claude Copilot
 
           # INFO, DEBUG, ERROR, WARNING, etc.
           log_level: DEBUG

@@ -24,6 +24,7 @@ from annexremote import (
 )
 
 from datalad.customremotes import SpecialRemote
+from datalad.support.exceptions import CommandError
 
 URI_PREFIX = "dl"
 
@@ -120,7 +121,23 @@ def init_datalad_remote(repo, remote, encryption=None, autoenable=False,
     # ATM only datalad/datalad-archives is expected,
     # so on purpose getitem
     remote_opts.append('uuid=%s' % DATALAD_SPECIAL_REMOTES_UUIDS[remote])
-    return repo.init_remote(remote, remote_opts + opts)
+    remote_opts += opts
+    try:
+        return repo.init_remote(remote, remote_opts)
+    except CommandError as e:
+        if 'git-annex: There is already a special remote named' in e.stderr:
+            # Fall back to enabling the existing one, as git-annex's own
+            # error message suggests.  uuid= is create-time-only and
+            # enableremote rejects it outright ("Unexpected parameters:
+            # uuid") -- the uuid of an existing special remote is not
+            # ours to (re)assign anyway.
+            enable_opts = [o for o in remote_opts
+                          if not o.startswith('uuid=')]
+            lgr.warning(
+                "Special remote %s already exists, enabling it instead "
+                "of failing: %s", remote, e)
+            return repo.enable_remote(remote, enable_opts)
+        raise
 
 
 def ensure_datalad_remote(repo, remote=None,
@@ -149,7 +166,24 @@ def ensure_datalad_remote(repo, remote=None,
         raise ValueError("'{}' is not a known datalad special remote: {}"
                          .format(remote,
                                  ", ".join(DATALAD_SPECIAL_REMOTES_UUIDS)))
-    name = repo.get_special_remotes().get(uuid, {}).get("name")
+    specialremotes = repo.get_special_remotes()
+    name = specialremotes.get(uuid, {}).get("name")
+    if not name:
+        # The dataset might have this special remote configured under a
+        # uuid other than the one currently hard-coded in
+        # DATALAD_SPECIAL_REMOTES_UUIDS -- e.g. a dataset created before
+        # that convention was introduced.  Fall back to a lookup by name,
+        # so we do not attempt (and fail) to initremote a duplicate.
+        name = next(
+            (sr["name"] for sr in specialremotes.values()
+             if sr.get("name") == remote),
+            None
+        )
+        if name:
+            lgr.warning(
+                "Special remote %s is known under a uuid other than the "
+                "expected %s -- dataset possibly predates that convention",
+                remote, uuid)
 
     if not name:
         init_datalad_remote(repo, remote,
