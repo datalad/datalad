@@ -62,6 +62,18 @@ icacls "$USERPROFILE\\.ssh" /grant:r \
   "BUILTIN\\Administrators:(OI)(CI)F" \
   "NT AUTHORITY\\SYSTEM:(OI)(CI)F"
 
+# The runner's account (e.g. runneradmin) is in the local Administrators
+# group, and Win32-OpenSSH's default sshd_config has a `Match Group
+# administrators` block that redirects AuthorizedKeysFile to this
+# ProgramData location for any such account -- ~/.ssh/authorized_keys
+# above is simply never consulted for it. See
+# https://github.com/PowerShell/Win32-OpenSSH/wiki/Security-protection-of-various-files-in-Win32-OpenSSH#administrators_authorized_keys
+mkdir -p /c/ProgramData/ssh
+cp ~/.ssh/id_rsa.pub /c/ProgramData/ssh/administrators_authorized_keys
+icacls "C:\\ProgramData\\ssh\\administrators_authorized_keys" /inheritance:r
+icacls "C:\\ProgramData\\ssh\\administrators_authorized_keys" /grant \
+  "Administrators:F" "SYSTEM:F"
+
 # "datalad-test"/"datalad-test2" are the hostnames the test suite connects
 # to (see tools/ci/ssh_config and DATALAD_TESTS_SSH); AppVeyor provided
 # these via its `hosts:` config section, GitHub Actions has no equivalent
