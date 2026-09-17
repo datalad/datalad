@@ -1253,6 +1253,11 @@ def test_run_merge_sub_under_plain_dir(path=None, *, request):
         # exactly that case, and it affects the run-merge detection below
         # too, not just the final status check.
         # https://github.com/datalad/datalad/issues/7905
+        # NOTE: this now covers more of the test body than just the known
+        # issue above (`ds.run()`, both `_assert_run_merge()` calls, and
+        # the `ok_()` check below) -- if it turns out only a subset of
+        # those actually fail because of #7905, narrow this back down to
+        # not risk masking an unrelated regression as an expected failure.
         request.node.add_marker(pytest.mark.xfail(
             strict=True,
             reason="git-annex: nested submodule pointer not propagated"))
