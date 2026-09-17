@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test functioning of the datalad main cmdline utility """
 
+import logging
 import os
 import re
 from io import StringIO
@@ -75,26 +76,41 @@ def run_main(args, exit_code=0, expect_stderr=False):
         # a dedicated handle
         fakeout = StringIO()
         fakeerr = StringIO()
-        with patch('sys.stderr', new=fakeerr) as cmerr, \
-             patch('sys.stdout', new=fakeout) as cmout, \
-             patch.object(datalad.ui.ui._ui, 'out', new=fakeout):
-            with assert_raises(SystemExit) as cm:
-                main(["datalad"] + list(args))
-            eq_('cmdline', datalad.get_apimode())
-            stdout = cmout.getvalue()
-            stderr = cmerr.getvalue()
-            assert_equal(
-                cm.value.code, exit_code,
-                msg="Exit code mismatch.\nstdout:\n%s\nstderr:\n%s"
-                    % (stdout, stderr))
-            if expect_stderr is False:
-                assert_equal(stderr, "")
-            elif expect_stderr is True:
-                # do nothing -- just return
-                pass
-            else:
-                # must be a string
-                assert_equal(stderr, expect_stderr)
+        # datalad's exception handler in cli.main reports some failures
+        # (e.g. a bare CommandError) via `lgr.error(...)`, whose handler
+        # may be bound to the real stderr stream rather than the one
+        # patched below -- capture log records directly too, so a
+        # mismatch's message doesn't come up empty.
+        log_records = []
+        log_handler = logging.Handler()
+        log_handler.setLevel(logging.DEBUG)
+        log_handler.emit = lambda record: log_records.append(
+            log_handler.format(record))
+        logging.getLogger('datalad').addHandler(log_handler)
+        try:
+            with patch('sys.stderr', new=fakeerr) as cmerr, \
+                 patch('sys.stdout', new=fakeout) as cmout, \
+                 patch.object(datalad.ui.ui._ui, 'out', new=fakeout):
+                with assert_raises(SystemExit) as cm:
+                    main(["datalad"] + list(args))
+                eq_('cmdline', datalad.get_apimode())
+                stdout = cmout.getvalue()
+                stderr = cmerr.getvalue()
+                assert_equal(
+                    cm.value.code, exit_code,
+                    msg="Exit code mismatch.\nstdout:\n%s\nstderr:\n%s\n"
+                        "log:\n%s"
+                        % (stdout, stderr, "\n".join(log_records)))
+        finally:
+            logging.getLogger('datalad').removeHandler(log_handler)
+        if expect_stderr is False:
+            assert_equal(stderr, "")
+        elif expect_stderr is True:
+            # do nothing -- just return
+            pass
+        else:
+            # must be a string
+            assert_equal(stderr, expect_stderr)
     finally:
         # restore what we had
         datalad.__api = was_mode
