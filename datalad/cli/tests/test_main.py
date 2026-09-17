@@ -104,11 +104,26 @@ def run_main(args, exit_code=0, expect_stderr=False):
                 return len(data)
             return orig_os_write(fd, data)
 
+        # cli.main's exception handler always wraps whatever it caught in
+        # a CapturedException before deciding how (or whether) to report
+        # it -- spy on construction to get the real exception's type and
+        # message even if the reporting path itself turns out to produce
+        # no visible output at all.
+        from datalad.support.exceptions import CapturedException
+        caught_exceptions = []
+        orig_ce_init = CapturedException.__init__
+
+        def _spy_ce_init(self, exc, *a, **kw):
+            caught_exceptions.append(
+                '%s: %s' % (type(exc).__name__, exc))
+            return orig_ce_init(self, exc, *a, **kw)
+
         try:
             with patch('sys.stderr', new=fakeerr) as cmerr, \
                  patch('sys.stdout', new=fakeout) as cmout, \
                  patch.object(datalad.ui.ui._ui, 'out', new=fakeout), \
-                 patch('os.write', new=_capture_os_write):
+                 patch('os.write', new=_capture_os_write), \
+                 patch.object(CapturedException, '__init__', new=_spy_ce_init):
                 with assert_raises(SystemExit) as cm:
                     main(["datalad"] + list(args))
                 eq_('cmdline', datalad.get_apimode())
@@ -117,8 +132,9 @@ def run_main(args, exit_code=0, expect_stderr=False):
                 assert_equal(
                     cm.value.code, exit_code,
                     msg="Exit code mismatch.\nstdout:\n%s\nstderr:\n%s\n"
-                        "log:\n%s"
-                        % (stdout, stderr, "\n".join(log_records)))
+                        "log:\n%s\ncaught exceptions:\n%s"
+                        % (stdout, stderr, "\n".join(log_records),
+                           "\n".join(caught_exceptions)))
         finally:
             logging.getLogger('datalad').removeHandler(log_handler)
         if expect_stderr is False:
