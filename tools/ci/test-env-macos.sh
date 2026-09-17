@@ -25,7 +25,7 @@ chmod 700 ~/.ssh
 ssh-keygen -f ~/.ssh/id_rsa -N ""
 cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
 cat tools/ci/ssh_config >> ~/.ssh/config
-chmod go-rwx -R ~/.ssh
+chmod -R go-rwx ~/.ssh
 
 # "datalad-test"/"datalad-test2" are the hostnames the test suite connects
 # to (see tools/ci/ssh_config and DATALAD_TESTS_SSH); AppVeyor provided
