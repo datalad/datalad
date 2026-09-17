@@ -87,10 +87,28 @@ def run_main(args, exit_code=0, expect_stderr=False):
         log_handler.emit = lambda record: log_records.append(
             log_handler.format(record))
         logging.getLogger('datalad').addHandler(log_handler)
+        # cli.main's exception handler reports a bare CommandError by
+        # writing straight to file descriptors 1/2 (os.write) rather than
+        # sys.stdout/stderr, to preserve byte-exact subprocess output --
+        # that bypasses both patches above too, so intercept it as well.
+        orig_os_write = os.write
+
+        def _capture_os_write(fd, data):
+            text = data.decode(errors='replace') \
+                if isinstance(data, bytes) else data
+            if fd == 1:
+                fakeout.write(text)
+                return len(data)
+            elif fd == 2:
+                fakeerr.write(text)
+                return len(data)
+            return orig_os_write(fd, data)
+
         try:
             with patch('sys.stderr', new=fakeerr) as cmerr, \
                  patch('sys.stdout', new=fakeout) as cmout, \
-                 patch.object(datalad.ui.ui._ui, 'out', new=fakeout):
+                 patch.object(datalad.ui.ui._ui, 'out', new=fakeout), \
+                 patch('os.write', new=_capture_os_write):
                 with assert_raises(SystemExit) as cm:
                     main(["datalad"] + list(args))
                 eq_('cmdline', datalad.get_apimode())
