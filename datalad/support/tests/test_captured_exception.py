@@ -166,6 +166,27 @@ def test_format_exception_with_cause_deduplicates():
 
 
 @pytest.mark.ai_generated
+def test_format_exception_with_cause_deduplicates_qualified_type():
+    # a cause whose class does not live in builtins: python 3.13+ reports its
+    # type module-qualified ("http.client.IncompleteRead"), while the message
+    # embedding it spells the bare name, so comparing the two verbatim never
+    # matched and the cause got repeated after all
+    from http.client import IncompleteRead
+    try:
+        try:
+            raise IncompleteRead(b'a', 2)
+        except IncompleteRead as e:
+            # the shape urllib3 reports a dropped connection in
+            raise RuntimeError("Connection broken: %r" % e) from e
+    except Exception as e:
+        assert_equal(CapturedException(e).format_short().count('-caused by-'),
+                     0)
+        assert_equal(format_exception_with_cause(e),
+                     "Connection broken: IncompleteRead(1 bytes read, "
+                     "2 more expected)")
+
+
+@pytest.mark.ai_generated
 def test_format_exception_with_cause_cycle():
     # `raise e from e` makes an exception its own cause.  Rendering it must
     # terminate -- reporting a failure may not become a failure of its own

@@ -275,8 +275,11 @@ def _append_unique_cause(s, exc_cause, haystack=None, _seen=None):
     if haystack is None:
         haystack = s
     cause = format_exception_with_cause(exc_cause, _seen=_seen)
-    if str(exc_cause) and cause in haystack \
-            and _exception_type_name(exc_cause) in haystack:
+    # the bare class name: a message embeds `IncompleteRead(...)`, never the
+    # module-qualified `http.client.IncompleteRead` that python 3.13+ reports
+    # for a TracebackException
+    type_name = _exception_type_name(exc_cause).rpartition('.')[2]
+    if str(exc_cause) and cause in haystack and type_name in haystack:
         return s
     return f'{s} -caused by- {cause}'
 
