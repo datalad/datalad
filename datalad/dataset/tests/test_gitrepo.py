@@ -330,6 +330,54 @@ def test_get_dot_git(emptycase=None, gitdircase=None, barecase=None, gitfilecase
             (gitfilecase.resolve() if r else gitfilecase) / 'subdir')
 
 
+@with_tempfile(mkdir=True)
+@with_tempfile
+def test_dot_git_common(path=None, worktree_path=None):
+    gr = GitRepo(path).init()
+    gr.call_git(['commit', '--allow-empty', '-m', 'some'])
+    # nothing special about a plain repository
+    eq_(gr.dot_git_common, gr.dot_git)
+
+    # but a linked worktree checkout has its own (per-worktree) `dot_git`,
+    # while `config` etc remain shared with the repository it came from
+    gr.call_git(['worktree', 'add', '-b', 'wt', worktree_path])
+    wt = GitRepo(worktree_path)
+    neq_(wt.dot_git_common, wt.dot_git)
+    eq_(wt.dot_git_common, gr.dot_git.resolve())
+    ok_((wt.dot_git_common / 'config').exists())
+
+    # `config` being common rather than per-worktree is what this rests on --
+    # so assert it against git itself, not against a reading of the docs
+    def git_config_path(repo):
+        return (repo.pathobj / repo.call_git(
+            ['rev-parse', '--git-path', 'config']).strip()).resolve()
+
+    for repo in (gr, wt):
+        eq_(git_config_path(repo), (repo.dot_git_common / 'config').resolve())
+
+    # ...also with per-worktree configuration enabled, where the overlay is a
+    # separately named `config.worktree`
+    wt.call_git(['config', '--local', 'extensions.worktreeConfig', 'true'])
+    eq_(git_config_path(wt), (wt.dot_git_common / 'config').resolve())
+
+
+@with_tempfile
+def test_dot_git_derived_state_after_init(path=None):
+    # whatever is derived from `dot_git` must follow the reassignment `init()`
+    # does.  A bare repository makes that visible: it has no `.git/` at all
+    gr = GitRepo(path)
+    # ask before `init()`, so that a stale answer could have been cached
+    eq_(gr.dot_git_common, gr.dot_git)
+
+    gr.init(init_options=['--bare'])
+    eq_(gr.dot_git, gr.pathobj)
+    eq_(gr.dot_git_common, gr.pathobj)
+    eq_(gr._valid_git_test_path, gr.pathobj / 'HEAD')
+    # or the instance would consider itself invalid, and the flyweight would
+    # discard and recreate it on every lookup
+    ok_(gr.is_valid())
+
+
 file1_content = "file1 content\n"
 file2_content = "file2 content\0"
 example_tree = {
