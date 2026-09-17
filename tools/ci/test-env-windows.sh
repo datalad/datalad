@@ -17,6 +17,14 @@
 # of downloading an old (2018) third-party OpenSSH-Win32 build.
 set -eo pipefail
 
+# MSYS2's path-conversion layer (which Git-Bash is built on) rewrites any
+# argument that looks like a POSIX path before exec'ing a native .exe --
+# including single-slash flags like `/v`, `/t`, `/f` below, which it
+# mistakes for paths and mangles, breaking reg.exe/dism.exe/icacls.exe
+# with "Invalid syntax"-style errors. Disable that for this script instead
+# of doubling every slash.
+export MSYS_NO_PATHCONV=1
+
 # Remove Windows' 260-char path length limit.
 reg add "HKLM\\SYSTEM\\CurrentControlSet\\Control\\FileSystem" \
   /v LongPathsEnabled /t REG_DWORD /d 1 /f

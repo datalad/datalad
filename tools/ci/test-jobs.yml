@@ -216,6 +216,13 @@
 # under the runner's timeout; PYTEST_SELECTION is cleared so the full
 # (non-turtle) suite runs on each, matching what those AppVeyor jobs did.
 #
+# _DL_ANNEX_INSTALL_SCENARIO is overridden here rather than left at its
+# top-level (test.yml) default: that default pins an old miniconda
+# installer build (py37_23.1.0-1) which 404s on macOS arm64 (no such
+# per-platform build was ever published) -- pinned Windows availability is
+# unconfirmed too, so use the same unpinned "latest miniconda" scenario
+# the newer Linux (3.12+) entries already rely on, for both.
+#
 # TODO: drop `allow-failure` once these have proven themselves stable
 # across a number of runs (they replace AppVeyor, now retired, so there's
 # no fallback Windows/macOS signal to lean on in the meantime).
@@ -227,6 +234,7 @@
     PYTEST_SELECTION: ""
     PYTEST_SELECTION_OP: "not"
     TESTS_TO_PERFORM: "datalad.core datalad.dataset datalad.runner datalad.support"
+    _DL_ANNEX_INSTALL_SCENARIO: "miniconda --channel conda-forge --python-match minor --batch git-annex -m conda"
 
 - python-version: '3.10'
   os: macos-latest
@@ -237,6 +245,7 @@
     TESTS_TO_PERFORM: >-
       datalad.cli datalad.customremotes datalad.distribution
       datalad.downloaders datalad.interface datalad.tests datalad.ui
+    _DL_ANNEX_INSTALL_SCENARIO: "miniconda --channel conda-forge --python-match minor --batch git-annex -m conda"
 
 - python-version: '3.10'
   os: macos-latest
@@ -245,6 +254,7 @@
     PYTEST_SELECTION: ""
     PYTEST_SELECTION_OP: "not"
     TESTS_TO_PERFORM: "datalad.local datalad.distributed"
+    _DL_ANNEX_INSTALL_SCENARIO: "miniconda --channel conda-forge --python-match minor --batch git-annex -m conda"
 
 - python-version: '3.10'
   os: windows-2022
@@ -253,6 +263,7 @@
     PYTEST_SELECTION: ""
     PYTEST_SELECTION_OP: "not"
     TESTS_TO_PERFORM: "datalad.core datalad.dataset datalad.runner"
+    _DL_ANNEX_INSTALL_SCENARIO: "miniconda --channel conda-forge --python-match minor --batch git-annex -m conda"
 
 - python-version: '3.10'
   os: windows-2022
@@ -264,6 +275,7 @@
       datalad.cli datalad.customremotes datalad.distribution
       datalad.distributed datalad.downloaders datalad.interface
       datalad.tests
+    _DL_ANNEX_INSTALL_SCENARIO: "miniconda --channel conda-forge --python-match minor --batch git-annex -m conda"
 
 - python-version: '3.10'
   os: windows-2022
@@ -272,3 +284,4 @@
     PYTEST_SELECTION: ""
     PYTEST_SELECTION_OP: "not"
     TESTS_TO_PERFORM: "datalad.local datalad.support datalad.ui"
+    _DL_ANNEX_INSTALL_SCENARIO: "miniconda --channel conda-forge --python-match minor --batch git-annex -m conda"
