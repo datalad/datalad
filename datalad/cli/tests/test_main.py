@@ -8,7 +8,6 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test functioning of the datalad main cmdline utility """
 
-import logging
 import os
 import re
 from io import StringIO
@@ -76,75 +75,23 @@ def run_main(args, exit_code=0, expect_stderr=False):
         # a dedicated handle
         fakeout = StringIO()
         fakeerr = StringIO()
-        # datalad's exception handler in cli.main reports some failures
-        # (e.g. a bare CommandError) via `lgr.error(...)`, whose handler
-        # may be bound to the real stderr stream rather than the one
-        # patched below -- capture log records directly too, so a
-        # mismatch's message doesn't come up empty.
-        log_records = []
-        log_handler = logging.Handler()
-        log_handler.setLevel(logging.DEBUG)
-        log_handler.emit = lambda record: log_records.append(
-            log_handler.format(record))
-        logging.getLogger('datalad').addHandler(log_handler)
-        # cli.main's exception handler reports a bare CommandError by
-        # writing straight to file descriptors 1/2 (os.write) rather than
-        # sys.stdout/stderr, to preserve byte-exact subprocess output --
-        # that bypasses both patches above too, so intercept it as well.
-        orig_os_write = os.write
-
-        def _capture_os_write(fd, data):
-            text = data.decode(errors='replace') \
-                if isinstance(data, bytes) else data
-            if fd == 1:
-                fakeout.write(text)
-                return len(data)
-            elif fd == 2:
-                fakeerr.write(text)
-                return len(data)
-            return orig_os_write(fd, data)
-
-        # cli.main's exception handler always wraps whatever it caught in
-        # a CapturedException before deciding how (or whether) to report
-        # it -- spy on construction to get the real exception's type and
-        # message even if the reporting path itself turns out to produce
-        # no visible output at all.
-        from datalad.support.exceptions import CapturedException
-        caught_exceptions = []
-        orig_ce_init = CapturedException.__init__
-
-        def _spy_ce_init(self, exc, *a, **kw):
-            caught_exceptions.append(
-                '%s: %s' % (type(exc).__name__, exc))
-            return orig_ce_init(self, exc, *a, **kw)
-
-        try:
-            with patch('sys.stderr', new=fakeerr) as cmerr, \
-                 patch('sys.stdout', new=fakeout) as cmout, \
-                 patch.object(datalad.ui.ui._ui, 'out', new=fakeout), \
-                 patch('os.write', new=_capture_os_write), \
-                 patch.object(CapturedException, '__init__', new=_spy_ce_init):
-                with assert_raises(SystemExit) as cm:
-                    main(["datalad"] + list(args))
-                eq_('cmdline', datalad.get_apimode())
-                stdout = cmout.getvalue()
-                stderr = cmerr.getvalue()
-                assert_equal(
-                    cm.value.code, exit_code,
-                    msg="Exit code mismatch.\nstdout:\n%s\nstderr:\n%s\n"
-                        "log:\n%s\ncaught exceptions:\n%s"
-                        % (stdout, stderr, "\n".join(log_records),
-                           "\n".join(caught_exceptions)))
-        finally:
-            logging.getLogger('datalad').removeHandler(log_handler)
-        if expect_stderr is False:
-            assert_equal(stderr, "")
-        elif expect_stderr is True:
-            # do nothing -- just return
-            pass
-        else:
-            # must be a string
-            assert_equal(stderr, expect_stderr)
+        with patch('sys.stderr', new=fakeerr) as cmerr, \
+             patch('sys.stdout', new=fakeout) as cmout, \
+             patch.object(datalad.ui.ui._ui, 'out', new=fakeout):
+            with assert_raises(SystemExit) as cm:
+                main(["datalad"] + list(args))
+            eq_('cmdline', datalad.get_apimode())
+            assert_equal(cm.value.code, exit_code)
+            stdout = cmout.getvalue()
+            stderr = cmerr.getvalue()
+            if expect_stderr is False:
+                assert_equal(stderr, "")
+            elif expect_stderr is True:
+                # do nothing -- just return
+                pass
+            else:
+                # must be a string
+                assert_equal(stderr, expect_stderr)
     finally:
         # restore what we had
         datalad.__api = was_mode

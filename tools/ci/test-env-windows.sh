@@ -35,11 +35,20 @@ reg add "HKLM\\SYSTEM\\CurrentControlSet\\Control\\FileSystem" \
 git config --system filter.annex.process "git-annex filter-process"
 
 # A short, top-level scratch dir keeps generated test paths well under
-# Windows' path-length limits even with LongPathsEnabled.
-mkdir -p /c/DLTMP
+# Windows' path-length limits even with LongPathsEnabled -- but it must
+# live on the same drive as the checkout. GitHub Actions' Windows
+# runners check the repository out to D:, not the OS/profile drive C:,
+# and Python's os.path.relpath() (used e.g. by datalad's own pwd
+# handling) cannot compute a relative path across drives: a TMP/TEMP on
+# a different drive than the checkout makes it raise "ValueError: path
+# is on mount 'D:', start on mount 'C:'" wherever a command's cwd
+# (checkout-drive) and a temp path (profile-drive) get compared.
+checkout_drive=$(pwd -W | cut -c1)
+checkout_drive_lower=$(echo "$checkout_drive" | tr '[:upper:]' '[:lower:]')
+mkdir -p "/$checkout_drive_lower/DLTMP"
 {
-  echo "TMP=C:\\DLTMP"
-  echo "TEMP=C:\\DLTMP"
+  echo "TMP=$checkout_drive:\\DLTMP"
+  echo "TEMP=$checkout_drive:\\DLTMP"
 } >> "$GITHUB_ENV"
 
 # --- SSH server, for DATALAD_TESTS_SSH ---
