@@ -47,9 +47,9 @@ jobs:
           # otherwise, so the `test` job below can key off it directly.
           if [ "${{ github.event_name == 'schedule' }}" = true ]
           then
-              yq '{"include": [.[] | .os //= "ubuntu-latest"]} | to_json' tools/ci/test-jobs.yml >> "$GITHUB_OUTPUT"
+              yq '{"include": [.[] | .os |= (. // "ubuntu-latest")]} | to_json' tools/ci/test-jobs.yml >> "$GITHUB_OUTPUT"
           else
-              yq '{"include": [.[] | select(."cron-only" != true) | .os //= "ubuntu-latest"]} | to_json' tools/ci/test-jobs.yml >> "$GITHUB_OUTPUT"
+              yq '{"include": [.[] | select(."cron-only" != true) | .os |= (. // "ubuntu-latest")]} | to_json' tools/ci/test-jobs.yml >> "$GITHUB_OUTPUT"
           fi
           echo 'EOT' >> "$GITHUB_OUTPUT"
 
