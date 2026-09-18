@@ -1395,9 +1395,15 @@ def test_run_explicit_dirty_inputs(path=None):
                   result_renderer='disabled')
     assert_in_results(res, action='run', status='impossible')
     # the message reports the path the way datalad reports paths
-    # everywhere -- with the platform's separator, so do not hardcode one
-    ok_(any(op.join('data', 'in.dat') in str(r.get('message', ''))
-            for r in res))
+    # everywhere -- with the platform's separator, so do not hardcode one.
+    # Report what we did get: an `impossible` from the input *preparation*
+    # looks the same to assert_in_results() above as the dirty-input one
+    # this is actually about, and telling them apart from a bare
+    # `assert False` is impossible.
+    messages = [str(r.get('message', '')) for r in res]
+    ok_(any(op.join('data', 'in.dat') in m for m in messages),
+        msg="no result named the input relative to the dataset; got %r"
+            % (messages,))
     ds.save()
 
     # without --explicit nothing changes: any dirty dataset is refused
