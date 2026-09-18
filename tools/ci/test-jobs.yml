@@ -9,8 +9,8 @@
 # * every entry runs the whole suite except `@turtle`.  There used to be a
 #   "not slow" / "slow only" split per scenario; a full run now costs about
 #   what the "not slow" half used to, so one job per scenario covers more for
-#   the same money.  Set PYTEST_SELECTION/PYTEST_SELECTION_OP only if a job
-#   really needs a subset.
+#   the same money.  Scope a job with TESTS_TO_PERFORM if it really needs a
+#   subset -- the marker-based selection knob is gone.
 # * git-annex comes from the PyPI wheel unless the entry says otherwise, which
 #   is both the fastest to install and unwrapped (worth 2-3x on test runtime
 #   over the standalone bundle).  The bundle and the conda package are

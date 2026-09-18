@@ -21,13 +21,6 @@ defaults:
     shell: 'bash -eio pipefail {0}'
 
 env:
-   # Empty selection == everything except "turtle", which is never run here.
-   # We used to split each scenario into a "not slow" and a "slow" job; with
-   # git-annex no longer wrapped in a standalone bundle a full run costs about
-   # what the "not slow" half used to, so one job per scenario covers more for
-   # the same money -- and PRs stop skipping the @slow/@network tests.
-   PYTEST_SELECTION: ""
-   PYTEST_SELECTION_OP: "not"
    # A stall guard rather than a "needs @slow annotation" lint: with nothing
    # but @turtle excluded, a test legitimately taking a couple of minutes is
    # not a mistake, but one taking 5 is stuck.
@@ -300,7 +293,7 @@ jobs:
             -m pytest "${PYTEST_OPTS[@]}" \
             -c ../tox.ini \
             -n "$PYTEST_NPROC" \
-            -m "${PYTEST_SELECTION:+$PYTEST_SELECTION_OP($PYTEST_SELECTION) and }not(turtle)" \
+            -m "not(turtle)" \
             --doctest-modules \
             --report-log=pytest-report.jsonl \
             --pyargs ${TESTS_TO_PERFORM:-datalad}
