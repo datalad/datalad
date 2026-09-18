@@ -2448,6 +2448,11 @@ _HEAVY_TREE = {
 
 # @known_failure_windows  # might fail with some older annex `cp` failing to set permissions
 @slow  # 313s  well -- if errors out - only 3 sec
+# Adding _HEAVY_TREE's 10k files over NFS trips git-annex's
+# "changed while it was being added" check on the attribute cache, so the
+# job fails at random.  What this test is about -- splitting an over-long
+# argument list -- is filesystem-agnostic, so NFS buys no coverage here.
+@skip_if(on_github and on_nfs)
 @pytest.mark.parametrize("cls", [GitRepo, AnnexRepo])
 @with_tree(tree=_HEAVY_TREE)
 def test_files_split(topdir=None, *, cls):
