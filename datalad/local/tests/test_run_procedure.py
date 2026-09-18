@@ -40,6 +40,7 @@ from datalad.tests.utils_pytest import (
     known_failure_windows,
     ok_file_has_content,
     patch_config,
+    skip_if_no_annex_magicmime,
     with_tempfile,
     with_tree,
 )
@@ -375,6 +376,7 @@ When the earth was flat
     '0blob': '\x00',
     'emptyline': '\n',  # libmagic: "binary" "application/octet-stream"
 })
+@skip_if_no_annex_magicmime
 def test_text2git(path=None):
     # Test if files being correctly annexed in a ds configured with text2git.
     TEXT_FILES = ('JSON', 'YAML', 'MARKDOWN', 'empty')
@@ -438,6 +440,8 @@ def test_call_fmt_from_env_requires_reload(path=None):
         ds.run_procedure("p")
 
 
+# runs cfg_text2git, whose annex.largefiles uses mimeencoding=
+@skip_if_no_annex_magicmime
 @with_tempfile
 def test_run_proc_with_dict(path=None):
     # Test whether a result from run_procedure(discover=True) will be accepted

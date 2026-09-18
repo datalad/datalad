@@ -2020,6 +2020,53 @@ def skip_if_adjusted_branch(func):
     return _wrap_skip_if_adjusted_branch
 
 
+@lru_cache(maxsize=1)
+def get_annex_build_flags():
+    """Build flags git-annex reports in the output of `git annex version`
+
+    Not every build enables every flag.  MagicMime in particular -- what
+    `annex.largefiles=(mimetype=...)` needs -- requires libmagic at build
+    time, and git-annex's macOS wheel on PyPI currently ships without it
+    (it bundles magic.mgc but no libmagic), so the capability cannot be
+    inferred from the git-annex version alone.
+
+    Returns
+    -------
+    frozenset of str
+      Empty if git-annex is unavailable or reports no `build flags:` line,
+      so callers degrade to treating every capability as absent.
+    """
+    try:
+        out = WitlessRunner().run(
+            ['git', 'annex', 'version'], protocol=StdOutErrCapture)['stdout']
+    except Exception as exc:
+        lgr.debug("Could not determine git-annex build flags: %s", exc)
+        return frozenset()
+    for line in out.splitlines():
+        if line.startswith('build flags:'):
+            return frozenset(line.split(':', 1)[1].split())
+    return frozenset()
+
+
+def skip_if_no_annex_magicmime(func):
+    """Skip test if git-annex cannot match files by MIME type
+
+    A git-annex built without MagicMime rejects an `annex.largefiles`
+    expression using `mimetype=` or `mimeencoding=` outright, failing the
+    command rather than falling back to matching by some other means.  Our
+    cfg_text2git procedure relies on `mimeencoding=binary`, so tests running
+    it need this too.
+    """
+
+    @wraps(func)
+    @attr('skip_if_no_annex_magicmime')
+    def _wrap_skip_if_no_annex_magicmime(*args, **kwargs):
+        if 'MagicMime' not in get_annex_build_flags():
+            pytest.skip("git-annex was built without MagicMime support")
+        return func(*args, **kwargs)
+    return _wrap_skip_if_no_annex_magicmime
+
+
 def get_ssh_port(host):
     """Get port of `host` in ssh_config.
 
