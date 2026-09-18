@@ -1394,7 +1394,10 @@ def test_run_explicit_dirty_inputs(path=None):
                   explicit=True, on_failure='ignore',
                   result_renderer='disabled')
     assert_in_results(res, action='run', status='impossible')
-    ok_(any('data/in.dat' in str(r.get('message', '')) for r in res))
+    # the message reports the path the way datalad reports paths
+    # everywhere -- with the platform's separator, so do not hardcode one
+    ok_(any(op.join('data', 'in.dat') in str(r.get('message', ''))
+            for r in res))
     ds.save()
 
     # without --explicit nothing changes: any dirty dataset is refused
