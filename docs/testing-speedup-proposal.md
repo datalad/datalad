@@ -57,19 +57,24 @@ Three findings, in order of payoff:
    several *unmarked* tests take 8–21 s.  The slow/not-slow split costs more in
    coverage gaps (PRs never run the 75 `@slow` tests) than it saves in time.
 
-The proposals, in short (§7):
+The proposals, in short — as two pull requests (§7):
 
-|     | proposal                                                                              |       saving |
-| --- | ------------------------------------------------------------------------------------- | -----------: |
-| P1  | install git-annex from PyPI by default, on all three platforms                        | ~180 job-min |
-| P2  | keep *one* standalone, *one* minimum-version, *one* conda entry                       |            — |
-| P3  | de-duplicate the 3.12/3.13/3.14 matrix pairs                                          | ~112 job-min |
-| P4  | scope the six "scenario smoke" entries like the NFS ones already are                  |  ~78 job-min |
-| P5  | stop provisioning NeuroDebian on jobs that never use APT                              |        small |
-| P6  | dead knobs: `DATALAD_TESTS_SETUP_TESTREPOS`, duplicate `--doctest-modules`, pip cache |        small |
-| P7  | no coverage on cron runs (+39 % measured); `-n 2` → `-n auto` (1.58×)                 | ~160 job-min |
-| P8  | test-level: `CMD_MAX_ARG` patching, `testremote --fast`, session dataset templates    |  ~10 min/run |
-| P9  | durations-based sharding from the `pytest-report.jsonl` already uploaded              |    wall time |
+|        |                                                                                |              |
+| ------ | ------------------------------------------------------------------------------ | -----------: |
+| **A1** | install git-annex from PyPI by default, on all three platforms                 | ~180 job-min |
+| **A2** | retire miniconda; standalone + conda coverage on cron only                     |            — |
+| **A3** | one selection instead of the slow/not-slow split; Python sweep = base + newest | ~112 job-min |
+| **A4** | scope the six "scenario smoke" entries like the NFS ones already are           |  ~78 job-min |
+| **A5** | coverage for PRs under review only — off on cron and on drafts                 | ~160 job-min |
+| **A6** | `-n 2` → an explicit worker count (1.58× measured at `-n 4`)                   |      per job |
+| **A7** | stop provisioning NeuroDebian where APT is unused; pip cache / `uv`            |        small |
+| **A8** | drop `DATALAD_TESTS_SETUP_TESTREPOS`, duplicate `--doctest-modules`            |        small |
+| **B1** | `test_files_split`: monkeypatch `CMD_MAX_ARG` instead of 10 000 files          |  ~10 min/run |
+| **B2** | `git-annex testremote --fast --size=1KiB`                                      |   ~1 min/run |
+| **B3** | delete the uncollected `@turtle` in `test_s3.py`                               |            — |
+| **B4** | remove `utils_testrepos.py` + its config option outright                       |            — |
+| **B5** | fixture reuse by tarball for one `@slow` cluster                               |      minutes |
+| later  | a caching dataset fixture keyed on the tree spec (P11)                         |            — |
 
 Measured and **rejected**: TMPDIR on tmpfs (within noise), `eatmydata` /
 `core.fsync=none` / `gc.auto=0` (this suite is not fsync-bound),
@@ -120,6 +125,16 @@ _DL_ANNEX_INSTALL_SCENARIO: "miniconda=py37_23.1.0-1 --python-match minor --batc
 Travis has been gone for years, and `actions/setup-python` puts its Python
 ahead of conda's anyway.
 
+Worth separating the two jobs miniconda was doing here.  As a **Python-version
+provider** it is redundant: `actions/setup-python` does that in seconds, and
+does it on all three platforms.  As a way to **install git-annex from a conda
+package** it is still meaningful coverage, but `miniconda` is the slowest way
+in and datalad-installer v1.2.x deprecates that component outright in favour of
+`miniforge` ("to avoid Anaconda Terms of Service issues").  `micromamba` (a
+single static binary, no bootstrap installer) or `pixi` is the uniform, fast
+replacement, and `uv` is the same argument one layer up for the Python
+dependencies.
+
 ### 2.2 Three matrix entries are exact duplicates
 
 `test.yml` builds the marker expression as
@@ -145,8 +160,11 @@ That is ~112 job-minutes per run of duplicated work.  (The 3.10 pair with
 `PYTEST_SELECTION` at the non-empty default, so `OP=""` / `OP="not "` really
 do split the suite in halves.)
 
-Either the pairs were meant to be complementary halves — in which case both
-need an explicit `PYTEST_SELECTION` — or one of each pair can go.
+The intention was presumably the slow/not-slow split that the 3.10 pair still
+implements.  Rather than repair it, the cheaper move is to drop the split
+altogether (§7 A3): once a full run is ~2× cheaper, one job per scenario
+running everything-but-turtle costs about what today's "not slow" half costs,
+saves a second job's worth of setup, and stops PRs skipping 101 tests.
 
 ### 2.3 Wall-clock is set by a concurrency cap of 20, not by the matrix size
 
@@ -178,9 +196,10 @@ So the 85 min wall = 31 min of queueing + a 54 min job.  Consequences:
   from APT/NeuroDebian any more.  It is pure setup cost on 20 jobs.
 * `test.yml` exports `DATALAD_TESTS_SETUP_TESTREPOS=1`.  The config key it maps
   to (`datalad.tests.setup.testrepos`) is still *declared* in
-  `datalad/interface/common_cfg.py`, but nothing reads it since the
-  nose→pytest migration removed `@with_testrepos`; `utils_testrepos.py`'s
-  classes have no users left in datalad itself either.  Dead knob.
+  `datalad/interface/common_cfg.py`, but has **zero** readers since the
+  nose→pytest migration removed `@with_testrepos`, and
+  `datalad/tests/utils_testrepos.py` has exactly one in-tree user left — its
+  own test file.  All of it goes (§7 A8, B4), not just the export.
 * `--doctest-modules` is passed **twice** in the `Run tests` step (once from
   `PYTEST_OPTS`, once on the command line).
 
@@ -210,8 +229,9 @@ A `git_annex:cli` console script `os.execv`s the binary.
 
 **`dl.kyleam.com/git-annex/`** — 116 MB.  One statically linked Linux/amd64
 ELF, with `git-annex-shell`, `git-remote-annex` and `git-remote-tor-annex` as
-symlinks to it.  Build scripts at `git.kyleam.com/static-annex`; only the most
-recent releases are kept.
+symlinks to it.  Build scripts at `git.kyleam.com/static-annex`; a good number
+of older releases are kept alongside the recent ones, though not every one —
+10.20260316, the version the rest of this document uses, is not among them.
 
 Note that `-m datalad/packages` (used by the 3.14 entries, and on Windows since
 #7933) is *also* the standalone bundle on Linux: datalad-installer downloads
@@ -318,8 +338,9 @@ the same Haskell binary:
 That also settles the choice between the two wrapper-free options on grounds
 other than speed: coverage (the wheel has macOS and Windows builds and every
 release since 10.20250605; the static builds are Linux/amd64 and only the most
-recent releases), an installer method (`git-annex -m pip`, §7 P1), and
-`LD_PRELOAD` (works against the wheel, impossible against a static binary).
+recent releases), an installer method (`datalad-installer git-annex -m pip` —
+its method selector, not `python -m pip`; §7 A1), and `LD_PRELOAD` (works
+against the wheel, impossible against a static binary).
 
 ### 3.4 Side benefits of leaving the standalone bundle behind
 
@@ -334,13 +355,14 @@ recent releases), an installer method (`git-annex -m pip`, §7 P1), and
 * No `~/.ssh/git-annex-shell` / `~/.cache/git-annex/locales` side effects in
   `$HOME` during tests.
 
-### 3.5 What to keep on a standalone build anyway
+### 3.5 What to keep on a standalone build anyway (on cron)
 
 The standalone bundle is what a large fraction of users actually install
 (NeuroDebian, `datalad-installer` defaults, conda).  Its `PATH`/`GIT_EXEC_PATH`/
 `LOCPATH` behavior has caused real bugs before, so it deserves to stay in the
-matrix — but on **one** job, not on all of them.  `-m datalad/packages`
-installs it in 12 s, so that coverage is nearly free.
+matrix — but on **one cron job**, not on every PR.  Packaging variants of the
+same git-annex are not what a PR usually breaks, and `-m datalad/packages`
+installs in 12 s, so that coverage is nearly free where it belongs.
 
 Likewise the **minimum announced version** (`AnnexRepo.GIT_ANNEX_MIN_VERSION`
 = `10.20230126`, Debian bookworm's) is not on PyPI at all — PyPI's oldest
@@ -436,15 +458,16 @@ the number of `Dataset.create()` calls.
   exercised with ~200 files and a monkeypatched limit, in seconds.  Keep the
   full-size version as `@turtle` for cron if the "real limit" assurance is
   wanted.
-* **Module-scoped dataset templates.**  `test_rerun_merges.py` has 12 `@slow`
-  tests, each of which calls a `_setup_*` helper that does
+* **Build each fixture once, then hand out copies.**  `test_rerun_merges.py`
+  has 12 `@slow` tests, each of which calls a `_setup_*` helper that does
   `Dataset(path).create()` + 2–3 `ds.run()` + a merge.  The same pattern
   repeats in `test_update.py` (10 `@slow`), `test_get.py` (8),
-  `test_create_sibling.py` (7), `test_push.py` (5).  A helper that builds each
-  distinct fixture **once per session** and hands out `cp -a` copies would turn
-  12 × ~12 s of setup into 1 × 12 s + 12 × ~0.3 s.  It has to be opt-in:
-  copies share the dataset ID and annex UUID, which is fine for local-only
-  tests but not for tests that wire two copies together as siblings.
+  `test_create_sibling.py` (7), `test_push.py` (5).  Building each distinct
+  fixture **once per session** and unpacking a fresh copy per test turns
+  12 × ~12 s of setup into 1 × 12 s + 12 × milliseconds.  A tarball round-trip
+  is the better mechanism — see §5 — and it has to be opt-in: copies share the
+  dataset ID and annex UUID, which is fine for local-only tests but not for
+  tests that wire two copies together as siblings (§7 B5, P11).
 * **Mark what is actually slow.**  Several unmarked tests exceed the
   documented 10 s `@slow` threshold on the build CI uses.  Rather than annotate
   them by hand, drive the split from measured durations (P9) — the workflow
@@ -528,9 +551,11 @@ test time that is roughly **160 job-minutes per nightly run**.  On PR runs all
 14 jobs upload, which codecov merges; most of those jobs re-measure the same
 lines.
 
-`--dist worksteal` showed nothing at 91 tests / 2 workers; it may still help on
-a full 1300-test job with an imbalanced tail, so it is worth a single trial
-rather than a recommendation.
+`--dist worksteal` was then re-measured locally at a realistic scale —
+`datalad/core` + `datalad/support` + `datalad/local`, 574 tests at `-n 4`:
+**121 s with the default `--dist load`, 120 s with `--dist worksteal`**.  A
+dead heat, so it is not worth changing; the suite's tail is apparently not
+imbalanced enough for work stealing to matter.
 
 ### 6.3 git-level durability knobs
 
@@ -553,12 +578,17 @@ No gain — both variants land within the ±8 % noise floor, and if anything on
 the slow side.  Consistent with the `LD_PRELOAD` result above: this suite is
 not fsync-bound.  Dead end, recorded so nobody has to try it again.
 
-## 7. Proposal
+## 7. Proposal, as two pull requests
 
-Ordered roughly by payoff / risk.  Everything lands in `test.yml` +
-`tools/ci/test-jobs.yml`, except P8 which touches test files.
+The work splits cleanly along the line of what it touches.  **PR A** changes
+only `.github/workflows/test.yml` + `tools/ci/`; **PR B** changes only
+`datalad/`.  They are independent: PR A makes the suite cheaper to *run*, PR B
+makes the suite itself cheaper.  A third, larger piece (the caching dataset
+fixture, P11) is better as its own work later.
 
-### P1 — Install git-annex from PyPI by default  *(~180 job-min/run)*
+### PR A — CI tune-ups
+
+#### A1 — Install git-annex from PyPI by default  *(~180 job-min/run)*
 
 Teach the `Install git-annex` step a `pypi` scenario and make it the default:
 
@@ -586,30 +616,16 @@ env:
     fi
 ```
 
-Those symlinks can also recover the console script's own overhead.  The
-wheel's `git-annex` entry point is a Python script that `os.execv`s the real
-binary, which costs ~14 ms of interpreter startup per spawn — **+27 % of test
-time** (§3.3).  Pointing the symlinks at the binary instead of at the console
-script avoids it, at the price of setting `MAGIC` yourself, which is the only
-other thing the entry point does:
-
-```yaml
-    gadir=$(python -c 'import git_annex, os.path as op; print(op.dirname(git_annex.__file__))')
-    sudo ln -sf "$gadir/git-annex" /usr/local/bin/git-annex
-    sudo ln -sf "$gadir/git-annex" /usr/local/bin/git-annex-shell
-    echo "MAGIC=$gadir/magic.mgc" >> "$GITHUB_ENV"
-```
-
-Worth doing only after the plain version is proven in CI — it trades a
-supported entry point for 27 %.
+This exact step has been run locally under `act` (§8): git-annex 10.20260901
+installed in **1.0–2.4 s**, `git-annex-shell` resolved from `/usr/local/bin`,
+and `datalad/core/local/tests/test_create.py` passed 33/33.
 
 The `/usr/local/bin` symlinks are not cosmetic: `datalad`'s
 `SSHConnection.get_annex_installdir()` resolves git-annex on the far side with
 `sh -e -c 'dirname $(readlink -f $(which git-annex-shell))'`, and a
 non-interactive `sshd` session gets a minimal `PATH` that contains
-`/usr/local/bin` but not `$GITHUB_PATH` additions.  This is the one part of P1
-that needs a trial run to confirm (the `DATALAD_TESTS_SSH=1` and `sudo -E`
-jobs).
+`/usr/local/bin` but not `$GITHUB_PATH` additions.  The `DATALAD_TESTS_SSH=1`
+and `sudo -E` jobs are the ones to watch on the first real run.
 
 `pypi` is also the **only** method that is identical on all three platforms —
 wheels exist for `manylinux_2_34_{x86_64,aarch64}`, `macosx_14_0_arm64`,
@@ -619,63 +635,84 @@ method is Linux-only; `pypi` collapses all three to one line and drops a
 Homebrew install from the macOS jobs.
 
 **datalad-installer already has this method — it just is not on PyPI.**
-`git-annex -m pip` was added in
+`datalad-installer git-annex -m pip` (its *method* selector, not `python -m
+pip`) was added in
 [datalad-installer#219](https://github.com/datalad/datalad-installer/pull/219)
 ("Now that @mih provides those builds starting from 10.20250605 release"),
 merged 2026-04-15 and released as **v1.2.1**.  But PyPI's newest
 `datalad-installer` is **1.1.1 (2024-12-13)**: v1.2.0, v1.2.1 and v1.2.2 exist
-only as GitHub releases, and the `Install git-annex` step does a plain
-`pip install datalad-installer`, so CI gets 1.1.1, whose `PipInstaller.PACKAGES`
-knows only `datalad`.  So the real action item is not a new PR upstream but
-**publishing v1.2.2 to PyPI** (or, until then, installing datalad-installer
-from git).  Once that is done the scenario becomes just:
+only as GitHub releases, and the step does a plain `pip install
+datalad-installer`, so CI gets 1.1.1, whose `PipInstaller.PACKAGES` knows only
+`datalad`.  So the prerequisite is **publishing v1.2.2 to PyPI** (or installing
+datalad-installer from git meanwhile).  Once that is done the scenario becomes
+just `_DL_ANNEX_INSTALL_SCENARIO: "git-annex -m pip"` with the `-E new.env`
+machinery unchanged — but the `/usr/local/bin` symlinks are still needed, since
+`PipInstaller` does not call `manager.addpath()`.
+
+Optional, and only after the plain version is proven: the wheel's console
+script is a Python entry point that `os.execv`s the real binary, costing ~14 ms
+of interpreter startup per spawn — **+27 % of test time** (§3.3).  Pointing the
+symlinks at the binary instead avoids it, at the price of setting `MAGIC`
+yourself, which is the only other thing the entry point does:
 
 ```yaml
-_DL_ANNEX_INSTALL_SCENARIO: "git-annex -m pip"
+    gadir=$(python -c 'import git_annex, os.path as op; print(op.dirname(git_annex.__file__))')
+    sudo ln -sf "$gadir/git-annex" /usr/local/bin/git-annex
+    sudo ln -sf "$gadir/git-annex" /usr/local/bin/git-annex-shell
+    echo "MAGIC=$gadir/magic.mgc" >> "$GITHUB_ENV"
 ```
 
-with the `-E new.env` machinery unchanged.  The `/usr/local/bin` symlinks are
-still needed either way: `PipInstaller` does not call `manager.addpath()`, so
-the console-script directory only reaches `PATH` through whatever put it there
-(here `actions/setup-python`), which non-interactive `sshd` sessions do not
-see.
+#### A2 — Retire miniconda; keep conda coverage on cron only
 
-Note also that datalad-installer v1.2.x **deprecates the `miniconda`
-component** in favour of `miniforge` ("to avoid Anaconda Terms of Service
-issues") — an independent reason to stop pinning `miniconda=py37_23.1.0-1`.
+`miniconda` in the matrix served two purposes that have both moved on:
 
-### P2 — Keep, but shrink, standalone / minimum-version / conda coverage
+* **Python versions** — `actions/setup-python` already provides those, and
+  does it in seconds.  Nothing needs conda for that any more.
+* **git-annex from a conda package** — still worth covering, but not with
+  `miniconda`, which datalad-installer v1.2.x now deprecates outright in
+  favour of `miniforge` ("to avoid Anaconda Terms of Service issues").
+  `micromamba` or `pixi` is the faster, more uniform way in; §2.1 has the
+  measurement.
 
-Three entries, not fourteen:
+For PRs, neither the conda build nor the standalone bundle needs to be in the
+picture at all: both are *packaging* variants of the same git-annex, and a PR
+breaking them specifically is rare.  Keep **one cron entry each**:
 
-* one with `venv git-annex -m datalad/packages` — the NeuroDebian standalone
-  bundle, i.e. what most users run, 12 s to install.  Keeps `runshell`,
-  the bundled `git`, `LOCPATH`/`GIT_EXEC_PATH` behavior under test;
-* one cron entry with
-  `miniconda=py310_25.9.1-1 --python-match minor --batch git-annex=10.20230126 -m conda`
-  for `AnnexRepo.GIT_ANNEX_MIN_VERSION` — that version is **not on PyPI**
-  (PyPI's oldest is `10.20250520b7`), so this is exactly the "one ad-hoc
-  conda/NeuroDebian case" worth keeping.  It is already in the matrix and
-  already takes 0.7 min;
-* one with `miniforge --channel conda-forge … -m conda` so the conda install
-  path itself keeps being exercised — `miniforge`, not `miniconda`, which
-  datalad-installer v1.2.x deprecates over Anaconda's Terms of Service.
+* `git-annex -m datalad/packages` — the NeuroDebian standalone bundle, i.e.
+  what most users run, 12 s to install.  Keeps `runshell`, the bundled `git`
+  and `LOCPATH`/`GIT_EXEC_PATH` behavior under test.
+* one conda-packaged entry via micromamba/pixi, so that install path keeps
+  being exercised.
+* the **minimum announced version** (`AnnexRepo.GIT_ANNEX_MIN_VERSION` =
+  `10.20230126`, Debian bookworm's) — not on PyPI at all, so this is the one
+  ad-hoc conda/NeuroDebian case that has to stay.  It is already in the matrix
+  at 0.7 min with a current miniconda.  Natural extension later, as dandi-cli
+  recently did: make that job a *minimal-dependencies* job generally, pinning
+  the lowest supported versions of the Python dependencies too, not just
+  git-annex.
 
-Delete the `py37_23.1.0-1` pin everywhere.
+#### A3 — One selection, and a Python sweep that is base + newest  *(~112 job-min/run)*
 
-### P3 — De-duplicate the matrix  *(~112 job-min/run, −3 jobs)*
+Two things collapse together here.
 
-Make the 3.12 / 3.13 / 3.14 pairs either explicitly complementary
-(`PYTEST_SELECTION: "integration or usecase or slow or network"` on both, with
-`OP: ""` vs `OP: "not "`), or single entries.  Recommendation: single entries
-running everything-but-turtle — with P1 a full job is affordable, and removing
-3 jobs also buys back queue slots (§2.3).
+**The slow/not-slow split can go.** The 3.12/3.13/3.14 entries come in pairs
+that were presumably meant to be complementary halves, but are byte-identical
+invocations (§2.2).  Rather than repair the split, drop it: with A1 making a
+full run ~2× cheaper, one job per scenario running everything-but-turtle costs
+about what the "not slow" half costs today, and saves a second job's worth of
+setup — and PRs stop skipping the 101 `@slow`/`network` tests they skip now.
 
-### P4 — Scope the "scenario smoke" jobs  *(~75 job-min/run)*
+**Keep a Python sweep, but concentrate it.** On PRs: the base supported version
+(3.10) and the newest (3.14), both full runs.  On cron: the middles (3.12,
+3.13) plus whatever else is cron-only today.  That keeps a partial sweep on
+every PR without paying for four of them.
+
+#### A4 — Scope the "scenario smoke" jobs  *(~78 job-min/run)*
 
 Six entries exist to smoke-test an environment knob (log level/target, obscure
-filename prefix, locale, `max-batched`, SSH multiplexing off, pathspec-from-file)
-and each runs the *whole* suite to do it — 155 min of test time between them:
+filename prefix, locale, `max-batched`, SSH multiplexing off,
+pathspec-from-file) and each runs the *whole* suite to do it — 155 min of test
+time between them:
 
 | entry                                                                   |     `Run tests` |
 | ----------------------------------------------------------------------- | --------------: |
@@ -687,129 +724,277 @@ and each runs the *whole* suite to do it — 155 min of test time between them:
 
 The NFS entries already do the right thing with `TESTS_TO_PERFORM`.  Giving
 these the same treatment (e.g. `datalad.tests datalad.core datalad.cli
-datalad.support`) roughly halves them.  This is a coverage/time judgment call
-for the team, hence listed separately from P1–P3.
+datalad.support`) roughly halves them.  This is a coverage/time judgment call,
+hence listed separately from A1–A3.
 
-### P5 — Stop setting up NeuroDebian where it is unused
+#### A5 — Coverage: keep it for PRs under review, drop it elsewhere  *(~160 job-min/run)*
+
+Coverage costs **+39 %** of test time (§6.2) and `test.yml` measures it on all
+21 jobs while uploading only `if: github.event_name != 'schedule'` — so every
+nightly run pays for a report nobody consumes.  It *is* valuable on PRs, so the
+gate is not "less coverage" but "coverage where someone reads it":
+
+* **cron runs**: off.
+* **draft PRs**: off — nobody is reading the codecov annotation yet.
+* **PRs ready for review**: on, as today.
+
+The draft part needs one addition to the trigger so that flipping a PR out of
+draft re-runs the suite with coverage on:
+
+```yaml
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+```
+
+`ready_for_review` fires only on draft → ready, not the other way, so flipping
+back to draft costs nothing.  In the `Run tests` step:
+
+```yaml
+if [ "${{ github.event_name }}" != schedule ] \
+   && [ "${{ github.event.pull_request.draft }}" != true ]; then
+  PYTEST_OPTS+=( --cov=datalad --cov-report=xml )
+fi
+```
+
+#### A6 — `-n 2` → an explicit worker count  *(up to 1.58×)*
+
+Measured 1.86× from `-n 1` to `-n 2` and 2.93× to `-n 4` (§6.1), and `-n 2` is
+hardcoded while the runners are believed to have 4 vCPU.  `-n auto` is the
+tempting spelling but not the reliable one — it follows `os.cpu_count()`, which
+on a container-limited runner can report the host's CPUs rather than the
+job's quota, and it would silently change behavior on macOS/Windows runners
+with different sizing.  So: an explicit `PYTEST_NPROC` knob, default 4 on
+Linux, overridable per matrix entry, with the NFS entries left at 2.  Confirm
+the runner sizing first with a one-line `nproc` in the workflow, and roll the
+change out on one entry before the whole matrix — `test_push.py` already
+carries a comment about a test exceeding 30 s "when running in parallel with
+n=2", so the suite has some parallelism sensitivity.
+
+#### A7 — Stop setting up NeuroDebian where it is unused
 
 Gate the `neurodebian-ci-setup.sh` lines in `tools/ci/test-env-linux.sh` on a
-matrix flag (`needs-neurodebian: true`), set only on the P2 entry that needs
-APT.
+matrix flag (`needs-neurodebian: true`), set only on the A2 entry that needs
+APT.  Also `cache: pip` on `actions/setup-python`, and `uv pip install` for
+`requirements-devel.txt` (CONTRIBUTING already recommends `uv`): ~15 s × 20
+jobs.
 
-### P6 — Dead knobs and small cleanups
+#### A8 — Dead knobs in the workflow
 
-* drop `DATALAD_TESTS_SETUP_TESTREPOS=1` (nothing reads it);
-* drop the duplicated `--doctest-modules`;
-* `cache: pip` on `actions/setup-python`, and `uv pip install` for
-  `requirements-devel.txt` (CONTRIBUTING already recommends `uv`): ~15 s × 20
-  jobs;
-* separately: either retire `datalad/tests/utils_testrepos.py` +
-  `datalad.tests.setup.testrepos` or document them as extension-only.
+Drop `DATALAD_TESTS_SETUP_TESTREPOS=1` (nothing reads it — see B4) and the
+duplicated `--doctest-modules` in the `Run tests` step.
 
-### P7 — The two measured pytest knobs
+### PR B — test-suite changes
 
-1. **Stop measuring coverage where it is discarded** *(~160 job-min/nightly)*.
-   Coverage costs +39 % of test time (§6.2) and the upload is gated on
-   `github.event_name != 'schedule'`, so every nightly run measures 21 jobs'
-   worth of coverage and throws all of it away:
+#### B1 — `test_files_split`: patch the limit instead of materialising 10 000 files
 
-   ```yaml
-   # in the Run tests step
-   if [ "${{ github.event_name }}" != schedule ] && [ "${COVERAGE:-1}" = 1 ]; then
-     PYTEST_OPTS+=( --cov=datalad --cov-report=xml )
-   fi
-   ```
+`@slow  # 313s`, parametrized ×2 → ~10 min/run.  It materialises 100 × 100
+files with 101-character names only to push a command line past `CMD_MAX_ARG`
+and exercise the chunking in `datalad.utils.generate_file_chunks`.  That
+function reads the module-level `datalad.utils.CMD_MAX_ARG` at call time, so
+the same path can be exercised with ~200 files and a monkeypatched limit, in
+seconds.  Keep the full-size version as `@turtle` for cron if the "real limit"
+assurance is wanted.
 
-   For PR runs, consider narrowing it further to the two or three jobs that
-   actually contribute distinct paths rather than all 14 — codecov merges
-   whatever arrives, and most of those jobs re-measure the same lines.
-2. **`-n 2` → `-n auto` (capped)** *(up to 1.58× per job)*.  Measured 1.86×
-   from `-n 1` to `-n 2` and 2.93× to `-n 4`; `-n 2` is hardcoded.  Add
-   `nproc` output to the workflow first to confirm the runners really have 4,
-   then roll it out on one entry before the whole matrix — `test_push.py`
-   already carries a comment about a test exceeding 30 s "when running in
-   parallel with n=2", so the suite has some parallelism sensitivity.  Keep the
-   NFS entries at `-n 2`.
+#### B2 — `git-annex testremote --fast`
 
-Not recommended, measured and rejected: TMPDIR on tmpfs (within noise),
-`eatmydata`/`core.fsync=none`/`gc.auto=0` (no effect — this suite is not
-fsync-bound), `--dist worksteal` (no effect at the scale tested).
+`test_gitannex_local` (`@slow`, 41 s) and `test_gitannex_ssh` (the only
+collected `@turtle`) call `ds.repo._call_annex(['testremote', 'store'], …)`.
+`testremote` accepts `--fast` ("avoid slow operations") and `--size` (default
+**1 MiB**); neither is passed.  `['testremote', '--fast', '--size=1KiB',
+'store']` should cut both by a large factor while still exercising the RIA
+special remote's protocol surface.
 
-### P8 — Test-level fixes
+#### B3 — Delete `test_s3.py::_test_expiring_token`
 
-1. **`test_files_split`** (`@slow  # 313s`, parametrized ×2 → ~10 min/run).  It
-   materializes 100 × 100 files with 101-character names only to push a command
-   line past `CMD_MAX_ARG` and exercise the chunking in
-   `datalad.utils.generate_file_chunks`.  That function reads the module-level
-   `datalad.utils.CMD_MAX_ARG` at call time, so the same path can be exercised
-   with ~200 files and a monkeypatched limit, in seconds.  Keep the full-size
-   version as `@turtle` for cron if the "real limit" assurance is wanted.
-2. **`test_gitannex_local` / `test_gitannex_ssh`**: pass `--fast --size=1KiB` to
-   `git-annex testremote` (it defaults to 1 MiB and the full slow matrix):
-   `ds.repo._call_annex(['testremote', '--fast', '--size=1KiB', 'store'], …)`.
-   That is the only collected `@turtle` and a 41 s `@slow`.
-3. **`test_s3.py::_test_expiring_token`**: `@turtle @integration` on a
-   `_`-prefixed function pytest never collects — it waits out a 900 s STS
-   token.  Delete it, or rename it and keep it cron-only.
-4. **Session-scoped dataset templates.**  `test_rerun_merges.py` (12 `@slow`),
-   `test_update.py` (10), `test_get.py` (8), `test_create_sibling.py` (7),
-   `test_push.py` (5) all re-build the same hierarchy per test.  A helper that
-   builds each distinct fixture once per session and hands out
-   `shutil.copytree(..., symlinks=True)` copies turns ~350 ms per dataset into
-   ~6 ms (§5).  Opt-in only: copies share the dataset ID and annex UUID, which
-   is fine for local-only tests but not for tests that wire two copies together
-   as siblings.
-5. **Stop hand-maintaining `@slow`.**  Several unmarked tests already exceed the
-   documented 10 s threshold on the build CI uses.  Drive the split from
-   measured durations instead (P9).
+`@turtle @integration` on a `_`-prefixed function pytest never collects; it
+waits out a 900 s STS token.  Dead code with decorative markers.
 
-### P9 — Durations-based sharding instead of hand-written module lists
+#### B4 — Remove the test-repo machinery outright
 
-`test.yml` already uploads a `pytest-report.jsonl` per job.  Commit a
+`datalad/tests/utils_testrepos.py` (`TestRepo`, `BasicAnnexTestRepo`,
+`BasicGitTestRepo`, `SubmoduleDataset`, `NestedDataset`, `InnerSubmodule`) has
+exactly one in-tree user left: its own `test_utils_testrepos.py`.  The
+`datalad.tests.setup.testrepos` config option in
+`datalad/interface/common_cfg.py` has **zero** readers since the nose→pytest
+migration removed `@with_testrepos`.  Remove all three: the module, its test,
+and the config option — plus the `DATALAD_TESTS_SETUP_TESTREPOS` export in
+`test.yml` (A8).
+
+#### B5 — Fixture reuse by tarball, not by `cp`
+
+`test_rerun_merges.py` (12 `@slow`), `test_update.py` (10), `test_get.py` (8),
+`test_create_sibling.py` (7) and `test_push.py` (5) each rebuild the same
+dataset hierarchy per test, at ~350 ms per `create()` (§5).  Reusing one built
+copy is the win, but `cp -a` is the wrong mechanism: it has to be told to
+preserve symlinks, times and modes, and annex object files are read-only, which
+makes both the copy and the later cleanup awkward.  A tarball round-trip is
+better behaved — `tar` records the modes and permissions explicitly, and
+untarring into a fresh temp dir gives a clean tree every time.  §5 has both
+measured.
+
+Scope for PR B: convert *one* cluster (`test_rerun_merges.py` is the most
+uniform) with a local helper, and only then generalise.
+
+#### P11 (separate, later) — a caching dataset fixture
+
+The general form of B5 is a session-scoped fixture that mints a dataset from a
+`tree` spec *once*, tars it, and untars a fresh copy per test — effectively a
+`with_tree_dataset` keyed on the tree spec plus the creation options, so
+several test modules asking for the same shape share one build.  There is prior
+art to learn from: `datalad/tests/utils_cached_dataset.py` already implements a
+cache of *clones* keyed on a URL (`datalad.tests.cache`), and has no in-tree
+users left — the idea was started and dropped.  Worth doing deliberately, with
+its own design pass, rather than smuggling it into PR B: the cache key has to
+cover everything that affects the result (tree, create options, git/git-annex
+version, repo version), and copies share a dataset ID and annex UUID, which is
+fine for local-only tests but not for tests that wire two copies together as
+siblings.
+
+### Optional, once A1–A3 have landed — durations-based sharding
+
+`test.yml` already uploads a `pytest-report.jsonl` per job.  A committed,
 periodically refreshed `tools/ci/test-durations.json` plus a small
-`tools/ci/split-tests.py` that turns it into N balanced chunks, then replace the
+`tools/ci/split-tests.py` would turn it into N balanced chunks and replace the
 hand-maintained `TESTS_TO_PERFORM` module lists (Windows ×3, macOS ×3, NFS ×2)
-with `chunk: i/N`.  Benefits: balanced jobs instead of a grouping
-frozen years ago; and — once P1 has made tests cheap — the option to retire the
-`slow`/`not slow` split entirely, so PRs stop skipping 101 tests.  Mind the
-concurrency cap (§2.3): shard only after P3/P4 have freed slots.
+with `chunk: i/N`.  Mind the concurrency cap (§2.3): shard only after A3/A4
+have freed slots.
 
 ### Projected effect
 
 Starting from the measured nightly baseline of **814 job-min / 85 min wall /
 21 test jobs**.  Split into what follows from measurements alone and what
-additionally needs a team judgment call:
+additionally needs a judgment call:
 
-**Verified changes only (P1 + P3 + P5 + P6 + P7.1):**
+**Verified changes only (A1 + A3 + A5 + A7 + A8):**
 
 | step                                                   |  job-min |
 | ------------------------------------------------------ | -------: |
 | baseline                                               |      814 |
-| P1: install 196 min → ~10 min                          |     −186 |
-| P3: drop 3 duplicate jobs (their 115 min of test time) |     −115 |
-| P1: test time ÷1.5 on the remaining 464 min            |     −155 |
-| P7.1: no coverage on cron runs (÷1.39 on ~309 min)     |      −87 |
-| P5+P6: NeuroDebian gating, pip cache/`uv`              |      −20 |
+| A1: install 196 min → ~10 min                          |     −186 |
+| A3: drop 3 duplicate jobs (their 115 min of test time) |     −115 |
+| A1: test time ÷1.5 on the remaining 464 min            |     −155 |
+| A5: no coverage on cron runs (÷1.39 on ~309 min)       |      −87 |
+| A7+A8: NeuroDebian gating, pip cache/`uv`              |      −20 |
 | **remaining**                                          | **~250** |
 
 The ÷1.5 on test time is deliberately below the 2.0–3.5× measured on
 annex-heavy modules, since some jobs are NFS-, network- or doctest-bound rather
 than annex-bound.  That leaves 18 jobs instead of 21, which drops below the
-concurrency cap (§2.3), so the
-31 min of queueing disappears: **wall ~30 min instead of 85**.  On a PR run
-(11 jobs after P3, coverage retained) the longest job goes from ~54 min to
-roughly **28 min** — that is what a contributor would feel.
+concurrency cap (§2.3), so the 31 min of queueing disappears: **wall ~30 min
+instead of 85**.  On a PR run (11 jobs after A3, coverage retained) the longest
+job goes from ~54 min to roughly **28 min** — that is what a contributor would
+feel.
 
-**With the judgment calls (P4 scoping, P7.2 `-n auto`, P8 test fixes):**
-another ÷1.58 on test time from `-n auto` plus ~78 job-min from scoping the
-scenario jobs would bring the nightly to roughly **~120 job-min** and a PR run
-to **~15–20 min wall**.  Those need the `nproc` confirmation and a coverage
-judgment respectively, so they are not in the conservative column.
+**With the judgment calls (A4 scoping, A6 worker count, PR B):** another ÷1.58
+on test time from `-n 4` plus ~78 job-min from scoping the scenario jobs would
+bring the nightly to roughly **~120 job-min** and a PR run to **~15–20 min
+wall**.  Those need the `nproc` confirmation and a coverage judgment
+respectively, so they are not in the conservative column.
 
 If the full measured 2.3× build speedup holds in CI rather than the 1.5×
 discount applied above, subtract a further ~80 job-min from either column.
 
-## 8. Alternatives considered
+## 8. Validating CI changes locally with `act`
+
+[nektos/act](https://github.com/nektos/act) runs a workflow from
+`.github/workflows/` locally, in a container, using the real GitHub Actions
+expression engine.  For PR A that is worth a lot: the things most likely to
+break there are the `filter` job's `yq` expressions, the dynamic-matrix
+plumbing and the shell in the `Run tests` step — all of which cost a full CI
+round trip to test otherwise, and none of which need a 30-minute test run to
+verify.
+
+It works, including inside a Claude Code cloud session, with some setup.  What
+was verified here (act 0.2.89):
+
+* `act -l` and the job graph — no container needed.
+* the **`filter` job**: the `yq` expressions over `tools/ci/test-jobs.yml`, all
+  the way to the full matrix JSON on `$GITHUB_OUTPUT`.
+* the **`test` job's plumbing**: `fromJson(needs.filter.outputs.jobs)`,
+  `env: ${{ matrix.extra-envs }}` and `runs-on: ${{ matrix.os }}` — act prints
+  the expanded matrix entry it is about to run.
+* `actions/checkout`, `actions/setup-python@v7` (CPython 3.10.21 installed in
+  6.5 s) and `actions/upload-artifact@v7`.
+* **A1's whole `Install git-annex` step, plus a real pytest run**: git-annex
+  installed from PyPI in 1.0 s, `git-annex-shell` resolved from
+  `/usr/local/bin`, and `datalad/core/local/tests/test_create.py` passing
+  33/33 — **30 s end to end**.
+
+### Setup in this sandbox
+
+Two obstacles, both surmountable:
+
+1. **No runner image can be pulled.**  The egress policy denies Docker Hub and
+   ghcr blob hosts (`production.cloudfront.docker.com`,
+   `pkg-containers.githubusercontent.com` → 403), so
+   `catthehacker/ubuntu:act-latest` is unavailable.  Workaround: build an image
+   from the sandbox's own root filesystem, which already has python, git, node,
+   `sudo` and both `yq` flavors:
+
+   ```sh
+   dockerd --iptables=false --bridge=none &          # no daemon runs by default
+   tar -cf - --numeric-owner --one-file-system \
+       --exclude=./proc --exclude=./sys --exclude=./dev --exclude=./run \
+       --exclude=./tmp --exclude=./var/tmp --exclude=./var/lib/docker \
+       --exclude=./root/.cache --exclude=./home/user -C / . \
+     | docker import - actrunner:local                # ~5 min, 2.7 GB
+   # /tmp was excluded, so recreate it, and stub the one missing tool
+   cid=$(docker run -d --network=host actrunner:local tail -f /dev/null)
+   docker exec "$cid" sh -c 'mkdir -p /tmp /var/tmp && chmod 1777 /tmp /var/tmp
+                             printf "#!/bin/sh\nexec echo Module Size Used_by\n" > /usr/local/bin/lsmod
+                             chmod +x /usr/local/bin/lsmod'
+   docker commit "$cid" actrunner:local && docker rm -f "$cid"
+   ```
+
+   `/tmp` matters: without it `git-annex` fails with `openFdAt template hash:
+   does not exist` on every `annex add`.  `lsmod` is only there because the
+   workflow runs `sudo lsmod` informationally and the sandbox lacks `kmod`.
+
+2. **Node actions do not trust the sandbox proxy's CA**, so
+   `actions/setup-python` fails with `self-signed certificate in certificate
+   chain`.  Pass the bundle in.
+
+   ```sh
+   act schedule --pull=false -P ubuntu-latest=actrunner:local --bind \
+       --container-options "--network=host" \
+       --artifact-server-path /tmp/act-artifacts \
+       --env HTTPS_PROXY="$HTTPS_PROXY" --env https_proxy="$HTTPS_PROXY" \
+       --env NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt \
+       -W .github/workflows/test.yml -j filter
+   ```
+
+   `--pull=false` stops act re-pulling the local image; `--network=host` is
+   needed because the daemon runs without a bridge; `--bind` mounts the
+   checkout instead of cloning.
+
+On an ordinary developer machine none of this applies — registry pulls work,
+so `act -j filter` with the default image is enough.
+
+### Limits worth knowing before relying on it
+
+* **Self-hosted mode (`-P ubuntu-latest=-self-hosted`) is not useful here.**
+  It runs steps directly on the host, but gives each run a *fresh, empty*
+  workspace under `~/.cache/act/<hash>/hostexecutor`, makes `actions/checkout`
+  a no-op, and ignores `--env GITHUB_WORKSPACE`, so nothing in the repo is
+  visible to the steps.  Container mode with `--bind` is the usable one.
+* **Blocked hosts still block.**  `tools/ci/test-env-linux.sh` fails at its
+  first line here because `neuro.debian.net` is denied by the same egress
+  policy — which is an argument for A7 (gate that setup) quite apart from the
+  minutes it costs.
+* **act is for logic, not for timings.**  It cannot tell us anything about
+  runner sizing, the 6 h job timeout, the concurrency cap, or the
+  GitHub-hosted image's preinstalled tools — the container is our own
+  filesystem, not `ubuntu-24.04`.  Every number in this document came from
+  real CI or from direct local runs, not from act.
+* **No Windows or macOS.**  Those matrix entries can only be tested on GitHub.
+* A useful accident: the sandbox's `/usr/bin/yq` is the *Python* yq
+  (kislyuk), while runners have mikefarah's Go yq.  act surfaced that in the
+  first run, which is exactly the class of bug #7933 had to fix in CI
+  (`yq //= is not valid in the mikefarah yq on runners`).  Install
+  mikefarah's into `/usr/local/bin` before trusting a local `filter` run.
+
+## 9. Alternatives considered
 
 Things that were looked at and are *not* in the proposal above, with reasons —
 several are worth revisiting if P1–P9 do not go far enough.
@@ -843,16 +1028,18 @@ several are worth revisiting if P1–P9 do not go far enough.
   everything for the changes that matter, while risking false negatives on the
   ones it prunes.  Durations-based balancing (P9) gives most of the wall-time
   win without the correctness risk.
-* **Dropping coverage entirely.**  Measured at +39 % (§6.2), which is why P7.1
-  turns it off on cron runs, where the report is discarded anyway.  Dropping it
-  from PR runs too would save more, but that trades a visible review signal for
-  minutes — a call for the team, not a measurement.
+* **Dropping coverage entirely.**  Measured at +39 % (§6.2).  A5 turns it off
+  where nobody reads it — cron runs, where the report is discarded, and draft
+  PRs, where nobody is looking at the codecov annotation yet — and keeps it for
+  PRs under review, where it is the point.  Dropping it from those too would
+  save more but trade away a review signal, which is not a trade the
+  measurements can make.
 * **Marking more tests `@slow`.**  This was the obvious reading of "partition
   the slow cases", but the duration distribution (§4.3) says there is no fat
-  tail: the split mostly moves 101 tests out of PR coverage for ~13 min.  P8.5
-  + P9 supersede it.
+  tail: the split mostly moves 101 tests out of PR coverage for ~13 min.  A3
+  goes the other way and removes the split.
 
-## 9. What could not be measured here
+## 10. What could not be measured here
 
 * CI's own `pytest-report.jsonl` artifacts:
   `productionresultssa5.blob.core.windows.net` is denied by this sandbox's
@@ -869,7 +1056,7 @@ several are worth revisiting if P1–P9 do not go far enough.
   identical configuration differed by ~8 %.  Ratios within a single sitting are
   solid; absolute seconds across sittings are not.
 
-## 10. Reproducing the local measurements
+## 11. Reproducing the local measurements
 
 `tools/testing/bench-git-annex-flavors.sh` does both halves of §3 — the
 startup micro-benchmark and the test-subset wall time — for any set of
