@@ -222,7 +222,14 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip uv
-          uv pip install --system -r requirements-devel.txt
+          # Target this job's interpreter explicitly.  `uv pip install
+          # --system` picks *a* system interpreter rather than the one on
+          # PATH, and on macOS runners that is Homebrew's python@3.14 (pulled
+          # in by `brew install` during provisioning), which is
+          # externally-managed (PEP 668) and refuses the install outright.
+          uv pip install --system \
+            --python "$(python -c 'import sys; print(sys.executable)')" \
+            -r requirements-devel.txt
 
       - name: Configure Git
         run: |
