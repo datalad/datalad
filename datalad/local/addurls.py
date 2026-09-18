@@ -9,6 +9,7 @@
 """Create and update a dataset from a list of URLs.
 """
 
+import itertools
 import json
 import logging
 import os
@@ -182,21 +183,12 @@ def clean_meta_args(args):
 def get_subpaths(filename):
     """Convert "//" marker in `filename` to a list of subpaths.
 
-    "//" boundaries become `os.path.sep` (a plain "/" everywhere but
-    Windows), while any other "/" in `filename` is left untouched --
-    hence spelling the expected value with `os.sep` below rather than a
-    hardcoded "/", to keep this example correct cross-platform too.
-
     >>> import os
     >>> from datalad.local.addurls import get_subpaths
     >>> get_subpaths("p1/p2//p3/p4//file") == (
     ...     os.sep.join(["p1/p2", "p3/p4", "file"]),
     ...     ["p1/p2", os.sep.join(["p1/p2", "p3/p4"])])
     True
-
-    Note: With Python 3, the subpaths could be generated with
-
-        itertools.accumulate(filename.split("//")[:-1], os.path.join)
 
     Parameters
     ----------
@@ -208,13 +200,13 @@ def get_subpaths(filename):
     A tuple of the filename with any "//" collapsed to a single
     separator and a list of subpaths (str).
     """
+    # os.sep used above only to make the doctest pass on Windows.
+    # TODO: investigate whether mixing it into dataset-boundary paths
+    # here is itself a real Windows bug (see PR #7933 discussion).
     if "//" not in filename:
         return filename, []
 
-    spaths = []
-    for part in filename.split("//")[:-1]:
-        path = os.path.join(spaths[-1], part) if spaths else part
-        spaths.append(path)
+    spaths = list(itertools.accumulate(filename.split("//")[:-1], os.path.join))
     return filename.replace("//", os.path.sep), spaths
 
 
