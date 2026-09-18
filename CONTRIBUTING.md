@@ -158,7 +158,8 @@ we outline the workflow used by the developers:
    `semver-minor`) to indicate the type of version bump. Adding the
    `CHANGELOG-missing` label triggers automatic generation of a changelog
    snippet under `changelog.d/`.  See [CHANGELOG entries](#changelog-entries-and-labelling-pull-requests)
-   for details.
+   for details.  Keep that snippet short and scaled to the change; see
+   [Writing the entry](#writing-the-entry).
 
 (If any of the above seems like magic to you, then look up the
 [Git documentation](https://git-scm.com/documentation) on the web.)
@@ -588,6 +589,41 @@ The section that workflow adds to the changelog depends on the `semver-` label a
 - `semver-tests` — for changes to tests
 - `semver-dependencies` — for updates to dependency versions
 - `semver-performance` — for performance improvements
+
+#### Writing the entry
+
+A changelog entry is a release note for **users**: what changed for them, and
+whether they need to act.  Lead with the user-visible effect, in the present
+tense, naming the affected command or API so that entries stay greppable.
+
+Scale the entry to the change:
+
+- a typo fix, a test tweak, a small bug fix -- one sentence;
+- an ordinary bug fix or enhancement -- one or two;
+- a new feature, a breaking change, a migration -- a short summary of what it
+  does and of what the user has to do, then a pointer to the documentation
+  for the rest.
+
+**Rule of thumb: under ~40 words**, excluding the `Fixes`/`PR`/`by`
+attribution that the tooling appends.  It is a guide, not a limit -- all 119
+entries from 0.18.1 (2023) through 1.2.3 (2025) fit within it, with a median
+of 11 words -- but a large change may well need more, whereas a small fix
+never does.
+
+A brief summary of the cause or of the reasoning is welcome where it helps a
+user recognize the problem; the details of either are not.  Leave the
+investigation, the debugging path and the restated diff to the commit message
+and the PR.  Skip filler such as "Note that" or "It is worth mentioning", and
+keep changes that no user can observe to a single line under `semver-internal`.
+
+[0.18.0](./CHANGELOG.md#changelog-0.18.0) is a good reference across the whole
+range: 30 entries across every category, two breaking changes and eight new
+features among them, none of them longer than 39 words.
+
+Fragments drafted with an AI assistant tend to run several times longer than
+that, since the assistant has the entire investigation in context and reports
+it.  If you use one, write the fragment last, from the user-visible behavior
+alone, and cut it back to the scale above.
 
 [link_zenodo]: https://github.com/datalad/datalad/blob/master/.zenodo.json
 

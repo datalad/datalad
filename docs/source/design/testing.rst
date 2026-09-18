@@ -46,7 +46,7 @@ Local test execution usually requires a local installation with all development 
 
 CI setup
 --------
-At the moment, Travis-CI, Appveyor, and GitHub Workflows exercise the tests battery for every PR and on the default branch, covering different operating systems, Python versions, and file systems.
+At the moment, GitHub Workflows exercise the tests battery for every PR and on the default branch, covering different operating systems (via ``test.yml``'s matrix, see ``tools/ci/test-jobs.yml``), Python versions, and file systems.
 Tests should be ran on the oldest, latest, and current stable Python release.
 The projects uses https://codecov.io for an overview of code coverage.
 

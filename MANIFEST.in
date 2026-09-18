@@ -19,6 +19,6 @@ prune .github
 prune sandbox
 
 exclude .gitignore .gitmodules .mailmap .noannex .travis.yml .zenodo.json
-exclude CODE_OF_CONDUCT.md appveyor.yml readthedocs.yml
+exclude CODE_OF_CONDUCT.md readthedocs.yml
 
 global-exclude *.py[cod]
