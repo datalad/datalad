@@ -909,7 +909,14 @@ def test_install_subds_with_space(opath=None, tpath=None):
 
 
 # https://github.com/datalad/datalad/issues/2232
-@with_tempfile
+# opath needs os.path.relpath(opath, os.path.expanduser('~')) below to
+# succeed, which requires opath and HOME to be on the same drive on
+# Windows (os.path.relpath() cannot cross drive letters) -- pin opath
+# under HOME explicitly rather than relying on wherever the default
+# temp directory happens to be (e.g. on GitHub's Windows runners, the
+# checkout -- and thus the default @with_tempfile location -- lives on
+# a different drive than HOME).
+@with_tempfile(dir=os.path.expanduser('~'))
 @with_tempfile
 def test_install_from_tilda(opath=None, tpath=None):
     ds = create(opath)

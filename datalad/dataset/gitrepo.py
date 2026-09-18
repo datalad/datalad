@@ -150,8 +150,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # a cost. Most notably, this is used for validity checking of the
         # repository.
         self.pathobj = Path(path)
+        # a property -- its setter derives the rest of the .git state
         self.dot_git = _get_dot_git(self.pathobj, ok_missing=True)
-        self._valid_git_test_path = self.dot_git / 'HEAD'
 
         self._cfg = None
         self._git_runner = GitWitlessRunner(cwd=self.pathobj)
@@ -208,6 +208,31 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 not self_or_path.dot_git.is_dir()
                 or self_or_path._valid_git_test_path.exists()
             )
+
+    @property
+    def dot_git(self):
+        """Path to the .git directory of this repository ($GIT_DIR)"""
+        return self.__dot_git
+
+    @dot_git.setter
+    def dot_git(self, path):
+        # derive here, so that nothing goes stale when `init()` reassigns
+        self.__dot_git = path
+        self.__dot_git_common = None  # costs a stat, get it on demand below
+        self._valid_git_test_path = path / 'HEAD'
+
+    @property
+    def dot_git_common(self):
+        """Path to the .git directory shared with any other worktree
+
+        Same as `dot_git`, unless this is a linked worktree checkout, whose
+        `dot_git` holds the per-worktree files only -- see
+        `_get_dot_git_common()`.  Resolved in that case, so do not compare it
+        against `dot_git` to tell a worktree checkout apart.
+        """
+        if self.__dot_git_common is None:
+            self.__dot_git_common = _get_dot_git_common(self.__dot_git)
+        return self.__dot_git_common
 
     @property
     def cfg(self):
@@ -763,3 +788,30 @@ def _get_dot_git(pathobj, *, ok_missing=False, resolved=False):
             else:
                 raise InvalidGitRepositoryError("Invalid .git file")
     raise RuntimeError("Unaccounted condition")
+
+
+def _get_dot_git_common(dot_git):
+    """Given a path to a .git directory return the one common to all worktrees
+
+    For a linked worktree checkout, `dot_git` ($GIT_DIR) only holds the
+    per-worktree files (HEAD, index, ...), while everything shared -- `config`
+    and `objects` in particular -- lives in the common directory
+    ($GIT_COMMON_DIR) it points to via its `commondir` file.  For any other
+    repository the two are identical.  See the `commondir` description in
+    gitrepository-layout(5).  Note that `config` stays common also with
+    `extensions.worktreeConfig` enabled, where the per-worktree overlay is a
+    separately named `config.worktree` -- see git-worktree(1).
+
+    Parameters
+    ----------
+    dot_git: Path
+
+    Returns
+    -------
+    Path
+    """
+    commondir = dot_git / 'commondir'
+    if not commondir.exists():
+        return dot_git
+    # per gitrepository-layout(5) a relative path is relative to $GIT_DIR
+    return (dot_git / commondir.read_text().splitlines()[0]).resolve()

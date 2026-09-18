@@ -3921,7 +3921,7 @@ class GitRepo(CoreGitRepo):
         # bypass any convenience or safe-manipulator for speed reasons
         # use case: saving many new subdatasets in a single run
         with (self.pathobj / '.gitmodules').open('a') as gmf, \
-             (self.pathobj / '.git' / 'config').open('a') as gcf:
+             (self.dot_git_common / 'config').open('a') as gcf:
             for i in info:
                 # we update the subproject commit unconditionally
                 self.call_git([

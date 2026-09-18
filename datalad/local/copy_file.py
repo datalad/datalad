@@ -114,7 +114,7 @@ class _CachedRepo(object):
 
     def get_tmpdir(self):
         if not self._tmpdir:
-            tmploc = self._repo.pathobj / '.git' / 'tmp' / 'datalad-copy'
+            tmploc = self._repo.dot_git / 'tmp' / 'datalad-copy'
             tmploc.mkdir(exist_ok=True, parents=True)
             # put in cache for later clean/lookup
             self._tmpdir = tmploc
