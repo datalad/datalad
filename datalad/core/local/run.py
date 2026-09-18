@@ -1217,8 +1217,11 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 message=(
                     'declared inputs have unsaved modifications: %s. '
                     'Save them, or run with --assume-ready=inputs',
-                    ['{} [{}]'.format(ipath, istate)
-                     for ipath, istate in dirty_inputs]))
+                    # joined, not handed over as a list: %s of a list
+                    # renders its repr, which quotes the items and escapes
+                    # the separator of a Windows path
+                    ', '.join('{} [{}]'.format(ipath, istate)
+                              for ipath, istate in dirty_inputs)))
             return
 
     if not (inject or dry_run):

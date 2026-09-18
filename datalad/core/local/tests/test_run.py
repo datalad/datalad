@@ -93,6 +93,20 @@ def test_invalid_call(path=None):
         assert_status('impossible', run('doesntmatter', on_failure='ignore'))
 
 
+def rendered_message(res):
+    """Return the human-readable message of a result record
+
+    A result `message` is commonly a ``(format_string, args)`` tuple, not a
+    string.  ``str()`` on such a tuple yields its *repr*, in which a Windows
+    path separator comes out escaped (``data\\in.dat``), so a needle built
+    with `os.path.join` is never found there.  Render it instead.
+    """
+    msg = res.get('message', '')
+    if isinstance(msg, tuple):
+        return msg[0] % msg[1:]
+    return str(msg)
+
+
 def last_commit_msg(repo):
     # ATTN: Pass branch explicitly so that this check works when we're on an
     # adjusted branch too (e.g., when this test is executed under Windows).
@@ -1137,13 +1151,7 @@ def test_run_merge_branch_switch_rejected(path=None):
                      if r.get('action') == 'run'
                      and r.get('status') == 'error']
 
-    def _rendered(r):
-        msg = r.get('message', '')
-        if isinstance(msg, tuple):
-            return msg[0] % msg[1:]
-        return str(msg)
-
-    rendered = [_rendered(r) for r in error_results]
+    rendered = [rendered_message(r) for r in error_results]
     ok_(any('switched the active branch' in m for m in rendered))
     # Recovery hint: must surface the original commit and a save --since
     # command so the user can complete the run on the new branch.
@@ -1357,8 +1365,12 @@ def test_run_explicit_dirty_inputs(path=None):
     hexsha_before = ds.repo.get_hexsha()
     res = _run(inputs=["in.dat"])
     assert_in_results(res, action='run', status='impossible')
-    ok_(any('unsaved modifications' in str(r.get('message', ''))
-            for r in res))
+    ok_(any('unsaved modifications' in rendered_message(r) for r in res))
+    # the offending inputs are named in plain text. Handing the list over
+    # to %s would render its repr instead, which quotes the items and
+    # escapes the separator of a Windows path
+    ok_(any('in.dat [modified]' in rendered_message(r) for r in res))
+    ok_(not any("['" in rendered_message(r) for r in res))
     # the command was not executed and no output was prepared, the only
     # modification is the one we made ourselves
     eq_(hexsha_before, ds.repo.get_hexsha())
@@ -1396,11 +1408,9 @@ def test_run_explicit_dirty_inputs(path=None):
     assert_in_results(res, action='run', status='impossible')
     # the message reports the path the way datalad reports paths
     # everywhere -- with the platform's separator, so do not hardcode one.
-    # Report what we did get: an `impossible` from the input *preparation*
-    # looks the same to assert_in_results() above as the dirty-input one
-    # this is actually about, and telling them apart from a bare
-    # `assert False` is impossible.
-    messages = [str(r.get('message', '')) for r in res]
+    # It must be rendered, not str()'ed: str() of a (fmt, args) tuple is a
+    # repr, and a repr escapes the Windows separator.
+    messages = [rendered_message(r) for r in res]
     ok_(any(op.join('data', 'in.dat') in m for m in messages),
         msg="no result named the input relative to the dataset; got %r"
             % (messages,))
