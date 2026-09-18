@@ -78,10 +78,6 @@ jobs:
       - name: Show git describe output to ensure that we did fetch all the tags
         run: git describe
 
-      # Just in case we need to check if nfs is there etc
-      - if: runner.os == 'Linux'
-        run: sudo lsmod
-
       # OS-specific provisioning (APT/NeuroDebian on Linux, Homebrew on
       # macOS, long paths/SSH server on Windows) lives in
       # tools/ci/test-env-{linux,macos,windows}.sh rather than inline here,

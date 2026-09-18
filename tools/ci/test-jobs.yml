@@ -226,14 +226,9 @@
 # datalad-installer supports uniformly across all three platforms -- see
 # an existing Linux entry above ("venv git-annex -m datalad/packages")
 # for the same method already in use here.
-#
-# TODO: drop `allow-failure` once these have proven themselves stable
-# across a number of runs (they replace AppVeyor, now retired, so there's
-# no fallback Windows/macOS signal to lean on in the meantime).
 
 - python-version: '3.10'
   os: macos-latest
-  allow-failure: true
   extra-envs:
     PYTEST_SELECTION: ""
     PYTEST_SELECTION_OP: "not"
@@ -242,7 +237,6 @@
 
 - python-version: '3.10'
   os: macos-latest
-  allow-failure: true
   extra-envs:
     PYTEST_SELECTION: ""
     PYTEST_SELECTION_OP: "not"
@@ -253,7 +247,6 @@
 
 - python-version: '3.10'
   os: macos-latest
-  allow-failure: true
   extra-envs:
     PYTEST_SELECTION: ""
     PYTEST_SELECTION_OP: "not"
@@ -262,7 +255,6 @@
 
 - python-version: '3.10'
   os: windows-2022
-  allow-failure: true
   extra-envs:
     PYTEST_SELECTION: ""
     PYTEST_SELECTION_OP: "not"
@@ -271,7 +263,6 @@
 
 - python-version: '3.10'
   os: windows-2022
-  allow-failure: true
   extra-envs:
     PYTEST_SELECTION: ""
     PYTEST_SELECTION_OP: "not"
@@ -283,7 +274,6 @@
 
 - python-version: '3.10'
   os: windows-2022
-  allow-failure: true
   extra-envs:
     PYTEST_SELECTION: ""
     PYTEST_SELECTION_OP: "not"
