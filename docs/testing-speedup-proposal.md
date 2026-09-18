@@ -149,16 +149,24 @@ with no bootstrap installer; `pixi` additionally exposes the shims
 which is exactly what the `/usr/local/bin` requirement in §7 A1 wants.  One
 layer up, `uv` is the same argument for the Python dependencies.
 
-One caveat that applies to *any* conda route, and is worth knowing before
-trusting a pin: conda-forge's `nodep` packages are repackaged upstream
-standalone tarballs, and those lag their own release by a few commits.  The
-package labelled `git-annex 10.20230126` ships a binary that reports
-`10.20221213-ge5b6b7b5e`, and the one labelled 10.20260316 reports 10.20260213.
-datalad already compensates — `datalad/support/external_versions.py` carries a
-hard-coded special case rewriting exactly `10.20221213-ge5b6b7b5e` to
-`10.20230126`, with a comment about the standalone-build dance — so the
-minimum-version job is not broken.  But it is one more thing the PyPI wheel
-does not have: there the reported version matches the release.
+One caveat worth knowing before trusting a conda pin: conda-forge's `nodep`
+packages are repackaged upstream standalone tarballs, and those lag their own
+release by a few commits.  The `nodep` builds labelled `git-annex 10.20230126`
+ship a binary reporting `10.20221213-ge5b6b7b5e`, and the one labelled
+10.20260316 reports 10.20260213.  datalad already compensates —
+`datalad/support/external_versions.py` carries a hard-coded special case
+rewriting exactly `10.20221213-ge5b6b7b5e` to `10.20230126`, with a comment
+about the standalone-build dance — so nothing is broken by it.
+
+Which build you get depends on the resolver, and that cuts in our favour here:
+`conda install git-annex=10.20230126` under the old miniconda picked
+`nodep_h1234567_1` (the repackaged bundle, reporting 10.20221213), while `pixi
+global install "git-annex==10.20230126"` resolved `alldep_h97b9560_101` — the
+*dynamically linked* conda build, whose binary correctly reports
+`10.20230126-g36f5557`.  So the minimum-version entry via pixi is both better
+versioned and unwrapped.  `alldep` exists only up to 10.20230626, so a plain
+`pixi` (newest) still lands on a `nodep` bundle — which is exactly the
+packaging the other cron entry is there to cover.
 
 ### 2.2 Three matrix entries are exact duplicates
 
@@ -1039,6 +1047,24 @@ so `act -j filter` with the default image is enough.
   filesystem, not `ubuntu-24.04`.  Every number in this document came from
   real CI or from direct local runs, not from act.
 * **No Windows or macOS.**  Those matrix entries can only be tested on GitHub.
+* **`env: ${{ matrix.extra-envs }}` is not applied by act.**  A map assigned
+  to `env:` is a GitHub-specific behaviour act does not implement, so a local
+  run gets the workflow-level defaults instead of the entry's overrides (act
+  *does* print the expanded matrix entry, which makes this easy to miss).  Pass
+  the ones that matter with `--env` when validating locally, and treat
+  per-entry env plumbing as something only GitHub can confirm.
+* **`actions/upload-artifact@v7` does not speak to act's artifact server**
+  (`unknown field "mime_type"`, then five failed retries).  Since that step is
+  `if: always()`, its failure skips everything after it — including `Report
+  coverage` — so drop it from a local variant when validating the tail of the
+  job.
+* Two genuine bugs in A1 were caught this way before any CI round trip: `pixi`
+  installing into `$PWD/.pixi` (i.e. leaving untracked cruft inside the
+  checkout the tests then run against), and the step's own verification
+  reporting the *wrong* git-annex, because `$GITHUB_PATH` only affects
+  subsequent steps — so `command -v git-annex` found a previously installed one
+  instead of the one just installed.  Both fixed; the second is why the step
+  now prepends `$scriptdir` to its own `PATH` before checking.
 * A useful accident: the sandbox's `/usr/bin/yq` is the *Python* yq
   (kislyuk), while runners have mikefarah's Go yq.  act surfaced that in the
   first run, which is exactly the class of bug #7933 had to fix in CI
