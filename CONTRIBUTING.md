@@ -362,6 +362,15 @@ def test_download(srcdir=None, url=None):   # url points at srcdir over HTTP
 
 For parameterised tests use `@pytest.mark.parametrize` as usual.
 
+A test written by an AI assistant carries `@pytest.mark.ai_generated`, so that
+such tests can be told apart (and selected with `pytest -m ai_generated`) when
+reviewing or auditing them.  Mark the test functions the assistant wrote, not
+pre-existing ones it merely extended -- if an addition deserves the marker,
+give it a test function of its own.  The marker is registered for datalad and
+its extensions in [datalad/pytest_plugin.py](datalad/pytest_plugin.py); see
+also [AI assistants are not contributors](#ai-assistants-are-not-contributors)
+for how assistants are credited.
+
 #### Running tests
 
 Test files live in `datalad/tests` and in `tests/` subdirectories of each
