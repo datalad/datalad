@@ -128,12 +128,37 @@ ahead of conda's anyway.
 Worth separating the two jobs miniconda was doing here.  As a **Python-version
 provider** it is redundant: `actions/setup-python` does that in seconds, and
 does it on all three platforms.  As a way to **install git-annex from a conda
-package** it is still meaningful coverage, but `miniconda` is the slowest way
-in and datalad-installer v1.2.x deprecates that component outright in favour of
-`miniforge` ("to avoid Anaconda Terms of Service issues").  `micromamba` (a
-single static binary, no bootstrap installer) or `pixi` is the uniform, fast
-replacement, and `uv` is the same argument one layer up for the Python
-dependencies.
+package** it is still meaningful coverage — but `miniconda` is by far the
+slowest way in, and datalad-installer v1.2.x deprecates that component
+outright in favour of `miniforge` ("to avoid Anaconda Terms of Service
+issues").
+
+Measured on the same machine, each of these ending with a usable `git-annex`
+from conda-forge:
+
+| how                                                                |                                            time |
+| ------------------------------------------------------------------ | ----------------------------------------------: |
+| `pixi global install git-annex`                                    |                                         **3 s** |
+| `micromamba create -p … -c conda-forge git-annex`                  |                                        **12 s** |
+| `Miniconda3-py37_23.1.0-1` + `conda install git-annex=10.20230126` | **266 s** (4 s bootstrap + 261 s solve/install) |
+
+That 261 s is the same classic solver that takes 9–15 min on the runners, where
+it also has to fetch everything cold.  `micromamba` is a single static binary
+with no bootstrap installer; `pixi` additionally exposes the shims
+(`git-annex`, `git-annex-shell`, `git-remote-annex`, …) in one bin directory,
+which is exactly what the `/usr/local/bin` requirement in §7 A1 wants.  One
+layer up, `uv` is the same argument for the Python dependencies.
+
+One caveat that applies to *any* conda route, and is worth knowing before
+trusting a pin: conda-forge's `nodep` packages are repackaged upstream
+standalone tarballs, and those lag their own release by a few commits.  The
+package labelled `git-annex 10.20230126` ships a binary that reports
+`10.20221213-ge5b6b7b5e`, and the one labelled 10.20260316 reports 10.20260213.
+datalad already compensates — `datalad/support/external_versions.py` carries a
+hard-coded special case rewriting exactly `10.20221213-ge5b6b7b5e` to
+`10.20230126`, with a comment about the standalone-build dance — so the
+minimum-version job is not broken.  But it is one more thing the PyPI wheel
+does not have: there the reported version matches the release.
 
 ### 2.2 Three matrix entries are exact duplicates
 
@@ -696,8 +721,9 @@ yourself, which is the only other thing the entry point does:
 * **git-annex from a conda package** — still worth covering, but not with
   `miniconda`, which datalad-installer v1.2.x now deprecates outright in
   favour of `miniforge` ("to avoid Anaconda Terms of Service issues").
-  `micromamba` or `pixi` is the faster, more uniform way in; §2.1 has the
-  measurement.
+  `micromamba` (12 s) or `pixi` (3 s) is the faster, more uniform way in
+  against miniconda's 266 s on the same machine; §2.1 has the measurement and
+  a caveat about pinning through conda at all.
 
 For PRs, neither the conda build nor the standalone bundle needs to be in the
 picture at all: both are *packaging* variants of the same git-annex, and a PR
