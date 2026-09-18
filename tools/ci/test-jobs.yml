@@ -208,3 +208,84 @@
 #  extra-envs:
 #    DATALAD_TESTS_SSH: "1"
 #    UNSET_S3_SECRETS: "1"
+
+# macOS and Windows jobs.  `os` is the `runs-on` label to use; entries
+# without it default to `ubuntu-latest` (see the `filter` job in test.yml).
+# Each platform is split into three module groups the way AppVeyor's
+# Mac/WinP310core/a1/a2 jobs used to be, to keep any one job comfortably
+# under the runner's timeout; PYTEST_SELECTION is cleared so the full
+# (non-turtle) suite runs on each, matching what those AppVeyor jobs did.
+#
+# _DL_ANNEX_INSTALL_SCENARIO is overridden here rather than left at its
+# top-level (test.yml) default: datalad-installer's conda method for
+# git-annex is Linux-only (raises MethodNotSupportedError on both macOS
+# and Windows, confirmed live). macOS uses the brew method test_macos.yml
+# relied on instead (also what AppVeyor's Mac* jobs used); Windows uses
+# datalad/packages (a native installer download,
+# datasets.datalad.org/datalad/packages/windows/), the one method
+# datalad-installer supports uniformly across all three platforms -- see
+# an existing Linux entry above ("venv git-annex -m datalad/packages")
+# for the same method already in use here.
+#
+# TODO: drop `allow-failure` once these have proven themselves stable
+# across a number of runs (they replace AppVeyor, now retired, so there's
+# no fallback Windows/macOS signal to lean on in the meantime).
+
+- python-version: '3.10'
+  os: macos-latest
+  allow-failure: true
+  extra-envs:
+    PYTEST_SELECTION: ""
+    PYTEST_SELECTION_OP: "not"
+    TESTS_TO_PERFORM: "datalad.core datalad.dataset datalad.runner datalad.support"
+    _DL_ANNEX_INSTALL_SCENARIO: "git-annex -m brew"
+
+- python-version: '3.10'
+  os: macos-latest
+  allow-failure: true
+  extra-envs:
+    PYTEST_SELECTION: ""
+    PYTEST_SELECTION_OP: "not"
+    TESTS_TO_PERFORM: >-
+      datalad.cli datalad.customremotes datalad.distribution
+      datalad.downloaders datalad.interface datalad.tests datalad.ui
+    _DL_ANNEX_INSTALL_SCENARIO: "git-annex -m brew"
+
+- python-version: '3.10'
+  os: macos-latest
+  allow-failure: true
+  extra-envs:
+    PYTEST_SELECTION: ""
+    PYTEST_SELECTION_OP: "not"
+    TESTS_TO_PERFORM: "datalad.local datalad.distributed"
+    _DL_ANNEX_INSTALL_SCENARIO: "git-annex -m brew"
+
+- python-version: '3.10'
+  os: windows-2022
+  allow-failure: true
+  extra-envs:
+    PYTEST_SELECTION: ""
+    PYTEST_SELECTION_OP: "not"
+    TESTS_TO_PERFORM: "datalad.core datalad.dataset datalad.runner"
+    _DL_ANNEX_INSTALL_SCENARIO: "git-annex -m datalad/packages"
+
+- python-version: '3.10'
+  os: windows-2022
+  allow-failure: true
+  extra-envs:
+    PYTEST_SELECTION: ""
+    PYTEST_SELECTION_OP: "not"
+    TESTS_TO_PERFORM: >-
+      datalad.cli datalad.customremotes datalad.distribution
+      datalad.distributed datalad.downloaders datalad.interface
+      datalad.tests
+    _DL_ANNEX_INSTALL_SCENARIO: "git-annex -m datalad/packages"
+
+- python-version: '3.10'
+  os: windows-2022
+  allow-failure: true
+  extra-envs:
+    PYTEST_SELECTION: ""
+    PYTEST_SELECTION_OP: "not"
+    TESTS_TO_PERFORM: "datalad.local datalad.support datalad.ui"
+    _DL_ANNEX_INSTALL_SCENARIO: "git-annex -m datalad/packages"

@@ -6,7 +6,7 @@
 set -eu
 
 # Paths must not use $PWD: tests invoke datalad with cwd under temp dirs, so
-# $PWD/../.coveragerc would not point at the repository root (see AppVeyor/CI).
+# $PWD/../.coveragerc would not point at the repository root (see CI).
 _script_dir=$(cd "$(dirname "$0")" && pwd)
 _repo_root=$(cd "$_script_dir/../.." && pwd)
 
