@@ -475,25 +475,42 @@ the number of `Dataset.create()` calls.
 
 ---
 
-## 5. Fixture cost: creating datasets vs copying them
+## 5. Fixture cost: creating a dataset vs unpacking one
 
-In-process, with the PyPI wheel (medians, machine under mild load):
+In-process, with the PyPI wheel; the fixture is a dataset with three annexed
+files in two directories (medians, machine otherwise idle):
 
-|                                                               |          |
-| ------------------------------------------------------------- | -------: |
-| `import datalad.api`                                          |   435 ms |
-| `Dataset(p).create()`                                         |   347 ms |
-| `git init`                                                    |     3 ms |
-| `git init` + `git annex init`                                 |   110 ms |
-| `cp -a` / `shutil.copytree(symlinks=True)` of a small dataset | **6 ms** |
+| step                                          |           time |
+| --------------------------------------------- | -------------: |
+| `import datalad.api`                          |         294 ms |
+| `Dataset(p).create()`                         |         242 ms |
+| `create()` + 3 files + `save()` — one fixture |     **495 ms** |
+| `cp -a` of the result                         |          44 ms |
+| `shutil.copytree(..., symlinks=True)`         |           6 ms |
+| `tar -cf` — minted **once per session**       | 3 ms (180 KiB) |
+| `tar -xf` per test                            |       **7 ms** |
+| `tarfile.extractall` per test                 |           7 ms |
 
-A copy is ~60× cheaper than a `create()`, and the copy is fully functional —
-`datalad status`, `git-annex whereis`, `git-annex fsck --fast` and a subsequent
-`datalad save` all succeed in it (verified).  A test that builds a 3–5 dataset
-hierarchy spends 1–1.7 s on `create()` alone before it tests anything.
+So a fixture costs ~0.5 s to build and ~7 ms to unpack: **70× cheaper per
+test**, and a test that builds a 3–5 dataset hierarchy spends 1.5–2.5 s on
+construction before it tests anything.  The 294 ms `import datalad.api` is a
+separate, additive cost for every test that shells out to the `datalad` CLI
+rather than calling the Python API.
 
-The 435 ms `import datalad.api` is a separate, additive cost for every test that
-shells out to the `datalad` CLI rather than calling the Python API.
+On mechanism: both `cp -a` and `tar -xf` produced *working* copies here — `git
+status`, `git-annex whereis` and `git-annex fsck --fast` all succeeded in them,
+and both could be `rmtree`'d afterwards.  Two reasons to prefer tar anyway:
+
+* **speed and determinism** — `tar -xf` is 6× faster than `cp -a` (which
+  preserves timestamps and xattrs at the cost of many more syscalls), the
+  archive is minted once, and `tar` records modes explicitly instead of
+  depending on `cp`'s flags being right on BSD/macOS as well as GNU;
+* **the permission question is only masked here.**  These runs are as root, so
+  git-annex's read-only object files (`0444` in `0555` directories) never block
+  anything.  As a normal user — which is how CI runs — a naive copy-and-remove
+  does trip over them; datalad's own `datalad.utils.rmtree` exists partly for
+  that reason (it chmods files before unlinking, automatically on Windows).
+  Unpacking from a tarball into a fresh temp dir sidesteps the whole question.
 
 ## 6. Environment and pytest knobs
 
@@ -520,6 +537,14 @@ Two results worth calling out:
   hardcoded in `test.yml`.  Standard GitHub-hosted Linux runners for public
   repositories are 4-vCPU, but that deserves one `nproc` line in the workflow
   rather than an assumption.
+
+  Re-measured at a realistic scale — `datalad/core` + `datalad/support` +
+  `datalad/local`, 574 tests — `-n 2` takes **200 s** and `-n 4` **121 s**,
+  i.e. **1.65×**, and the two runs ended with *identical* outcomes (564
+  passed, 10 failed, 38 skipped, 6 errors; the failures are a local `patool`
+  incompatibility and one network test, present at both worker counts).  So
+  four workers bought 1.65× without destabilising anything in that subset —
+  which is the evidence A6 wants, not a guarantee for the whole suite.
 * **fsync is not a bottleneck** — eliding it entirely changes nothing
   (62.8 s vs 62.2 s), so `eatmydata`-style tricks are a dead end here.  Caveat:
   this container's backing store may fsync much more cheaply than an
@@ -826,12 +851,12 @@ and the config option — plus the `DATALAD_TESTS_SETUP_TESTREPOS` export in
 `test_rerun_merges.py` (12 `@slow`), `test_update.py` (10), `test_get.py` (8),
 `test_create_sibling.py` (7) and `test_push.py` (5) each rebuild the same
 dataset hierarchy per test, at ~350 ms per `create()` (§5).  Reusing one built
-copy is the win, but `cp -a` is the wrong mechanism: it has to be told to
-preserve symlinks, times and modes, and annex object files are read-only, which
-makes both the copy and the later cleanup awkward.  A tarball round-trip is
-better behaved — `tar` records the modes and permissions explicitly, and
-untarring into a fresh temp dir gives a clean tree every time.  §5 has both
-measured.
+copy is the win: ~495 ms to build a fixture against **7 ms to untar one**
+(§5).  A tarball round-trip is the mechanism to use rather than `cp -a` — it is
+6× faster, records modes explicitly instead of relying on `cp`'s flags being
+right on BSD as well as GNU, and unpacking into a fresh temp dir avoids the
+read-only annex object files that a copy-and-remove cycle trips over when the
+tests run as a normal user.
 
 Scope for PR B: convert *one* cluster (`test_rerun_merges.py` is the most
 uniform) with a local helper, and only then generalise.
