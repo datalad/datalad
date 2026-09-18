@@ -25,4 +25,7 @@ jobs:
           tools/ci/install-annex.sh \
           tools/ci/install-minimum-git.sh \
           tools/ci/prep-travis-devel-annex.sh \
-          tools/ci/prep-travis-forssh.sh
+          tools/ci/prep-travis-forssh.sh \
+          tools/ci/test-env-linux.sh \
+          tools/ci/test-env-macos.sh \
+          tools/ci/test-env-windows.sh

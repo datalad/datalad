@@ -951,6 +951,25 @@ def test_save_adjusted_partial(path=None):
 
 
 @with_tempfile
+@with_tempfile
+def test_save_subds_in_worktree(path=None, worktree_path=None):
+    # https://github.com/datalad/datalad/issues/7921
+    ds = Dataset(path).create(annex=False)
+    ds.repo.call_git(['worktree', 'add', '-b', 'wt', worktree_path])
+    wt = Dataset(worktree_path)
+    ok_((wt.pathobj / '.git').is_file())
+    with chpwd(worktree_path):
+        # no explicit `dataset=`, so that `save()` below is what registers the
+        # new subdataset -- as in the reported CLI use case
+        subds = create('sub', annex=False)
+        res = save(message="register sub")
+    assert_status('ok', res)
+    assert_in_results(res, action='add', path=subds.path)
+    assert_repo_status(wt.path)
+    eq_(wt.subdatasets(result_xfm='relpaths'), ['sub'])
+
+
+@with_tempfile
 def test_save_diff_ignore_submodules_config(path=None):
     ds = Dataset(path).create()
     subds = ds.create("sub")

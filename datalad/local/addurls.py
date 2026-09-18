@@ -182,9 +182,17 @@ def clean_meta_args(args):
 def get_subpaths(filename):
     """Convert "//" marker in `filename` to a list of subpaths.
 
+    "//" boundaries become `os.path.sep` (a plain "/" everywhere but
+    Windows), while any other "/" in `filename` is left untouched --
+    hence spelling the expected value with `os.sep` below rather than a
+    hardcoded "/", to keep this example correct cross-platform too.
+
+    >>> import os
     >>> from datalad.local.addurls import get_subpaths
-    >>> get_subpaths("p1/p2//p3/p4//file")
-    ('p1/p2/p3/p4/file', ['p1/p2', 'p1/p2/p3/p4'])
+    >>> get_subpaths("p1/p2//p3/p4//file") == (
+    ...     os.sep.join(["p1/p2", "p3/p4", "file"]),
+    ...     ["p1/p2", os.sep.join(["p1/p2", "p3/p4"])])
+    True
 
     Note: With Python 3, the subpaths could be generated with
 

@@ -1,4 +1,24 @@
 
+<a id='changelog-1.6.3'></a>
+# 1.6.3 (2026-09-17)
+
+## 🚀 Enhancements and New Features
+
+- run/rerun: add --on-cmd-failure option.  Fixes [#7902](https://github.com/datalad/datalad/issues/7902) via [PR #7903](https://github.com/datalad/datalad/pull/7903) (by [@copilot-swe-agent](https://github.com/apps/copilot-swe-agent))
+
+## 🐛 Bug Fixes
+
+- `run` no longer crashes with `'NoneType' object has no attribute 'get_hexsha'` when the command creates a commit in a subdataset reached through an ordinary directory (e.g. `dataset/plaindir//subds`).  Saving such a result treated plaindirs as datasets, and caused the outer datalad commit to fail.  Introduced with the new `datalad run` behavior in [PR #7821](https://github.com/datalad/datalad/pull/7821).  Via [PR #7904](https://github.com/datalad/datalad/pull/7904) (by [@asmacdo](https://github.com/asmacdo))
+
+- `rerun` now fails the same way as `run`: it does not re-execute a command
+  whose inputs could not be obtained, and does not save the results of a
+  re-execution whose exit code differs from the recorded one.  Also documents
+  how the recorded exit code is handled by both commands.
+  [PR #7906](https://github.com/datalad/datalad/pull/7906)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Command output that is not valid in the preferred encoding no longer fails the command.  `WitlessProtocol._prepare_result()` decoded the captured `stdout`/`stderr` strictly, so a single undecodable byte raised `UnicodeDecodeError` -- and, since that happens while assembling the result, discarded the very output needed to diagnose it.  A mere libmagic warning on `stderr` (as emitted by the copy bundled with git-annex when its magic database does not match) was enough to abort an unrelated `git annex get`.  Output is now decoded with `surrogateescape`, keeping such bytes recoverable via `.encode(encoding, 'surrogateescape')`, the way Python itself handles undecodable file names.  Via [PR #7924](https://github.com/datalad/datalad/pull/7924)
+
 <a id='changelog-1.6.2'></a>
 # 1.6.2 (2026-08-13)
 
