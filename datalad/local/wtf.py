@@ -110,7 +110,11 @@ def _describe_annex():
             message=ce.format_short(),
         )
     info = {}
-    for line in out['stdout'].split(os.linesep):
+    # splitlines(), not split(os.linesep): this is a subprocess's output, so
+    # its line ending is git-annex's business, not the local platform's.  On
+    # Windows the two disagreed and everything but `version` was silently
+    # dropped -- the whole output stayed one "line".
+    for line in out['stdout'].splitlines():
         key = line.split(':')[0]
         if not key:
             continue
