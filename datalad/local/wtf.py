@@ -134,11 +134,24 @@ def _describe_system():
         lgr.warning("Failed to get distribution information: %s", ce)
         dist = tuple()
 
+    # How many CPUs code may actually use is not always os.cpu_count():
+    # under a cgroup/affinity mask (containers, CI runners, taskset) that
+    # reports the machine's CPUs rather than this process's allowance, and
+    # AnnexRepo derives its default --jobs from it.  Report both where the
+    # platform can tell them apart.
+    cpus = {'count': os.cpu_count()}
+    if hasattr(os, 'sched_getaffinity'):
+        try:
+            cpus['affinity'] = len(os.sched_getaffinity(0))
+        except OSError as exc:
+            lgr.debug("Failed to get CPU affinity: %s", CapturedException(exc))
+
     return {
         'type': os.name,
         'name': pl.system(),
         'release': pl.release(),
         'version': pl.version(),
+        'cpus': cpus,
         'distribution': ' '.join([_t2s(dist),
                                   _t2s(pl.mac_ver()),
                                   _t2s(pl.win32_ver())]).rstrip(),

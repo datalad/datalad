@@ -2048,23 +2048,32 @@ def get_annex_build_flags():
     return frozenset()
 
 
-def skip_if_no_annex_magicmime(func):
-    """Skip test if git-annex cannot match files by MIME type
+def annex_has_magicmime():
+    """Whether git-annex can match files by MIME type
 
     A git-annex built without MagicMime rejects an `annex.largefiles`
     expression using `mimetype=` or `mimeencoding=` outright, failing the
     command rather than falling back to matching by some other means.  Our
-    cfg_text2git procedure relies on `mimeencoding=binary`, so tests running
-    it need this too.
+    cfg_text2git procedure relies on `mimeencoding=binary`, so it is broken
+    by such a build too.
     """
+    return 'MagicMime' in get_annex_build_flags()
 
-    @wraps(func)
-    @attr('skip_if_no_annex_magicmime')
-    def _wrap_skip_if_no_annex_magicmime(*args, **kwargs):
-        if 'MagicMime' not in get_annex_build_flags():
-            pytest.skip("git-annex was built without MagicMime support")
-        return func(*args, **kwargs)
-    return _wrap_skip_if_no_annex_magicmime
+
+def xfail_if_no_annex_magicmime(func):
+    """Expect failure if git-annex cannot match files by MIME type
+
+    Deliberately xfail rather than skip: a git-annex without MagicMime is a
+    deficient build (see datalad#7936), not a platform we support in a
+    reduced form, and a skip would hide both the deficiency and the day it
+    gets fixed.  As an xfail it stays visible in the test summary, and turns
+    into an XPASS -- prompting removal of this marker -- once the build in
+    use has the flag.
+    """
+    return pytest.mark.xfail(
+        not annex_has_magicmime(),
+        reason="git-annex built without MagicMime support (datalad#7936)",
+    )(func)
 
 
 def get_ssh_port(host):

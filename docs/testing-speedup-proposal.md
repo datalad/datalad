@@ -1128,36 +1128,18 @@ several are worth revisiting if P1–P9 do not go far enough.
 
   [ce]: https://code.claude.com/docs/en/cloud-environments#allow-specific-domains
 * Whether GitHub's Linux runners here really give 4 vCPU (the `-n 2` question,
-  §6.1): worth adding a one-line `nproc` to the workflow before acting on it.
+  §6.1).  `datalad wtf` now reports `system.cpus` (both `os.cpu_count()` and,
+  where the platform distinguishes them, the affinity mask), and CI already
+  runs `datalad wtf`, so the number is in every job's log.
 * Every local number comes from one 4-vCPU container, where two runs of an
   identical configuration differed by ~8 %.  Ratios within a single sitting are
   solid; absolute seconds across sittings are not.
 
 ## 11. Reproducing the local measurements
 
-`tools/testing/bench-git-annex-flavors.sh` does both halves of §3 — the
-startup micro-benchmark and the test-subset wall time — for any set of
-flavors:
-
-```sh
-# fetch the publicly available flavors of one version
-tools/testing/bench-git-annex-flavors.sh fetch 10.20260316 /tmp/ga
-
-# benchmark them, plus anything else (e.g. an unpacked static build)
-tools/testing/bench-git-annex-flavors.sh run \
-    pypi=/tmp/ga/pypi/bin \
-    conda=/tmp/ga/conda/bin \
-    standalone=/tmp/ga/standalone/usr/bin \
-    static=/path/to/unpacked/static/build
-```
-
-It puts only git-annex's own executables on `PATH` per flavor (so a
-virtualenv-based flavor cannot shadow the interpreter running the tests),
-gives each flavor a fresh `$HOME`, and reports wall time, the sum of test
-durations and the median test.  `SUBSET`, `NPROC` and `STARTUP_REPS` override
-the defaults.
-
-By hand, the same thing is:
+Both halves of §3 -- the startup micro-benchmark and the test-subset wall
+time -- were measured with a throwaway script that is not worth carrying in
+the tree.  The recipe it automated:
 
 ```sh
 # three flavors of the same version

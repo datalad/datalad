@@ -46,19 +46,18 @@ from datalad.tests.utils_pytest import (
     create_tree,
     eq_,
     known_failure,
-    known_failure_windows,
     maybe_adjust_repo,
     neq_,
     ok_,
     patch,
     skip_if_adjusted_branch,
-    skip_if_no_annex_magicmime,
     skip_if_no_psutil,
     skip_wo_symlink_capability,
     swallow_logs,
     swallow_outputs,
     with_tempfile,
     with_tree,
+    xfail_if_no_annex_magicmime,
 )
 from datalad.utils import (
     Path,
@@ -502,12 +501,18 @@ def test_add_subdataset(path=None, other=None):
     ok_(other_clone.is_installed())
 
 
-# CommandError: command '['git', '-c', 'receive.autogc=0', '-c', 'gc.auto=0', 'annex', 'add', '--json', '--', 'empty', 'file.txt']' failed with exitcode 1
-# Failed to run ['git', '-c', 'receive.autogc=0', '-c', 'gc.auto=0', 'annex', 'add', '--json', '--', 'empty', 'file.txt'] under 'C:\\Users\\appveyor\\AppData\\Local\\Temp\\1\\datalad_temp_tree_j2mk92y3'. Exit code=1.
-@known_failure_windows
 # mimetype= in annex.largefiles needs a git-annex built against libmagic;
 # git-annex's macOS wheel is not, and rejects the gitattributes outright.
-@skip_if_no_annex_magicmime
+#
+# This also used to carry @known_failure_windows, from the AppVeyor era:
+#   CommandError: [... 'annex', 'add', '--json', '--', 'empty', 'file.txt']
+#   failed with exitcode 1 under
+#   'C:\\Users\\appveyor\\AppData\\Local\\Temp\\1\\datalad_temp_tree_j2mk92y3'
+# Since datalad.tests.knownfailures.skip defaults to True that marker skipped
+# the test outright, so it was never established whether it still fails -- and
+# the Windows git-annex wheel we install now does bundle libmagic.  Dropped to
+# find out; restore it with a specific reason if Windows goes red again.
+@xfail_if_no_annex_magicmime
 @with_tree(tree={
     'file.txt': 'some text',
     'empty': '',

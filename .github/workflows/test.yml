@@ -90,12 +90,6 @@ jobs:
       - name: Show git describe output to ensure that we did fetch all the tags
         run: git describe
 
-      # PYTEST_NPROC is set from this, not from `-n auto`
-      - name: Report runner resources
-        run: |
-          python -c "import os; print('os.cpu_count():', os.cpu_count())"
-          nproc || true
-
       # OS-specific provisioning (APT/NeuroDebian on Linux, Homebrew on
       # macOS, long paths/SSH server on Windows) lives in
       # tools/ci/test-env-{linux,macos,windows}.sh rather than inline here,
