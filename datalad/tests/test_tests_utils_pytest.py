@@ -43,6 +43,7 @@ from _pytest.outcomes import (
 
 from datalad import cfg as dl_cfg
 from datalad.support import path as op
+from datalad.support.external_versions import external_versions
 from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils_pytest import (
     OBSCURE_FILENAMES,
@@ -57,12 +58,15 @@ from datalad.tests.utils_pytest import (
     assert_str_equal,
     assert_true,
     eq_,
+    annex_has_magicmime,
     fs_supports_filename,
+    get_annex_build_flags,
     get_most_obscure_supported_name,
     ignore_nose_capturing_stdout,
     known_failure_githubci_win,
     known_failure_windows,
     local_testrepo_flavors,
+    nok_,
     nok_startswith,
     ok_,
     ok_broken_symlink,
@@ -771,3 +775,54 @@ def test_signal_timeout_noop_without_sigalrm(monkeypatch):
     # but with SIGALRM removed it must be a pure no-op.
     with signal_timeout(0.001):
         time.sleep(0.05)
+
+
+def _fresh_build_flags():
+    """get_annex_build_flags() bypassing its lru_cache"""
+    get_annex_build_flags.cache_clear()
+    try:
+        return get_annex_build_flags()
+    finally:
+        get_annex_build_flags.cache_clear()
+
+
+@skip_if(not external_versions['cmd:annex'])
+def test_get_annex_build_flags():
+    """Flags come back as a set, and agree with what git-annex reports"""
+    flags = _fresh_build_flags()
+    assert isinstance(flags, frozenset)
+    # every real build has some; and they are bare words, not a single blob
+    ok_(flags)
+    for flag in flags:
+        eq_(flag, flag.strip())
+        nok_(' ' in flag)
+    # a couple every build we support has had for years, as a sanity check
+    # that this is the "build flags" line and not some other one
+    assert_in('Testsuite', flags)
+    # and it agrees with the source wtf reads it from
+    from datalad.local.wtf import _describe_annex
+    eq_(flags, frozenset(_describe_annex()['build flags']))
+
+
+@skip_if(not external_versions['cmd:annex'])
+def test_annex_has_magicmime():
+    """The predicate just asks whether MagicMime is among the flags"""
+    eq_(annex_has_magicmime(),
+                 'MagicMime' in _fresh_build_flags())
+
+
+def test_get_annex_build_flags_without_annex(monkeypatch):
+    """Degrades to "no capabilities" rather than raising
+
+    _describe_annex() reports a version of 'not available' and no flags when
+    git-annex cannot be run; callers must then see an empty set rather than
+    a KeyError, so that a capability check simply comes out False.
+    """
+    monkeypatch.setattr('datalad.local.wtf._describe_annex',
+                        lambda: dict(version='not available', message='nope'))
+    eq_(_fresh_build_flags(), frozenset())
+    get_annex_build_flags.cache_clear()
+    try:
+        nok_(annex_has_magicmime())
+    finally:
+        get_annex_build_flags.cache_clear()

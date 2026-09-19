@@ -2030,22 +2030,17 @@ def get_annex_build_flags():
     (it bundles magic.mgc but no libmagic), so the capability cannot be
     inferred from the git-annex version alone.
 
+    Reuses `datalad wtf`'s parsing rather than repeating it, so there is one
+    place that knows how to read `git annex version`.
+
     Returns
     -------
     frozenset of str
-      Empty if git-annex is unavailable or reports no `build flags:` line,
-      so callers degrade to treating every capability as absent.
+      Empty if git-annex is unavailable, so callers degrade to treating
+      every capability as absent.
     """
-    try:
-        out = WitlessRunner().run(
-            ['git', 'annex', 'version'], protocol=StdOutErrCapture)['stdout']
-    except Exception as exc:
-        lgr.debug("Could not determine git-annex build flags: %s", exc)
-        return frozenset()
-    for line in out.splitlines():
-        if line.startswith('build flags:'):
-            return frozenset(line.split(':', 1)[1].split())
-    return frozenset()
+    from datalad.local.wtf import _describe_annex
+    return frozenset(_describe_annex().get('build flags', []))
 
 
 def annex_has_magicmime():
