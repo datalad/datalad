@@ -2020,6 +2020,57 @@ def skip_if_adjusted_branch(func):
     return _wrap_skip_if_adjusted_branch
 
 
+@lru_cache(maxsize=1)
+def get_annex_build_flags():
+    """Build flags git-annex reports in the output of `git annex version`
+
+    Not every build enables every flag.  MagicMime in particular -- what
+    `annex.largefiles=(mimetype=...)` needs -- requires libmagic at build
+    time, and git-annex's macOS wheel on PyPI currently ships without it
+    (it bundles magic.mgc but no libmagic), so the capability cannot be
+    inferred from the git-annex version alone.
+
+    Reuses `datalad wtf`'s parsing rather than repeating it, so there is one
+    place that knows how to read `git annex version`.
+
+    Returns
+    -------
+    frozenset of str
+      Empty if git-annex is unavailable, so callers degrade to treating
+      every capability as absent.
+    """
+    from datalad.local.wtf import _describe_annex
+    return frozenset(_describe_annex().get('build flags', []))
+
+
+def annex_has_magicmime():
+    """Whether git-annex can match files by MIME type
+
+    A git-annex built without MagicMime rejects an `annex.largefiles`
+    expression using `mimetype=` or `mimeencoding=` outright, failing the
+    command rather than falling back to matching by some other means.  Our
+    cfg_text2git procedure relies on `mimeencoding=binary`, so it is broken
+    by such a build too.
+    """
+    return 'MagicMime' in get_annex_build_flags()
+
+
+def xfail_if_no_annex_magicmime(func):
+    """Expect failure if git-annex cannot match files by MIME type
+
+    Deliberately xfail rather than skip: a git-annex without MagicMime is a
+    deficient build (see datalad#7936), not a platform we support in a
+    reduced form, and a skip would hide both the deficiency and the day it
+    gets fixed.  As an xfail it stays visible in the test summary, and turns
+    into an XPASS -- prompting removal of this marker -- once the build in
+    use has the flag.
+    """
+    return pytest.mark.xfail(
+        not annex_has_magicmime(),
+        reason="git-annex built without MagicMime support (datalad#7936)",
+    )(func)
+
+
 def get_ssh_port(host):
     """Get port of `host` in ssh_config.
 

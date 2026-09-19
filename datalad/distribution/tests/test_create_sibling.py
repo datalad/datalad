@@ -30,7 +30,10 @@ from datalad.api import (
 )
 from datalad.cmd import StdOutErrCapture
 from datalad.cmd import WitlessRunner as Runner
-from datalad.distribution.create_sibling import _RunnerAdapter
+from datalad.distribution.create_sibling import (
+    _RunnerAdapter,
+    _ls_remote_path,
+)
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
     CommandError,
@@ -988,3 +991,35 @@ def test_only_one_level_without_recursion(path=None):
     ok_((path / 'toplevelsibling').exists())
     # this shouldn't
     assert_false(Path(path / 'toplevelsibling' / 'sub1').exists())
+
+
+@pytest.mark.parametrize(
+    "stdout,expected",
+    [("", []),
+     ("foo\n", ["foo"]),
+     ("a\nb\nc\n", ["a", "b", "c"]),
+     # no trailing newline
+     ("a\nb", ["a", "b"]),
+     # \x0b, \x0c and U+2028 are legal in POSIX file names and must NOT be
+     # treated as separators -- which is what str.splitlines() would do
+     ("we\x0bird\nna me\n", ["we\x0bird", "na me"])],
+    ids=["empty", "one", "three", "no-trailing-nl", "exotic-names"])
+def test_ls_remote_path_splits_on_remote_newline(stdout, expected):
+    """`ls` runs on the remote, so its separator is not the local os.linesep
+
+    Splitting on os.linesep handed a Windows client the whole listing as a
+    single entry.  The only caller today just tests the list for emptiness,
+    which survived that, so this guards the contents.
+    """
+    eq_(_ls_remote_path(lambda cmd: (stdout, ""), "/some/path"), expected)
+
+
+def test_ls_remote_path_ignores_local_linesep(monkeypatch):
+    """Reproduce the Windows client on any platform
+
+    Pretending os.linesep is CRLF is what makes the regression catchable off
+    Windows: splitting on it turned a POSIX server's whole listing into one
+    entry.  The remote's `ls` separator does not depend on the local one.
+    """
+    monkeypatch.setattr(os, "linesep", "\r\n")
+    eq_(_ls_remote_path(lambda cmd: ("a\nb\nc\n", ""), "/p"), ["a", "b", "c"])

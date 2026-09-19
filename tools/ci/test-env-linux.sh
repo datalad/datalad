@@ -1,13 +1,23 @@
 #!/bin/bash
 #
 # Provision a Linux (GitHub-hosted Ubuntu) runner for the datalad test
-# suite: NeuroDebian + the APT packages the tests need, and the sudo/git
-# tweaks that the "install for a regular user, but be able to run a subset
-# of tests under `sudo -E`" setup in test.yml relies on later.
+# suite: the APT packages the tests need, and the sudo/git tweaks that the
+# "install for a regular user, but be able to run a subset of tests under
+# `sudo -E`" setup in test.yml relies on later.
+#
+# The NeuroDebian repository is only set up when an entry asks for it with
+# `needs-neurodebian: true` in tools/ci/test-jobs.yml.  Nothing needs it for
+# git-annex any more -- the wheel comes from PyPI, the standalone bundle is
+# downloaded as a .deb by datalad-installer, and the conda package comes from
+# conda-forge -- and the APT packages below are all in Ubuntu proper.  It is
+# ~30 s per job otherwise.
 set -eo pipefail
 
-# The ultimate one-liner setup for NeuroDebian repository
-bash <(wget -q -O- https://neuro.debian.net/_files/neurodebian-ci-setup.sh)
+if [ "${NEEDS_NEURODEBIAN:-}" = true ]
+then
+    # The ultimate one-liner setup for NeuroDebian repository
+    bash <(wget -q -O- https://neuro.debian.net/_files/neurodebian-ci-setup.sh)
+fi
 sudo apt-get update -qq
 sudo apt-get install -y eatmydata  # to speedup some installations
 tools/ci/prep-travis-forssh.sh
