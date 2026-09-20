@@ -69,11 +69,11 @@ The proposals, in short — as two pull requests (§7):
 | **A6** | `-n 2` → an explicit worker count (1.58× measured at `-n 4`)                   |      per job |
 | **A7** | stop provisioning NeuroDebian where APT is unused; pip cache / `uv`            |        small |
 | **A8** | drop `DATALAD_TESTS_SETUP_TESTREPOS`, duplicate `--doctest-modules`            |        small |
-| **B1** | `test_files_split`: monkeypatch `CMD_MAX_ARG` instead of 10 000 files          |  ~10 min/run |
-| **B2** | `git-annex testremote --fast --size=1KiB`                                      |   ~1 min/run |
+| **B1** | `test_files_split`: monkeypatch `CMD_MAX_ARG` instead of 10 000 files          |  124 s → 3 s |
+| **B2** | `git-annex testremote --fast --size=1KiB`                                      |   60 s → 3 s |
 | **B3** | delete the uncollected `@turtle` in `test_s3.py`                               |            — |
 | **B4** | remove `utils_testrepos.py` + its config option outright                       |            — |
-| **B5** | fixture reuse by tarball for one `@slow` cluster                               |      minutes |
+| **B5** | fixture reuse by tarball for one `@slow` cluster                               |  41 s → 35 s |
 | later  | a caching dataset fixture keyed on the tree spec (P11)                         |            — |
 
 Measured and **rejected**: TMPDIR on tmpfs (within noise), `eatmydata` /
@@ -845,6 +845,13 @@ duplicated `--doctest-modules` in the `Run tests` step.
 
 ### PR B — test-suite changes
 
+> **Measured after implementation** (this machine, git-annex 10.20260901 from
+> the PyPI wheel).  The B1/B2/B5 rows above are those numbers, not estimates.
+> Two of the projections in this section were wrong and are corrected in
+> place below: B5's premise about `test_rerun_merges.py`, and the size of the
+> win it yields.
+
+
 #### B1 — `test_files_split`: patch the limit instead of materialising 10 000 files
 
 `@slow  # 313s`, parametrized ×2 → ~10 min/run.  It materialises 100 × 100
@@ -894,6 +901,22 @@ tests run as a normal user.
 
 Scope for PR B: convert *one* cluster (`test_rerun_merges.py` is the most
 uniform) with a local helper, and only then generalise.
+
+**Correction, from doing it.**  The premise above is wrong for
+`test_rerun_merges.py`: its 15 tests do *not* rebuild the same hierarchy.
+They build 15 *different* commit graphs, and what they actually share is the
+bare `Dataset.create()` they all start from.  So the reusable artifact is an
+empty created dataset, not a populated one, and the win is correspondingly
+smaller: 496 ms to `create()` against 17 ms to untar, ×15 tests, which took
+the module from **41.3 s to 34.7 s (16%)** rather than the "minutes" guessed
+above.
+
+`test_rerun_merges.py` is still the right pilot, but for a different reason
+than the one given: it is the only one of the listed clusters where the
+copies are safe to share a dataset ID and annex UUID.  `test_update.py`,
+`test_create_sibling.py` and `test_push.py` all wire two copies together, so
+the P11 caveat applies to them from the start and naive tarball reuse is not
+available.
 
 #### P11 (separate, later) — a caching dataset fixture
 

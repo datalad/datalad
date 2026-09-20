@@ -130,7 +130,6 @@ Test infrastructure
    :toctree: generated
 
    tests.utils_pytest
-   tests.utils_testrepos
    tests.heavyoutput
 
 Command interface
