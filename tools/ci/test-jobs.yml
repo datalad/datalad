@@ -10,7 +10,11 @@
 #   "not slow" / "slow only" split per scenario; a full run now costs about
 #   what the "not slow" half used to, so one job per scenario covers more for
 #   the same money.  Scope a job with TESTS_TO_PERFORM if it really needs a
-#   subset -- the marker-based selection knob is gone.
+#   subset.
+# * `@turtle` is covered by exactly one entry, which runs *only* those.  The
+#   old per-scenario PYTEST_SELECTION/PYTEST_SELECTION_OP knob is still gone;
+#   PYTEST_MARKERS exists for this one job, and overriding it elsewhere would
+#   just re-create the split that was removed.
 # * git-annex comes from the PyPI wheel unless the entry says otherwise, which
 #   is both the fastest to install and unwrapped (worth 2-3x on test runtime
 #   over the standalone bundle).  The bundle and the conda package are
@@ -28,6 +32,20 @@
 - python-version: '3.10'
   extra-envs:
     PYTEST_NPROC: "4"
+
+# The only entry that runs `@turtle` -- everything else is `not(turtle)`, so
+# without this they would never run anywhere.  Base Python, plain ubuntu, the
+# default PyPI git-annex: nothing scenario-specific, because the point is to
+# exercise the tests themselves rather than an environment.
+#
+# It is cheap enough to keep on PRs rather than cron: 3 tests, ~2 min of test
+# time (test_files_split_heavy is 15 s + 108 s, test_gitannex_ssh needs the
+# sshd that DATALAD_TESTS_SSH already provisions).  If it ever stops being
+# cheap, add `cron-only: true` rather than dropping it -- a marker nothing
+# runs is a marker that quietly rots.
+- python-version: '3.10'
+  extra-envs:
+    PYTEST_MARKERS: turtle
 
 # To test https://github.com/datalad/datalad/pull/4342 fix.
 # From our testing in that PR seems to have no effect, but kept around
