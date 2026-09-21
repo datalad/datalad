@@ -72,7 +72,7 @@ The proposals, in short — as two pull requests (§7):
 | **B1** | `test_files_split`: monkeypatch `CMD_MAX_ARG` instead of 10 000 files          |  124 s → 3 s |
 | **B2** | `git-annex testremote --fast --size=1KiB`                                      |   60 s → 3 s |
 | **B3** | delete the uncollected `@turtle` in `test_s3.py`                               |            — |
-| **B4** | remove `utils_testrepos.py` + its config option outright                       |            — |
+| ~~B4~~ | ~~remove `utils_testrepos.py` + its config option~~ — **not doable**, see below |            — |
 | **B5** | fixture reuse by tarball for one `@slow` cluster                               |  41 s → 35 s |
 | later  | a caching dataset fixture keyed on the tree spec (P11)                         |            — |
 
@@ -229,10 +229,11 @@ So the 85 min wall = 31 min of queueing + a 54 min job.  Consequences:
   from APT/NeuroDebian any more.  It is pure setup cost on 20 jobs.
 * `test.yml` exports `DATALAD_TESTS_SETUP_TESTREPOS=1`.  The config key it maps
   to (`datalad.tests.setup.testrepos`) is still *declared* in
-  `datalad/interface/common_cfg.py`, but has **zero** readers since the
-  nose→pytest migration removed `@with_testrepos`, and
-  `datalad/tests/utils_testrepos.py` has exactly one in-tree user left — its
-  own test file.  All of it goes (§7 A8, B4), not just the export.
+  `datalad/interface/common_cfg.py` and has zero readers **in this
+  repository**, as does `datalad/tests/utils_testrepos.py` beyond its own
+  test file.  Only the export goes (§7 A8): the declaration and the module
+  itself are load-bearing for extensions — see B4, where removing them was
+  tried and reverted.
 * `--doctest-modules` is passed **twice** in the `Run tests` step (once from
   `PYTEST_OPTS`, once on the command line).
 
@@ -840,8 +841,9 @@ jobs.
 
 #### A8 — Dead knobs in the workflow
 
-Drop `DATALAD_TESTS_SETUP_TESTREPOS=1` (nothing reads it — see B4) and the
-duplicated `--doctest-modules` in the `Run tests` step.
+Drop the `DATALAD_TESTS_SETUP_TESTREPOS=1` export (no in-tree reader; the
+config *declaration* has to stay, see B4) and the duplicated
+`--doctest-modules` in the `Run tests` step.
 
 ### PR B — test-suite changes
 
@@ -878,14 +880,38 @@ waits out a 900 s STS token.  Dead code with decorative markers.
 
 #### B4 — Remove the test-repo machinery outright
 
-`datalad/tests/utils_testrepos.py` (`TestRepo`, `BasicAnnexTestRepo`,
-`BasicGitTestRepo`, `SubmoduleDataset`, `NestedDataset`, `InnerSubmodule`) has
-exactly one in-tree user left: its own `test_utils_testrepos.py`.  The
-`datalad.tests.setup.testrepos` config option in
-`datalad/interface/common_cfg.py` has **zero** readers since the nose→pytest
-migration removed `@with_testrepos`.  Remove all three: the module, its test,
-and the config option — plus the `DATALAD_TESTS_SETUP_TESTREPOS` export in
-`test.yml` (A8).
+**Tried, reverted — do not retry without a deprecation cycle.**
+
+The claim below was that `datalad/tests/utils_testrepos.py` has exactly one
+in-tree user left (its own test) and that `datalad.tests.setup.testrepos` has
+zero readers.  Both are true *in-tree* and both are beside the point: the
+consumers are **extensions**, and the Extensions CI job caught it within two
+minutes of pushing the removal.
+
+- `datalad-next` does
+  `from datalad.tests.test_utils_testrepos import BasicGitTestRepo`
+  in `datalad_next/tests/utils.py` — importing from the *test* module, not
+  from `utils_testrepos` — so deleting it is `ModuleNotFoundError` at
+  collection, for that extension's entire suite.
+- `datalad-deprecated` reads `datalad.tests.setup.testrepos`, and without the
+  definition `cfg.obtain()` raises
+  `RuntimeError: cannot obtain value ... not preconfigured, no default`,
+  taking out `test_auto.py`, `test_publish.py` and `test_testrepos.py`.
+
+So this is public API for extensions regardless of how dead it looks from
+inside this repository, and `grep` over `datalad/` cannot establish otherwise.
+Retiring it means a deprecation cycle coordinated with the extensions, which
+is its own piece of work; the original text is kept below for whoever picks
+that up.
+
+> `datalad/tests/utils_testrepos.py` (`TestRepo`, `BasicAnnexTestRepo`,
+> `BasicGitTestRepo`, `SubmoduleDataset`, `NestedDataset`, `InnerSubmodule`)
+> has exactly one in-tree user left: its own `test_utils_testrepos.py`.  The
+> `datalad.tests.setup.testrepos` config option in
+> `datalad/interface/common_cfg.py` has **zero** readers since the
+> nose→pytest migration removed `@with_testrepos`.  Remove all three: the
+> module, its test, and the config option — plus the
+> `DATALAD_TESTS_SETUP_TESTREPOS` export in `test.yml` (A8).
 
 #### B5 — Fixture reuse by tarball, not by `cp`
 

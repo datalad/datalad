@@ -375,6 +375,12 @@ _definitions = {
         'type': EnsureBool(),
         'default': False,
     },
+    'datalad.tests.setup.testrepos': {
+        'ui': ('question', {
+            'title': 'Pre-creates repositories for @with_testrepos within setup_package'}),
+        'type': EnsureBool(),
+        'default': False,
+    },
     'datalad.tests.temp.dir': {
         'ui': ('question', {
                'title': 'Create a temporary directory at location specified by this flag. It is used by tests to create a temporary git directory while testing git annex archives etc'}),
