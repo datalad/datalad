@@ -1113,6 +1113,41 @@ def _create_via_reckless_ephemeral(ds, target_path, rel_path):
         lgr.debug("Symlinked annex objects to parent")
 
 
+def _fix_annex_symlink_depth(subdataset_path, depth_removed):
+    """Rewrite git-annex symlink targets throughout history to the new depth.
+
+    Parameters
+    ----------
+    subdataset_path : str
+        Path to the subdataset repo to fix.
+    depth_removed : int
+        Number of leading path components removed by the split (e.g. 2
+        for a split of "deployments/falkor-hub"). No-op if <= 0.
+    """
+    if depth_removed <= 0:
+        return
+    lgr.info("Fixing annexed symlink depth (-%d levels) throughout history",
+              depth_removed)
+    env = os.environ.copy()
+    env['FILTER_BRANCH_SQUELCH_WARNING'] = '1'
+    # Not `git annex fix`: silently no-ops inside a --tree-filter. Plain
+    # text substitution instead.
+    tree_filter = (
+        'find . -type l | while read -r f; do '
+        '  target=$(readlink "$f"); '
+        '  case "$target" in '
+        '    */.git/annex/objects/*) '
+        f'      new_target=$(echo "$target" | sed -E "s#^(\\.\\./){{{depth_removed}}}##"); '
+        '      ln -sf "$new_target" "$f" ;; '
+        '  esac; '
+        'done'
+    )
+    repo = Dataset(subdataset_path).repo
+    repo.call_git(
+        ['filter-branch', '-f', '--tree-filter', tree_filter, '--', 'HEAD'],
+        env=env)
+
+
 def _filter_subdataset(subdataset_path, filter_path, parent_path,
                        annex_mode='as-is'):
     """Apply git-annex filter-branch and git filter-branch.
@@ -1185,6 +1220,11 @@ def _filter_subdataset(subdataset_path, filter_path, parent_path,
 
     # Step 4: Handle annex post-filtering
     if parent_has_annex and is_annex:
+        # Step 2's --subdirectory-filter relocates paths but not symlink
+        # blob content; fix up classic-symlink-mode annexed files' now-wrong
+        # relative depth throughout history (see commit message).
+        _fix_annex_symlink_depth(subdataset_path, len(Path(filter_path).parts))
+
         # Normal annex path: forget to clean up
         lgr.debug("Running git annex forget")
         repo.call_annex(['forget', '--force', '--drop-dead'])
