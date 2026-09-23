@@ -37,6 +37,7 @@ from datalad.interface.common_opts import (
     recursion_flag,
     recursion_limit,
 )
+from datalad.interface.results import StatusRecord
 from datalad.interface.utils import generic_result_renderer
 from datalad.support.constraints import (
     EnsureChoice,
@@ -185,7 +186,7 @@ def yield_dataset_status(ds, paths, annexinfo, untracked, recursion_limit,
     subds_statuscalls = []
     for path, props in status.items():
         cpath = ds.pathobj / path.relative_to(repo_path)
-        yield dict(
+        yield StatusRecord.from_kwargs(
             props,
             path=str(cpath),
             # report the dataset path rather than the repo path to avoid
@@ -417,7 +418,7 @@ class Status(Interface):
                     reporting_order='depth-first'):
                 if 'status' not in r:
                     r['status'] = 'ok'
-                yield dict(
+                yield StatusRecord.from_kwargs(
                     r,
                     refds=ds_path,
                     action='status',
