@@ -13,6 +13,7 @@ __docformat__ = 'restructuredtext'
 
 import os.path as op
 import tarfile
+import uuid
 
 import pytest
 
@@ -73,7 +74,20 @@ def ds(_created_dataset_tar, tmp_path):
             # `filter` only exists from 3.11.4; the tarball is one we just
             # wrote ourselves, so the unfiltered path is equivalent here
             tf.extractall(tmp_path)
-    return Dataset(str(tmp_path / "ds"))
+    ds = Dataset(str(tmp_path / "ds"))
+    # Every copy comes out of one tarball, so they would all carry the same
+    # annex UUID -- and git-annex takes that to mean "this remote is me".
+    # `git annex copy --to <another copy>` then exits 0 having transferred
+    # nothing, so a test could assert a successful push over an empty one.
+    # Nothing in this module wires two copies together today; this keeps that
+    # from being a precondition a future test has to know about.  ~2 ms.
+    ds.repo.config.set("annex.uuid", str(uuid.uuid4()), scope="local")
+    # `datalad.dataset.id` is deliberately left alone: it lives in the
+    # committed .datalad/config, so changing it would either dirty the
+    # worktree (these tests need it clean for `run`) or add a commit (they
+    # assert on exact commit graphs).  Only the annex UUID causes silent
+    # misbehaviour.
+    return ds
 
 
 def _setup_run_left_run_right(ds):
