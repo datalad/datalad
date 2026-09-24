@@ -1,4 +1,133 @@
 
+<a id='changelog-1.6.4'></a>
+# 1.6.4 (2026-09-24)
+
+## 🚀 Enhancements and New Features
+
+- `GitRepo` gained a `dot_git_common` property, pointing to the `.git`
+  directory that a linked worktree checkout shares with the repository it came
+  from -- where `config` and `objects` live, unlike the per-worktree `dot_git`.
+  For any other repository it is the same as `dot_git`.
+  [PR #7931](https://github.com/datalad/datalad/pull/7931)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🐛 Bug Fixes
+
+- `save` and `copy-file` now also operate in a plain `git` worktree checkout.
+  Fixes [#7921](https://github.com/datalad/datalad/issues/7921) via
+  [PR #7931](https://github.com/datalad/datalad/pull/7931)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- `datalad wtf` parses `git annex version` output with `splitlines()` rather
+  than splitting on the *local* platform's `os.linesep`.  Where the two
+  disagreed -- on Windows, always -- the whole output stayed a single line
+  and everything but `version` was silently dropped, so the `git-annex`
+  section reported no build flags, backends, remote types or repository
+  versions.
+
+- `create_sibling` splits the remote `ls -A1` listing on `"\n"` rather than
+  the *local* `os.linesep`.  A Windows client talking to a POSIX server got
+  the whole listing back as one entry.  Latent: the only caller tests the
+  result for emptiness, which survived the bad split.
+
+## 🏠 Internal
+
+- `datalad wtf` reports `system.cpus`: `os.cpu_count()` and, where the
+  platform distinguishes them, the size of the process's CPU affinity mask.
+  The two differ under cgroups/containers/CI runners, and `AnnexRepo`
+  derives its default `--jobs` from the former.
+
+## 🧪 Tests
+
+- Windows and macOS testing moved off AppVeyor into `test.yml`'s own
+  matrix (`tools/ci/test-jobs.yml`), splitting `datalad` submodules the
+  same three ways AppVeyor's `Mac/WinP310core/a1/a2` jobs did to stay
+  under the job timeout.  OS-specific provisioning (APT/NeuroDebian,
+  Homebrew, NTFS long paths + an SSH server on Windows) was extracted
+  into shellcheck-able `tools/ci/test-env-{linux,macos,windows}.sh`
+  scripts.  AppVeyor and its AppVeyor-only helper scripts are removed.
+  Dropping AppVeyor exposed a few Windows-only test issues that had no
+  other CI signal:
+  - `addurls.py::get_subpaths`'s doctest hardcoded a POSIX `/` in its
+    expected output, but the function joins subpaths with
+    `os.path.sep`; rewritten to compare against a platform-agnostic
+    value instead.
+  - `test_run_merge_sub_under_plain_dir`'s existing
+    `is_managed_branch()`-gated `xfail` (for the git-annex limitation
+    in [issue #7905](https://github.com/datalad/datalad/issues/7905),
+    where `git annex sync` only propagates a nested submodule's
+    pointer update on adjusted/managed branches at the repo's top
+    level) was registered too late to cover the earlier assertions it
+    was also hitting; moved earlier so it covers the whole affected
+    span.
+  - `tools/ci/test-env-windows.sh`'s scratch `TMP`/`TEMP` directory was
+    hardcoded to `C:\DLTMP`, but GitHub's Windows runners check the
+    repository out to `D:`; `os.path.relpath()` cannot compute a
+    relative path across drive letters, so anything comparing a
+    checkout-drive path against a profile-drive temp path (as
+    `datalad run` does) raised `ValueError: path is on mount 'D:',
+    start on mount 'C:'`.  The scratch directory now derives its drive
+    from the checkout's own location instead of hardcoding `C:`.
+  [PR #7933](https://github.com/datalad/datalad/pull/7933)
+  (by [@yarikoptic-gitmate](https://github.com/yarikoptic-gitmate))
+
+- CI installs git-annex from the PyPI wheel by default, 2-3x faster to run
+  tests against than the standalone bundle, and covers the standalone and
+  conda builds on cron.  Each scenario now runs one full test selection
+  instead of a slow/not-slow pair.
+
+- Tests that need git-annex to match files by MIME type (`mimetype=` or
+  `mimeencoding=` in `annex.largefiles`, the latter used by the
+  `cfg_text2git` procedure) are marked `xfail` when git-annex was built
+  without MagicMime, which the macOS wheel is.  See #7936.
+
+- `test_add_mimetypes` is additionally `xfail` on Windows, where git-annex
+  *is* built against libmagic and `mimeencoding=` matching works, but
+  `mimetype=` does not match.  See #7937.  It previously carried
+  `@known_failure_windows` from the AppVeyor era, which skipped it outright
+  and so hid that the symptom had changed.
+
+- `test_files_split` is skipped on the NFS CI job.  Adding its 10k-file tree
+  over NFS trips git-annex's "changed while it was being added" check at
+  random, and argument-list splitting is filesystem-agnostic, so NFS added
+  flakiness rather than coverage.  It was never run there before: the job
+  used to exclude `@slow`.
+
+- `datalad wtf`'s CPU reporting is covered by tests, including that an
+  unreadable affinity mask costs that one field rather than taking the
+  whole report down -- `wtf` is what gets run when something is already
+  wrong, so none of its probes may raise.
+
+- `test_files_split` exercises the over-long-argument-list chunking against a
+  lowered `datalad.utils.CMD_MAX_ARG` and 200 files, rather than by
+  materialising 10 000 files with 101-character names: 124 s → 3 s for both
+  parametrizations.  The against-the-real-limit version is kept as
+  `test_files_split_heavy`, now `@turtle`.
+
+- `git-annex testremote` is called with `--fast --size=1KiB` in the RIA
+  tests.  The default key size is 1 MiB and neither flag was passed, so most
+  of the runtime was spent moving bytes rather than exercising the special
+  remote's protocol: `test_gitannex_local` goes 60 s → 3.4 s, which also
+  takes it under the 10 s its `@slow` marker stood for.
+
+- `test_rerun_merges.py` unpacks one created dataset per test from a
+  module-scoped tarball instead of calling `Dataset.create()` 15 times
+  (496 ms vs 17 ms each): 50.9 s → 42.7 s, i.e. −16%.  Each copy gets a fresh
+  `annex.uuid`, since otherwise every copy carries the tarball's and
+  git-annex reads a same-UUID remote as "me" -- `git annex copy --to` then
+  exits 0 having moved nothing.  Nothing here wires two copies together, so
+  that is insurance rather than a fix, and it costs ~2 s of the ~10 s saved.
+
+- `@turtle` tests run in CI again, in one dedicated matrix entry on base
+  Python and plain ubuntu.  Every other entry selects `not(turtle)`, so until
+  now they ran nowhere at all -- three tests that no job would have reported
+  on.  `PYTEST_MARKERS` in an entry's `extra-envs` overrides the selection;
+  it defaults to the previous `not(turtle)`.
+
+- Deleted `test_s3.py::_test_expiring_token`, which carried `@turtle` and
+  `@integration` but was `_`-prefixed and so never collected, and did little
+  but wait out a 900 s STS token.
+
 <a id='changelog-1.6.3'></a>
 # 1.6.3 (2026-09-17)
 
