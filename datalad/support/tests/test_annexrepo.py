@@ -86,6 +86,7 @@ from datalad.tests.utils_pytest import assert_dict_equal as deq_
 from datalad.tests.utils_pytest import (
     assert_equal,
     assert_false,
+    assert_greater,
     assert_in,
     assert_is_instance,
     assert_not_equal,
@@ -119,6 +120,7 @@ from datalad.tests.utils_pytest import (
     skip_if_root,
     skip_nomultiplex_ssh,
     slow,
+    turtle,
     swallow_logs,
     swallow_outputs,
     with_parametric_batch,
@@ -2446,16 +2448,25 @@ _HEAVY_TREE = {
     for d in range(_ht_n)
 }
 
-# @known_failure_windows  # might fail with some older annex `cp` failing to set permissions
-@slow  # 313s  well -- if errors out - only 3 sec
-# Adding _HEAVY_TREE's 10k files over NFS trips git-annex's
-# "changed while it was being added" check on the attribute cache, so the
-# job fails at random.  What this test is about -- splitting an over-long
-# argument list -- is filesystem-agnostic, so NFS buys no coverage here.
-@skip_if(on_github and on_nfs)
-@pytest.mark.parametrize("cls", [GitRepo, AnnexRepo])
-@with_tree(tree=_HEAVY_TREE)
-def test_files_split(topdir=None, *, cls):
+# 200 files, in the same shape as _HEAVY_TREE but without the padding: the
+# over-long argument list is produced by shrinking the limit rather than by
+# materialising 10 000 paths (see test_files_split).
+_LIGHT_TREE = {
+    'd%02d' % d: {
+        'f%02d' % f: str(f)
+        for f in range(10)
+    }
+    for d in range(20)
+}
+
+# Small enough that 200 paths of ~70 characters need ~16 chunks, large enough
+# that a chunk still holds a dozen files -- at chunk_size 1 this would turn
+# into 200 separate git invocations and stop being fast.
+_SPLIT_CMD_MAX_ARG = 1000
+
+
+def _add_modify_save(topdir, cls):
+    """Add a tree, then rewrite every file and `save` the directories"""
     from glob import glob
     r = cls(topdir)
     dirs = glob(op.join(topdir, '*'))
@@ -2472,6 +2483,39 @@ def test_files_split(topdir=None, *, cls):
         with open(f, 'w') as f:
             f.write('1')
     dl.save(dataset=r.path, path=dirs, result_renderer="disabled")
+    return files
+
+
+@pytest.mark.parametrize("cls", [GitRepo, AnnexRepo])
+@with_tree(tree=_LIGHT_TREE)
+def test_files_split(topdir=None, *, cls):
+    """Chunking of an over-long argument list, against a lowered limit
+
+    `generate_file_chunks()` reads `datalad.utils.CMD_MAX_ARG` at call time,
+    so lowering it exercises exactly the path that 10 000 real files used to
+    reach -- in seconds instead of ~5 minutes.  test_files_split_heavy keeps
+    the against-the-real-limit version.
+    """
+    with patch('datalad.utils.CMD_MAX_ARG', _SPLIT_CMD_MAX_ARG):
+        files = _add_modify_save(topdir, cls)
+        # guard the premise: without real chunking this test would pass while
+        # testing nothing, and the lowered limit is what makes it chunk.
+        from datalad.utils import generate_file_chunks
+        assert_greater(len(list(generate_file_chunks(files))), 1)
+
+
+# @known_failure_windows  # might fail with some older annex `cp` failing to set permissions
+@turtle  # 313s  well -- if errors out - only 3 sec
+# Adding _HEAVY_TREE's 10k files over NFS trips git-annex's
+# "changed while it was being added" check on the attribute cache, so the
+# job fails at random.  What this test is about -- splitting an over-long
+# argument list -- is filesystem-agnostic, so NFS buys no coverage here.
+@skip_if(on_github and on_nfs)
+@pytest.mark.parametrize("cls", [GitRepo, AnnexRepo])
+@with_tree(tree=_HEAVY_TREE)
+def test_files_split_heavy(topdir=None, *, cls):
+    """test_files_split against the real CMD_MAX_ARG, with real files"""
+    _add_modify_save(topdir, cls)
 
 
 @skip_if_on_windows

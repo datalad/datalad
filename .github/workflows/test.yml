@@ -287,7 +287,7 @@ jobs:
             -m pytest "${PYTEST_OPTS[@]}" \
             -c ../tox.ini \
             -n "$PYTEST_NPROC" \
-            -m "not(turtle)" \
+            -m "${PYTEST_MARKERS:-not(turtle)}" \
             --doctest-modules \
             --report-log=pytest-report.jsonl \
             --pyargs ${TESTS_TO_PERFORM:-datalad}
