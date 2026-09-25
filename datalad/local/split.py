@@ -147,23 +147,25 @@ class Split(Interface):
                 return
             todo.append((p, rel))
 
-        for i, (p, rel) in enumerate(todo):
-            try:
+        done = []
+        try:
+            for p, rel in todo:
+                done.append(p)
                 _split_one(ds, p, rel)
-            except Exception as e:
-                # the dataset was clean: undo everything done so far
-                for q, _ in todo[:i + 1]:
-                    if q.exists():
-                        rmtree(q)
-                repo.call_git(['reset', '-q', '--hard'])
-                yield get_status_dict(
-                    status='error', path=str(p), exception=e, **res_kwargs)
-                return
-        # the index holds nothing but the split. Not using `save`: it would
-        # re-add the removed files, which now exist again (inside the
-        # subdatasets)
-        repo.call_git(['commit', '-q', '-m', '[DATALAD] Split {} into subdataset{}'.format(
-            ', '.join(str(rel) for _, rel in todo), 's' if len(todo) > 1 else '')])
+            # the index holds nothing but the split. Not using `save`: it
+            # would re-add the removed files, which now exist again (inside
+            # the subdatasets)
+            repo.call_git(['commit', '-q', '-m', '[DATALAD] Split {} into subdataset{}'.format(
+                ', '.join(str(rel) for _, rel in todo), 's' if len(todo) > 1 else '')])
+        except Exception as e:
+            # the dataset was clean: undo everything done so far
+            for q in done:
+                if q.exists():
+                    rmtree(q)
+            repo.call_git(['reset', '-q', '--hard'])
+            yield get_status_dict(
+                status='error', path=str(done[-1]), exception=e, **res_kwargs)
+            return
         for p, _ in todo:
             yield get_status_dict(
                 status='ok', path=str(p), type='dataset', **res_kwargs)
