@@ -150,7 +150,7 @@ class Split(Interface):
         for i, (p, rel) in enumerate(todo):
             try:
                 _split_one(ds, p, rel)
-            except CommandError as e:
+            except Exception as e:
                 # the dataset was clean: undo everything done so far
                 for q, _ in todo[:i + 1]:
                     if q.exists():
@@ -216,7 +216,6 @@ def _split_one(ds, path, rel):
         sub.call_git(['update-ref', 'refs/heads/git-annex', annex_branch])
         # git-annex would merge its (unfiltered) index back into the branch
         (sub.dot_git / 'annex' / 'index').unlink(missing_ok=True)
-        sub.call_git(['update-ref', '-d', 'refs/annex/last-index'])
     # drop the parent's objects, also those still referenced by reflogs
     # (e.g. of the unfiltered git-annex branch)
     sub.call_git(['reflog', 'expire', '--expire=now', '--all'])
@@ -233,7 +232,7 @@ def _split_one(ds, path, rel):
         # an identity of its own (`create` would refuse, seeing the parent's
         # not yet saved content at this location)
         subid = str(uuid.uuid4())
-        (path / '.datalad').mkdir()
+        (path / '.datalad').mkdir(exist_ok=True)
         sub.call_git(['config', '-f', '.datalad/config',
                       'datalad.dataset.id', subid])
         sub.call_git(['add', '.datalad/config'])
