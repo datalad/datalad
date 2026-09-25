@@ -21,7 +21,6 @@ from pathlib import (
 )
 
 from datalad.distribution.dataset import (
-    Dataset,
     EnsureDataset,
     datasetmethod,
     require_dataset,
@@ -42,9 +41,13 @@ from datalad.support.constraints import (
     EnsureNone,
     EnsureStr,
 )
+from datalad.support.exceptions import CommandError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.param import Parameter
-from datalad.utils import ensure_list
+from datalad.utils import (
+    ensure_list,
+    rmtree,
+)
 
 lgr = logging.getLogger('datalad.local.split')
 
@@ -112,41 +115,56 @@ class Split(Interface):
             yield impossible('dataset has modifications or untracked files')
             return
 
-        abspaths = resolve_path(ensure_list(path), ds=dataset)
-        relpaths = []
-        for p in abspaths:
-            # git-facing relative path
+        todo = []  # (abspath, git-facing relpath)
+        for p in resolve_path(ensure_list(path), ds=dataset):
+            p = Path(os.path.normpath(p))
             rel = PurePosixPath(p.relative_to(ds.pathobj).as_posix()) \
                 if ds.pathobj in p.parents else None
             msg = None
             if rel is None:
                 msg = 'path is not a directory within the dataset'
             elif any(rel == o or rel in o.parents or o in rel.parents
-                     for o in relpaths):
+                     for _, o in todo):
                 msg = 'path overlaps with another path to split'
             else:
-                modes = {
-                    line.split(' ', 1)[0] for line in repo.call_git_items_(
-                        ['ls-files', '-s', '--', str(rel)], read_only=True)}
-                if not modes or not p.is_dir():
+                try:
+                    types = {line.split(' ', 2)[1] for line in repo.call_git_items_(
+                        ['ls-tree', '-r', f'HEAD:{rel}'], read_only=True)}
+                except CommandError:
+                    types = set()  # not a directory in HEAD
+                if not types:
                     msg = 'path is not a directory with tracked content'
-                elif '160000' in modes:
+                elif 'commit' in types:
                     msg = 'splitting directories with subdatasets ' \
                           'is not supported'
+                elif repo.call_git(
+                        ['ls-files', '-o', '-i', '--exclude-standard',
+                         '--directory', '--', f':(literal){rel}'],
+                        read_only=True):
+                    msg = 'directory contains ignored files'
             if msg:
                 yield impossible(msg, p)
                 return
-            relpaths.append(rel)
+            todo.append((p, rel))
 
-        for p, rel in zip(abspaths, relpaths):
-            _split_one(ds, p, rel)
-        # the dataset was clean, so the index holds nothing but the split.
-        # Not using `save`: it would re-add the removed files, which now
-        # exist again (inside the subdatasets)
-        repo.call_git(['add', '.gitmodules'])
+        for i, (p, rel) in enumerate(todo):
+            try:
+                _split_one(ds, p, rel)
+            except CommandError as e:
+                # the dataset was clean: undo everything done so far
+                for q, _ in todo[:i + 1]:
+                    if q.exists():
+                        rmtree(q)
+                repo.call_git(['reset', '-q', '--hard'])
+                yield get_status_dict(
+                    status='error', path=str(p), exception=e, **res_kwargs)
+                return
+        # the index holds nothing but the split. Not using `save`: it would
+        # re-add the removed files, which now exist again (inside the
+        # subdatasets)
         repo.call_git(['commit', '-q', '-m', '[DATALAD] Split {} into subdataset{}'.format(
-            ', '.join(map(str, relpaths)), 's' if len(relpaths) > 1 else '')])
-        for p in abspaths:
+            ', '.join(str(rel) for _, rel in todo), 's' if len(todo) > 1 else '')])
+        for p, _ in todo:
             yield get_status_dict(
                 status='ok', path=str(p), type='dataset', **res_kwargs)
 
@@ -156,19 +174,17 @@ def _split_one(ds, path, rel):
     parent = ds.repo
     is_annex = isinstance(parent, AnnexRepo)
     lgr.info('Splitting %s out of %s', rel, ds)
-    parent.call_git(['rm', '-r', '-q', '--', str(rel)])
-    if path.exists():
-        raise RuntimeError(
-            f'{path} still exists after removing tracked content from it, '
-            'likely due to ignored files. Remove them and retry after '
-            'resetting the dataset')
+    parent.call_git(['rm', '-r', '-q', '--', f':(literal){rel}'])
     # a bare clone of just the current branch (bare, so filter-branch does
     # not demand a checkout), turned into a regular repository after filtering
     parent.call_git([
-        'clone', '-q', '--bare', '--single-branch', '--no-tags', '--origin', 'origin',
+        'clone', '-q', '--bare', '--single-branch', '--no-tags',
+        # regardless of clone.defaultRemoteName
+        '--origin', 'origin',
         ds.path, str(path / '.git')])
     sub = GitRepo(path)
-    env = dict(os.environ, FILTER_BRANCH_SQUELCH_WARNING='1')
+    env = dict(os.environ, FILTER_BRANCH_SQUELCH_WARNING='1',
+               GIT_LITERAL_PATHSPECS='1')
     cmd = ['filter-branch', '--subdirectory-filter', str(rel)]
     if is_annex:
         # annex symlinks moved up len(rel.parts) directories
@@ -177,8 +193,8 @@ def _split_one(ds, path, rel):
     sub.call_git(cmd + ['--', 'HEAD'], env=env)
     # nothing but the rewritten branch should remain from the parent
     for ref in sub.call_git_items_(
-            ['for-each-ref', '--format=%(refname)',
-             'refs/original', 'refs/remotes'], read_only=True):
+            ['for-each-ref', '--format=%(refname)', 'refs/original'],
+            read_only=True):
         sub.call_git(['update-ref', '-d', ref])
     sub.call_git(['config', 'core.bare', 'false'])
     if is_annex:
@@ -199,8 +215,10 @@ def _split_one(ds, path, rel):
             '--include-global-config'])
         sub.call_git(['update-ref', 'refs/heads/git-annex', annex_branch])
         # git-annex would merge its (unfiltered) index back into the branch
-        (sub.dot_git / 'annex' / 'index').unlink()
+        (sub.dot_git / 'annex' / 'index').unlink(missing_ok=True)
         sub.call_git(['update-ref', '-d', 'refs/annex/last-index'])
+    # drop the parent's objects, also those still referenced by reflogs
+    # (e.g. of the unfiltered git-annex branch)
     sub.call_git(['reflog', 'expire', '--expire=now', '--all'])
     sub.call_git(['gc', '-q', '--prune=now'])
     sub.call_git(['reset', '-q', '--hard'])
@@ -208,15 +226,18 @@ def _split_one(ds, path, rel):
         sub.call_annex([
             'get', '-c', 'annex.hardlink=true', '--from', 'origin',
             '--in', 'origin', '.'])
+    # the parent's history is unrelated to the subdataset's
+    sub.call_git(['remote', 'remove', 'origin'])
     subid = None
     if ds.id:
         # an identity of its own (`create` would refuse, seeing the parent's
         # not yet saved content at this location)
         subid = str(uuid.uuid4())
-        subds = Dataset(path)
-        subds.config.set('datalad.dataset.id', subid, scope='branch')
-        subds.save(path='.datalad', message='[DATALAD] new dataset',
-                   to_git=True, result_renderer='disabled')
+        (path / '.datalad').mkdir()
+        sub.call_git(['config', '-f', '.datalad/config',
+                      'datalad.dataset.id', subid])
+        sub.call_git(['add', '.datalad/config'])
+        sub.call_git(['commit', '-q', '-m', '[DATALAD] new dataset'])
     # register in the parent
     parent.call_git(['update-index', '--add', '--cacheinfo',
                      f'160000,{sub.get_hexsha()},{rel}'])
@@ -224,3 +245,4 @@ def _split_one(ds, path, rel):
         if v:
             parent.call_git(['config', '-f', '.gitmodules',
                              f'submodule.{rel}.{k}', str(v)])
+    parent.call_git(['add', '.gitmodules'])
