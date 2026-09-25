@@ -70,8 +70,9 @@ class Split(Interface):
     ``git annex unused`` and ``git annex dropunused``.
 
     The dataset must not have any modifications or untracked files.
-    Directories containing subdatasets, as well as datasets on an adjusted
-    branch, are not supported.
+    Directories containing subdatasets or ignored files, as well as datasets
+    on an adjusted branch, are not supported. Should splitting fail, the
+    dataset is reset to its prior state.
     """
 
     _params_ = dict(

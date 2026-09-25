@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 from datalad.api import clone
 from datalad.distribution.dataset import Dataset
+from datalad.local import split as split_mod
 from datalad.tests.utils_pytest import (
     assert_in,
     assert_in_results,
@@ -99,14 +100,14 @@ def test_split_annex(path=None, clonepath=None):
     eq_((cloned.pathobj / 'd' / 'f').read_text(), 'df')
 
 
-@with_tree(tree={'a': {'b': {'f': 'f'}, 'g': 'g'}})
+@with_tree(tree={'a': {'b': {'f': 'f', '.datalad': {'x': 'x'}}, 'g': 'g'}})
 def test_split_git(path=None):
     ds = Dataset(path).create(force=True, annex=False)
     ds.save()
     ds.split('a/b')
     assert_repo_status(ds.path)
     subds = Dataset(ds.pathobj / 'a' / 'b')
-    eq_(subds.repo.call_git(['ls-files']).split(), ['.datalad/config', 'f'])
+    eq_(subds.repo.call_git(['ls-files']).split(), ['.datalad/config', '.datalad/x', 'f'])
     eq_((subds.pathobj / 'f').read_text(), 'f')
     eq_((ds.pathobj / 'a' / 'g').read_text(), 'g')
 
@@ -133,7 +134,14 @@ def test_split_refusals(path=None):
     check(['d/e', 'd'], 'path overlaps with another path to split')
     check('d', 'splitting directories with subdatasets is not supported')
     # failure midway is rolled back, also for already split paths
-    with patch('datalad.local.split._FIXLINKS', ds.pathobj / 'nonexistent'):
+    orig_split_one = split_mod._split_one
+
+    def fail_second(ds_, p, rel):
+        if rel.name == 'i':
+            raise RuntimeError('injected')
+        return orig_split_one(ds_, p, rel)
+
+    with patch('datalad.local.split._split_one', fail_second):
         res = ds.split(['d/e', 'i'], on_failure='ignore', result_renderer='disabled')
     assert_in_results(res, action='split', status='error')
     eq_(ds.repo.get_hexsha(), head)
