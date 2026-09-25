@@ -38,6 +38,7 @@ Dataset operations
    api.push
    api.remove
    api.save
+   api.split
    api.status
    api.update
    api.unlock
