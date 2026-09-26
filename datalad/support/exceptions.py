@@ -610,10 +610,11 @@ class ConnectionOpenFailedError(CommandError):
 
 class DownloadError(Exception):
 
-    def __init__(self, msg=None, status=None, **kwargs):
+    def __init__(self, msg=None, status=None, filepath=None, **kwargs):
         super(DownloadError, self).__init__(msg, **kwargs)
         # store response status code
         self.status = status
+        self.filepath = filepath  # the destination, once known
 
 
 class IncompleteDownloadError(DownloadError):
