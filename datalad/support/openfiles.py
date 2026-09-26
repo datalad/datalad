@@ -21,16 +21,22 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import (
+    Any,
+    Optional,
+)
 
 from datalad.utils import on_windows
+
+lgr = logging.getLogger('datalad.support.openfiles')
 
 try:
     import psutil
 except ImportError:
     psutil = None  # type: ignore[assignment]
-
-lgr = logging.getLogger('datalad.support.openfiles')
+    lgr.warning(
+        "psutil is not installed; open-file detection will not be "
+        "available. Install it with: pip install datalad[misc]")
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -87,10 +93,10 @@ def get_files_open_for_writing(
     # Only inspect processes owned by the current user — other users'
     # processes would raise AccessDenied anyway and cannot conflict
     # with our git operations.
-    # On Windows os.getuid() and psutil's 'uids' attr are unavailable,
-    # so UID-based filtering is skipped and all processes are scanned.
-    _have_uids = hasattr(os, 'getuid')
-    my_uid = os.getuid() if _have_uids else None
+    # On Windows there is no real UID, so UID-based filtering is skipped
+    # and all processes are scanned.
+    my_uid = get_real_uid()
+    _have_uids = my_uid is not None
     n_procs = 0
     n_skipped_uid = 0
     # Cache lsof results per-pid so we call it at most once per process
@@ -160,6 +166,25 @@ def get_files_open_for_writing(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def get_real_uid() -> Optional[int]:
+    """Return the process' real UID as seen by the kernel.
+
+    Unlike :func:`os.getuid`, which resolves through libc and can be
+    faked by UID-virtualizing wrappers such as ``fakeroot`` (as used e.g.
+    during Debian package builds), this prefers *psutil*, which reads the
+    UID directly from the kernel's process credentials (e.g.
+    ``/proc/<pid>/status`` on Linux) and such wrappers cannot spoof.
+
+    Falls back to :func:`os.getuid` if *psutil* is not installed.  Returns
+    ``None`` on platforms without a real UID concept (Windows).
+    """
+    if not hasattr(os, 'getuid'):
+        return None
+    if psutil is not None:
+        return psutil.Process().uids().real
+    return os.getuid()
+
 
 def _is_write_mode(f) -> bool | None:
     """Check whether open-file handle *f* is opened for writing.

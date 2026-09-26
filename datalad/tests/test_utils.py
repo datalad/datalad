@@ -42,6 +42,7 @@ import pytest
 from datalad import cfg as dl_cfg
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.external_versions import external_versions
+from datalad.support.openfiles import get_real_uid
 from datalad.utils import (
     CMD_MAX_ARG,
     Path,
@@ -232,6 +233,31 @@ def test_get_sig_param_names():
     assert_raises(ValueError, get_sig_param_names, f, ('mumba',))
 
 
+@pytest.mark.ai_generated
+def test_get_real_uid(monkeypatch):
+    """get_real_uid() prefers psutil over a faked os.getuid(), but falls
+    back to os.getuid() when psutil is unavailable."""
+    skip_if_no_module('psutil')
+    import psutil
+
+    import datalad.support.openfiles as openfiles_mod
+    real_uid = psutil.Process().uids().real
+
+    eq_(get_real_uid(), real_uid)
+
+    # even if os.getuid() lies (e.g. faked by fakeroot), psutil wins
+    monkeypatch.setattr(os, 'getuid', lambda: real_uid + 1)
+    eq_(get_real_uid(), real_uid)
+
+    # no psutil -> falls back to (possibly faked) os.getuid()
+    monkeypatch.setattr(openfiles_mod, 'psutil', None)
+    eq_(get_real_uid(), real_uid + 1)
+
+    # no os.getuid() at all (e.g. Windows) -> None
+    monkeypatch.delattr(os, 'getuid', raising=False)
+    assert get_real_uid() is None
+
+
 @with_tempfile(mkdir=True)
 def test_rotree(d=None):
     d2 = opj(d, 'd1', 'd2')  # deep nested directory
@@ -248,7 +274,7 @@ def test_rotree(d=None):
     # see http://git-annex.branchable.com/bugs/decides_that_FS_is_crippled_
     # under_cowbuilder___40__symlinks_supported_etc__41__/#comment-60c3cbe2710d6865fb9b7d6e247cd7aa
     # so explicit 'or'
-    if not (ar.is_crippled_fs() or (os.getuid() == 0)):
+    if not (ar.is_crippled_fs() or (get_real_uid() == 0)):
         assert_raises(OSError, os.unlink, f)          # OK to use os.unlink
         assert_raises(OSError, unlink, f)   # and even with waiting and trying!
         assert_raises(OSError, shutil.rmtree, d)
