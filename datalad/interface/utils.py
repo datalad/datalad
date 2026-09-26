@@ -226,6 +226,11 @@ def eval_results(wrapped):
     return eval_results_moved(wrapped)
 
 
+def _interpolate_message(msg):
+    """Render a result record's message, which may be a `(fmt, *args)` tuple"""
+    return str(msg[0] % msg[1:] if isinstance(msg, tuple) else msg)
+
+
 def generic_result_renderer(res):
     if res.get('status', None) != 'notneeded':
         path = res.get('path', None)
@@ -236,6 +241,13 @@ def generic_result_renderer(res):
                 # can happen, e.g., on windows with paths from different
                 # drives. just go with the original path in this case
                 pass
+        msg = _interpolate_message(res['message']) \
+            if res.get('message', None) else ''
+        err = _interpolate_message(res['error_message']) \
+            if res.get('error_message', None) \
+            and res.get('status', None) != 'ok' else ''
+        if err in msg:  # typically the head of a message with its causes
+            err = ''
         ui.message('{action}({status}):{path}{type}{msg}{err}'.format(
             action=ac.color_word(
                 res.get('action', '<action-unspecified>'),
@@ -245,16 +257,8 @@ def generic_result_renderer(res):
             type=' ({})'.format(
                 ac.color_word(res['type'], ac.MAGENTA)
             ) if 'type' in res else '',
-            msg=' [{}]'.format(
-                res['message'][0] % res['message'][1:]
-                if isinstance(res['message'], tuple) else res[
-                    'message'])
-            if res.get('message', None) else '',
-            err=ac.color_word(' [{}]'.format(
-                res['error_message'][0] % res['error_message'][1:]
-                if isinstance(res['error_message'], tuple) else res[
-                    'error_message']), ac.RED)
-            if res.get('error_message', None) and res.get('status', None) != 'ok' else ''))
+            msg=' [{}]'.format(msg) if msg else '',
+            err=ac.color_word(' [{}]'.format(err), ac.RED) if err else ''))
 
 
 # keep for legacy compatibility
