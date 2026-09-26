@@ -1,0 +1,111 @@
+#!/usr/bin/env python
+"""HTTP server which fails in reproducible ways, to exercise downloaders
+
+usage: flaky-httpd [PORT]    (default: 8378), then e.g.
+
+  datalad download-url 'http://127.0.0.1:8378/flaky?size=8388608&after=65536'
+
+Endpoints, with sizes in bytes and all parameters optional:
+
+  /ok?size=N                    N bytes
+  /truncate?size=N&after=M      announce N bytes, send M, hang up
+  /flaky?size=N&after=M&fail=K  /truncate the first K requests for this very
+                                URL (vary it to start over), then /ok
+  /reset?after=M                send M bytes, then reset the connection
+  /stall?after=M&delay=S        send M bytes, then stall for S seconds
+  /status/CODE                  respond with CODE (429 with Retry-After: 1)
+"""
+
+import socket
+import struct
+import sys
+import time
+from collections import Counter
+from http.server import (
+    BaseHTTPRequestHandler,
+    ThreadingHTTPServer,
+)
+from urllib.parse import (
+    parse_qsl,
+    urlparse,
+)
+
+CHUNK = 64 * 1024
+REQUESTS = Counter()  # by URL, for /flaky
+
+
+class Handler(BaseHTTPRequestHandler):
+    protocol_version = 'HTTP/1.1'
+
+    def _reply(self, code, body=b'', size=None):
+        self.send_response(code)
+        self.send_header('Content-Length', str(len(body) if size is None else size))
+        self.send_header('Accept-Ranges', 'none')  # a retry has to start over
+        if code == 429:
+            self.send_header('Retry-After', '1')
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _send_bytes(self, count):
+        while count > 0:
+            n = min(count, CHUNK)
+            self.wfile.write(b'x' * n)
+            self.wfile.flush()
+            count -= n
+
+    def _hang_up(self, reset=False):
+        self.close_connection = True
+        try:
+            if reset:
+                # RST instead of FIN
+                self.connection.setsockopt(
+                    socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
+                self.connection.close()
+            else:
+                self.connection.shutdown(socket.SHUT_RDWR)
+        except OSError as e:
+            self.log_message('could not hang up: %s', e)
+
+    def do_GET(self):
+        url = urlparse(self.path)
+        route = url.path.rstrip('/')
+        query = dict(parse_qsl(url.query))
+        size = int(query.get('size', 1 << 20))
+        after = min(int(query.get('after', size // 2)), size)
+
+        if route == '/ok':
+            self._reply(200, size=size)
+            self._send_bytes(size)
+        elif route in ('/truncate', '/flaky'):
+            REQUESTS[self.path] += 1
+            full = route == '/flaky' \
+                and REQUESTS[self.path] > int(query.get('fail', 2))
+            self.log_message('request %d for %s: %s', REQUESTS[self.path],
+                             self.path, 'in full' if full else 'truncated')
+            self._reply(200, size=size)
+            self._send_bytes(size if full else after)
+            if not full:
+                self._hang_up()
+        elif route in ('/reset', '/stall'):
+            self._reply(200, size=1 << 30)
+            self._send_bytes(int(query.get('after', 1 << 16)))
+            if route == '/stall':
+                time.sleep(int(query.get('delay', 300)))
+            self._hang_up(reset=route == '/reset')
+        elif route.startswith('/status/'):
+            code = int(route[len('/status/'):])
+            self._reply(code, b'%d\n' % code)
+        else:
+            self._reply(404, __doc__.encode())
+
+
+if __name__ == '__main__':
+    if {'-h', '--help'} & set(sys.argv[1:]):
+        print(__doc__)
+        sys.exit()
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8378
+    print('Serving http://127.0.0.1:%d' % port, file=sys.stderr)
+    try:
+        ThreadingHTTPServer(('127.0.0.1', port), Handler).serve_forever()
+    except KeyboardInterrupt:
+        sys.exit(130)
