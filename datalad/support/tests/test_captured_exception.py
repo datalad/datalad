@@ -1,9 +1,13 @@
 import sys
+from http.client import IncompleteRead
 from unittest.mock import patch
+
+import pytest
 
 from datalad import cfg
 from datalad.support.exceptions import (
     CapturedException,
+    _exception_message,
     format_exception_with_cause,
 )
 from datalad.tests.utils_pytest import (
@@ -117,3 +121,76 @@ def test_format_exception_with_cause():
         assert_equal(
             ce.format_with_cause(),
             'RuntimeError -caused by- ValueError -caused by- Mike')
+
+
+_RESET = ConnectionResetError(104, 'Connection reset by peer')
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize('chain, expected', [
+    # a cause its wrapper already rendered, the way urllib3 reports a broken
+    # connection, is not spelled out a second time
+    ([RuntimeError("Connection broken: %r" % ValueError("no more data")),
+      ValueError("no more data")],
+     "Connection broken: ValueError('no more data')"),
+    ([RuntimeError("Connection broken: %r" % IncompleteRead(b'a', 2)),
+      IncompleteRead(b'a', 2)],
+     "Connection broken: IncompleteRead(1 bytes read, 2 more expected)"),
+    ([RuntimeError("Connection broken: %r" % _RESET, _RESET), _RESET],
+     "Connection broken: ConnectionResetError(104, 'Connection reset by peer')"),
+    # ... but only that one: its own cause is still reported
+    ([RuntimeError("step failed: %r" % ValueError("write failed")),
+      ValueError("write failed"), OSError(28, "No space left on device")],
+     "step failed: ValueError('write failed') "
+     "-caused by- [Errno 28] No space left on device"),
+    # sharing a word, or a type name without a message, is not a rendering
+    ([RuntimeError("the connection failed"), _RESET],
+     "the connection failed -caused by- [Errno 104] Connection reset by peer"),
+    ([RuntimeError("hit a timeout while reading"), OSError("timeout")],
+     "hit a timeout while reading -caused by- timeout"),
+    ([RuntimeError("could not parse the ValueError log"), ValueError()],
+     "could not parse the ValueError log -caused by- ValueError"),
+])
+def test_format_exception_with_cause_skips_rendered_causes(chain, expected):
+    for e, cause in zip(chain, chain[1:]):
+        e.__cause__ = cause
+    assert_equal(format_exception_with_cause(chain[0]), expected)
+    assert_equal(CapturedException(chain[0]).format_with_cause(), expected)
+    message, sep, causes = expected.partition(' -caused by- ')
+    assert_equal(CapturedException(chain[0]).format_short(),
+                 f'RuntimeError({message}){sep}{causes}')
+
+
+@pytest.mark.ai_generated
+def test_format_exception_with_cause_cycle():
+    a, b = RuntimeError("a"), RuntimeError("b")
+    a.__cause__, b.__cause__ = b, a
+    assert_equal(format_exception_with_cause(a), "a -caused by- b")
+    a.__cause__ = a
+    assert_equal(CapturedException(a).format_short(), "RuntimeError(a)")
+
+
+class _VerbatimStr(Exception):
+    def __str__(self):
+        return self.args[0]
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize('exc, expected', [
+    (Exception("Connection broken: %r" % _RESET, _RESET),
+     "Connection broken: ConnectionResetError(104, 'Connection reset by peer')"),
+    (Exception("""he said "hi" and 'bye'""", ValueError()),
+     """he said "hi" and 'bye'"""),
+    # anything else is left as is
+    (Exception('a', 'b'), "('a', 'b')"),
+    (Exception('a', 'b('), "('a', 'b(')"),
+    (Exception('', ValueError('y')), "('', ValueError('y'))"),
+    (Exception("(abc)"), "(abc)"),
+    (Exception("('abc)"), "('abc)"),
+    (_VerbatimStr(r"('\x', ValueError('y'))"), r"('\x', ValueError('y'))"),
+    (OSError(28, "No space left on device"),
+     "[Errno 28] No space left on device"),
+    (ValueError(), ""),
+])
+def test_exception_message(exc, expected):
+    assert_equal(_exception_message(exc), expected)

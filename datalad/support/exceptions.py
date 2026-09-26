@@ -9,6 +9,7 @@
 """ datalad exceptions
 """
 
+import ast
 import logging
 import re
 import sys
@@ -93,9 +94,7 @@ class CapturedException(object):
         str
         """
         s = self.name + '(' + self.message + ')'
-        if exc_cause := getattr(self.tb, '__cause__', None):
-            s += f' -caused by- {format_exception_with_cause(exc_cause)}'
-        return s
+        return s + _format_causes(self.tb, self.message)
 
     def format_with_cause(self):
         """Returns a representation of the original exception including the
@@ -111,7 +110,7 @@ class CapturedException(object):
         -------
         str
         """
-        return str(self.tb)
+        return _exception_message(self.tb)
 
     if sys.version_info < (3, 13):
         @property
@@ -179,9 +178,7 @@ def format_oneline_tb(exc, tb=None, limit=None, include_str=True):
     if include_str:
         # try exc message else exception type
         leading = exc.message or exc.name
-        out = "{} ".format(leading)
-        if exc_cause := getattr(tb, '__cause__', None):
-            out += f'-caused by- {format_exception_with_cause(exc_cause)} '
+        out = "{}{} ".format(leading, _format_causes(tb, exc.message))
     else:
         out = ""
 
@@ -209,7 +206,7 @@ def format_oneline_tb(exc, tb=None, limit=None, include_str=True):
 
 
 def format_exception_with_cause(e):
-    """Helper to recursively format an exception with all underlying causes
+    """Helper to format an exception with all underlying causes
 
     For each exception in the chain either the str() of it is taken, or the
     class name of the exception, with the aim to generate a simple and
@@ -221,14 +218,68 @@ def format_exception_with_cause(e):
     while being recognizably different from potential exception payload
     messages.
     """
-    s = str(e) or \
-        ((e.exc_type.__name__ if sys.version_info < (3, 13) else e.exc_type_str)
-         if isinstance(e, traceback.TracebackException)
-         else e.__class__.__name__)
-    exc_cause = getattr(e, '__cause__', None)
-    if exc_cause:
-        s += f' -caused by- {format_exception_with_cause(exc_cause)}'
-    return s
+    s = _exception_message(e) or _exception_type_name(e)
+    return s + _format_causes(e, s)
+
+
+def _iter_exception_chain(e):
+    """Yield `e` and the exceptions it was raised from, stopping at a cycle"""
+    seen = set()
+    while e is not None and id(e) not in seen:
+        seen.add(id(e))
+        yield e
+        e = e.__cause__
+
+
+def _format_causes(e, text):
+    """' -caused by- ...' for the causes of `e`, whose own rendering is `text`
+
+    A cause its wrapper already spelled out is skipped: urllib3, for one,
+    embeds the repr() of the IncompleteRead it wraps.
+    """
+    out = ''
+    for cause in list(_iter_exception_chain(e))[1:]:
+        msg = _exception_message(cause) or _exception_type_name(cause)
+        if not _renders_exception(text, cause):
+            out += f' -caused by- {msg}'
+        text = msg
+    return out
+
+
+def _renders_exception(text, e):
+    """Whether `text` shows `e`: its repr(), or its type and message"""
+    # the bare name: python 3.13+ reports e.g. http.client.IncompleteRead
+    name = _exception_type_name(e).rpartition('.')[2]
+    return bool(str(e)) and (
+        f'{name}(' in text
+        or (name in text and _exception_message(e) in text))
+
+
+def _exception_type_name(e):
+    """Class name of `e`, which may be an exception or a TracebackException"""
+    if isinstance(e, traceback.TracebackException):
+        return e.exc_type.__name__ if sys.version_info < (3, 13) \
+            else e.exc_type_str
+    return e.__class__.__name__
+
+
+# str() of an exception with several args is the repr() of all of them;
+# urllib3's ProtocolError has (message, wrapped exception)
+_MESSAGE_AND_EXCEPTION_ARGS = re.compile(
+    r"""\(('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"), [A-Za-z_][\w.]*\(.*\)\Z""",
+    re.S)
+
+
+def _exception_message(e):
+    """str(e), but only the message of a (message, exception) args tuple"""
+    s = str(e)
+    m = _MESSAGE_AND_EXCEPTION_ARGS.match(s)
+    if not m:
+        return s
+    try:
+        return ast.literal_eval(m[1]) or s
+    except (SyntaxError, ValueError):  # a custom __str__ can render anything
+        return s
 
 
 class MissingExternalDependency(RuntimeError):
@@ -559,10 +610,11 @@ class ConnectionOpenFailedError(CommandError):
 
 class DownloadError(Exception):
 
-    def __init__(self, msg=None, status=None, **kwargs):
+    def __init__(self, msg=None, status=None, filepath=None, **kwargs):
         super(DownloadError, self).__init__(msg, **kwargs)
         # store response status code
         self.status = status
+        self.filepath = filepath  # the destination, once known
 
 
 class IncompleteDownloadError(DownloadError):
