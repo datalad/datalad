@@ -8,12 +8,17 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for http downloader"""
 
-import builtins
+import errno
+import logging
 import os
 import re
 import time
 from calendar import timegm
+from contextlib import contextmanager
+from http.client import IncompleteRead
 from os.path import join as opj
+
+from urllib3.exceptions import ProtocolError
 
 from datalad.downloaders.providers import Providers
 from datalad.downloaders.tests.utils import get_test_providers
@@ -22,7 +27,6 @@ from datalad.support.network import (
     get_url_straight_filename,
 )
 from datalad.support.path import Path
-from datalad.utils import ensure_unicode
 
 from ...support.exceptions import AccessFailedError
 from ..base import (
@@ -41,6 +45,7 @@ from ..http import (
     HTTPBaseAuthenticator,
     HTTPBearerTokenAuthenticator,
     HTTPDownloader,
+    HTTPDownloaderSession,
     HTTPTokenAuthenticator,
     process_www_authenticate,
 )
@@ -56,13 +61,18 @@ except (ImportError, AttributeError):
        activate = lambda s, t: t
     httpretty = NoHTTPPretty()
 
-from unittest.mock import patch
+from unittest.mock import (
+    Mock,
+    patch,
+)
 
 import pytest
 
 from ...support.exceptions import (
     AccessDeniedError,
     AnonymousAccessDeniedError,
+    CapturedException,
+    UnaccountedDownloadError,
 )
 from ...support.network import get_url_disposition_filename
 from ...support.status import FileStatus
@@ -76,6 +86,7 @@ from ...tests.utils_pytest import (
     assert_raises,
     known_failure_githubci_win,
     ok_file_has_content,
+    patch_config,
     serve_path_via_http,
     skip_if,
     skip_if_no_network,
@@ -89,7 +100,10 @@ from ...tests.utils_pytest import (
     with_tree,
     without_http_proxy,
 )
-from ...utils import read_file
+from ...utils import (
+    chpwd,
+    read_file,
+)
 
 
 def test_docstring():
@@ -97,30 +111,21 @@ def test_docstring():
     assert_in("\ncredential: Credential", doc)
 
 
-# XXX doesn't quite work as it should since doesn't provide context handling
-# I guess... but at least causes the DownloadError ;)
-_builtins_open = builtins.open
+@contextmanager
+def _retries(n):
+    """Pin the retry budget (tox passes DATALAD_* on), and skip the backoff"""
+    with patch_config({'datalad.downloaders.retry': str(n)}), \
+            patch('datalad.downloaders.base.time.sleep') as sleep:
+        yield sleep
 
 
-def fake_open(write_=None, skip_regex=None):
-    class myfile(object):
-        """file which does nothing"""
-        if write_:
-            def write(self, *args, **kwargs):
-                write_(*args, **kwargs)
-        def close(self):
-            pass
-
-    def myopen(path, *args, **kwargs):
-        if skip_regex and re.search(skip_regex, ensure_unicode(path)):
-            return _builtins_open(path, *args, **kwargs)
-        else:
-            return myfile
-    return myopen
-
-
-def _raise_IOError(*args, **kwargs):
-    raise IOError("Testing here")
+def _fail_first(n, orig, fail):
+    """Call `fail` instead of `orig` for the first `n` calls, counted in .calls"""
+    def wrapper(*args, **kwargs):
+        wrapper.calls += 1
+        return (fail if wrapper.calls <= n else orig)(*args, **kwargs)
+    wrapper.calls = 0
+    return wrapper
 
 
 def test_process_www_authenticate():
@@ -141,7 +146,9 @@ def test_HTTPDownloader_basic(toppath=None, topurl=None):
     tfpath = opj(toppath, "file-downloaded.dat")
     downloader = HTTPDownloader()  # no auth/credentials needed
     download = downloader.download
-    download(furl, tfpath)
+    with swallow_logs(new_level=logging.INFO) as cml:
+        download(furl, tfpath)
+        assert_in("into '%s'" % tfpath, cml.out)
     ok_file_has_content(tfpath, 'abc')
 
     # download() creates leading directories if needed for file targets...
@@ -151,7 +158,9 @@ def test_HTTPDownloader_basic(toppath=None, topurl=None):
 
     # ... and for directory targets.
     subdir_dirtarget = opj(toppath, "d1", "d2", "")
-    download(furl, subdir_dirtarget)
+    with swallow_logs(new_level=logging.INFO) as cml:
+        download(furl, subdir_dirtarget)
+        assert_in("into directory '%s'" % subdir_dirtarget, cml.out)
     ok_file_has_content(opj(subdir_dirtarget, "file.dat"), "abc")
 
     # see if fetch works correctly
@@ -159,6 +168,9 @@ def test_HTTPDownloader_basic(toppath=None, topurl=None):
 
     # By default should not overwrite the file
     assert_raises(DownloadError, download, furl, tfpath)
+    with chpwd(toppath), swallow_logs(new_level=logging.INFO) as cml:
+        assert_raises(DownloadError, download, furl)
+        assert_in("into the current directory", cml.out)
     # but be able to redownload whenever overwrite==True
     downloaded_path = download(furl, tfpath, overwrite=True)
     assert_equal(downloaded_path, tfpath)
@@ -170,36 +182,57 @@ def test_HTTPDownloader_basic(toppath=None, topurl=None):
         download(topurl, toppath)
     assert_in("File name could not be determined", str(cm.value))
 
-    # Some errors handling
-    # XXX obscure mocking since impossible to mock write alone
-    # and it still results in some warning being spit out
-    # Note: we need to avoid mocking opening of the lock file!
+    # Some errors handling: the temporary file failing a write, failing
+    # flush() and close() as a buffered write out of space does, or failing
+    # close() after a complete transfer
+    ioerror = IOError("Testing here")
+    enospc = OSError(errno.ENOSPC, "No space left on device")
+    eio = OSError(errno.EIO, "I/O error")
+    for methods, message, cause in (
+            (dict(write=Mock(side_effect=ioerror)), "Failed to download", ioerror),
+            (dict(flush=Mock(side_effect=enospc), close=Mock(side_effect=enospc)),
+             "Ran out of space", enospc),
+            (dict(close=Mock(side_effect=eio)), "Failed to download", eio)):
+        tempfile = Mock(fileno=Mock(side_effect=ValueError), **methods)
+        with swallow_logs(), \
+                patch('datalad.downloaders.base.open', return_value=tempfile,
+                      create=True):
+            with assert_raises(DownloadError) as cm:
+                download(furl, tfpath, overwrite=True)
+        assert_in(message, str(cm.value))
+        assert_false(isinstance(cm.value, IncompleteDownloadError))
+        assert cm.value.__cause__ is cause
+        assert_not_in(str(cause), str(cm.value))
+    # a DownloadError of the session is not wrapped again
+    original = DownloadError("the session knows what went wrong")
     with swallow_logs(), \
-         patch.object(builtins, 'open', fake_open(write_=_raise_IOError, skip_regex=r'.*\.lck$')):
-        assert_raises(DownloadError, download, furl, tfpath, overwrite=True)
+            patch.object(HTTPDownloaderSession, 'download', side_effect=original):
+        with assert_raises(DownloadError) as cm:
+            download(furl, tfpath, overwrite=True)
+    assert cm.value is original
+    with swallow_logs(), \
+            patch.object(HTTPDownloaderSession, 'download', side_effect=ioerror):
+        with assert_raises(DownloadError) as cm:
+            downloader.fetch(furl)
+    assert_false(isinstance(cm.value, IncompleteDownloadError))
+    assert cm.value.__cause__ is ioerror
 
-    # incomplete download scenario - should have 3 tries
-    def _fail_verify_download(try_to_fail):
-        try_ = [0]
-        _orig_verify_download = BaseDownloader._verify_download
-        def _verify_download(self, *args, **kwargs):
-            try_[0] += 1
-            if try_[0] >= try_to_fail:
-                return _orig_verify_download(self, *args, **kwargs)
-            raise IncompleteDownloadError()
-        return _verify_download
+    # incomplete download scenario
+    def _incomplete(*args, **kwargs):
+        raise IncompleteDownloadError()
 
-    with patch.object(BaseDownloader, '_verify_download', _fail_verify_download(6)), \
-        swallow_logs():
-            # how was before the "fix":
-            #assert_raises(DownloadError, downloader.fetch, furl)
-            #assert_raises(DownloadError, downloader.fetch, furl)
-            # now should download just fine
-            assert_equal(downloader.fetch(furl), 'abc')
-    # but should fail if keeps failing all 5 times and then on 11th should raise DownloadError
-    with patch.object(BaseDownloader, '_verify_download', _fail_verify_download(7)), \
-        swallow_logs():
-            assert_raises(DownloadError, downloader.fetch, furl)
+    verify = BaseDownloader._verify_download
+    with _retries(5), \
+            patch.object(BaseDownloader, '_verify_download',
+                         _fail_first(5, verify, _incomplete)), \
+            swallow_logs():
+        assert_equal(downloader.fetch(furl), 'abc')
+    # but not when failing more often than retried
+    with _retries(5), \
+            patch.object(BaseDownloader, '_verify_download',
+                         _fail_first(6, verify, _incomplete)), \
+            swallow_logs():
+        assert_raises(DownloadError, downloader.fetch, furl)
 
     # TODO: access denied scenario
     # TODO: access denied detection
@@ -850,45 +883,106 @@ def test_lorisadapter(d=None, keyring=None):
 @with_tree(tree=[('file.dat', 'abc')])
 @serve_path_via_http
 def test_server_error_retry(toppath=None, topurl=None):
-    """Test retry logic for 5xx server errors (e.g., 503 Service Unavailable)."""
+    """Test retry logic for 5xx server errors (e.g., 503 Service Unavailable),
+    throttling (429), and a session which fails to connect."""
     furl = "%sfile.dat" % topurl
     downloader = HTTPDownloader()
+    get_session = HTTPDownloader.get_downloader_session
 
-    def _fail_get_downloader_session(try_to_fail):
-        """Return a function that raises AccessFailedError for N tries, then succeeds."""
-        try_ = [0]
-        _orig_get_downloader_session = HTTPDownloader.get_downloader_session
-
-        def _get_downloader_session(self, *args, **kwargs):
-            try_[0] += 1
-            if try_[0] >= try_to_fail:
-                return _orig_get_downloader_session(self, *args, **kwargs)
-            raise AccessFailedError(
-                f"Access to {args[0]} has failed: status code 503",
-                status=503
-            )
+    def _refuse(exc_class, status):
+        def _get_downloader_session(self, url, *args, **kwargs):
+            raise exc_class(f"Access to {url} has failed: status code {status}",
+                            status=status)
         return _get_downloader_session
+
+    def _fail_to_connect(self, *args, **kwargs):
+        raise AccessFailedError("Failed to establish a new session") \
+            from ConnectionResetError("reset by peer")
 
     start_time = time.time()
 
-    # Mock time.sleep to avoid actual delays during testing
-    with patch('datalad.downloaders.base.time.sleep'):
-        # Should succeed after 5 failures (on 6th attempt)
-        with patch.object(HTTPDownloader, 'get_downloader_session',
-                          _fail_get_downloader_session(6)), \
+    for fail, exc_class in ((_refuse(AccessFailedError, 503), AccessFailedError),
+                            (_refuse(AccessDeniedError, 429), AccessDeniedError),
+                            (_fail_to_connect, AccessFailedError)):
+        # Should succeed after 5 failures (on 6th attempt), backing off in between
+        with _retries(5) as sleep, \
+                patch.object(HTTPDownloader, 'get_downloader_session',
+                             _fail_first(5, get_session, fail)), \
                 swallow_logs():
             assert_equal(downloader.fetch(furl), 'abc')
+        assert_equal(sleep.call_count, 5)
+        delays = [c.args[0] for c in sleep.call_args_list]
+        assert_greater(delays[-1], delays[0])
 
         # Should fail after 6 failures (exceeds 5 retry limit)
-        with patch.object(HTTPDownloader, 'get_downloader_session',
-                          _fail_get_downloader_session(7)), \
+        with _retries(5), \
+                patch.object(HTTPDownloader, 'get_downloader_session',
+                             _fail_first(6, get_session, fail)), \
                 swallow_logs():
-            assert_raises(AccessFailedError, downloader.fetch, furl)
+            assert_raises(exc_class, downloader.fetch, furl)
 
     elapsed = time.time() - start_time
     # Ensure test runs fast (sleep is mocked) - fail if implementation changes
     # and starts sleeping for real
     assert elapsed < 1.0, f"Test took {elapsed:.1f}s, expected < 1s (is sleep mocked?)"
+
+
+@pytest.mark.ai_generated
+@with_tree(tree=[('file.dat', 'abc')])
+@serve_path_via_http
+def test_interrupted_transfer_retry(toppath=None, topurl=None):
+    furl = "%sfile.dat" % topurl
+    tfpath = opj(toppath, "downloaded.dat")
+    downloader = HTTPDownloader()
+    download = HTTPDownloaderSession.download
+
+    def _lose_connection(self, f=None, pbar=None, size=None):
+        if f is not None:
+            f.write(b'a')
+        # the way urllib3 reports a connection dropped mid-transfer
+        try:
+            raise IncompleteRead(b'a', 2)
+        except IncompleteRead as e:
+            raise ProtocolError("Connection broken: %r" % e, e) from e
+
+    with _retries(5):
+        failing = _fail_first(2, download, _lose_connection)
+        with patch.object(HTTPDownloaderSession, 'download', failing), \
+                swallow_logs(new_level=logging.INFO) as cml:
+            assert_equal(downloader.download(furl, tfpath, overwrite=True),
+                         tfpath)
+            assert_in("Retrying from the start (1 out of 5)", cml.out)
+            assert_in("after: Transfer of %s was interrupted" % furl, cml.out)
+            assert_in("succeeded after 2 retries", cml.out)
+        ok_file_has_content(tfpath, 'abc')
+        assert_equal(failing.calls, 3)
+
+        failing = _fail_first(2, download, _lose_connection)
+        with patch.object(HTTPDownloaderSession, 'download', failing), \
+                swallow_logs():
+            assert_equal(downloader.fetch(furl), 'abc')
+        assert_equal(failing.calls, 3)
+
+        # more than was announced would come again
+        failing = _fail_first(1, download,
+                              lambda self, f, *args, **kw: f.write(b'abcde'))
+        with patch.object(HTTPDownloaderSession, 'download', failing), \
+                swallow_logs():
+            assert_raises(UnaccountedDownloadError,
+                          downloader.download, furl, tfpath, overwrite=True)
+
+    for retries in (2, 0):
+        failing = _fail_first(10, download, _lose_connection)
+        with _retries(retries), \
+                patch.object(HTTPDownloaderSession, 'download', failing), \
+                swallow_logs():
+            with assert_raises(IncompleteDownloadError) as cm:
+                downloader.download(furl, tfpath, overwrite=True)
+        assert_equal(failing.calls, retries + 1)
+    assert_in("1 Byte of 3 Bytes stored", str(cm.value))
+    assert_not_in("datalad-download-temp", str(cm.value))
+    assert_equal(cm.value.filepath, tfpath)
+    assert_equal(str(CapturedException(cm.value)).count('-caused by-'), 1)
 
 
 @with_tree(tree=[('file.dat', 'abc')])
