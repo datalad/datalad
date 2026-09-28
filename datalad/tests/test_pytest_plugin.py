@@ -22,6 +22,20 @@ pytest_plugins = ["pytester"]
 
 
 @pytest.mark.ai_generated
+def test_plugin_keeps_pytest_directory_filtering(pytester):
+    """Our plugin must not veto pytest's own norecursedirs/venv filtering"""
+    pytester.makepyfile(test_top="def test_top(): pass")
+    venv = pytester.mkdir(".venv")
+    (venv / "pyvenv.cfg").write_text("")
+    (venv / "test_in_venv.py").write_text("def test_in_venv(): pass\n")
+
+    result = pytester.runpytest_subprocess("--collect-only", "-q")
+    output = result.stdout.str()
+    assert "test_top" in output
+    assert "test_in_venv" not in output
+
+
+@pytest.mark.ai_generated
 def test_plugin_registers_markers(pytester):
     """Test that plugin registers custom markers."""
     pytester.makepyfile("""
