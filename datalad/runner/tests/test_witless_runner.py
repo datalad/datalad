@@ -291,7 +291,7 @@ def test_asyncio_forked(temp_: str = "") -> None:
         # .fork availability is "Unix", and there are cases where it is "not supported"
         # so we will just skip if no forking is possible
         raise SkipTest(f"Cannot fork: {exc}")
-    if pid == 0:
+    if pid == 0:  # pragma: no cover -- child leaves via os._exit(), unrecorded
         # child: whatever happens, never return into the test session --
         # an xdist worker copy that survives would report this test a
         # second time and crash the controller
