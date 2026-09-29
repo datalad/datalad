@@ -158,7 +158,13 @@ class TraceBack(object):
         if self.collide:
             # lets remove part which is common with previous invocation
             prev_next = sftb
-            common_prefix = os.path.commonprefix((self.__prev, sftb))
+            # a plain string prefix: os.path.commonprefix() is deprecated
+            # in Python 3.15
+            common_len = next(
+                (i for i, (a, b) in enumerate(zip(self.__prev, sftb))
+                 if a != b),
+                min(len(self.__prev), len(sftb)))
+            common_prefix = sftb[:common_len]
             common_prefix2 = self.__prefix_re.sub('', common_prefix)
 
             if common_prefix2 != "":

@@ -1830,8 +1830,8 @@ def get_path_prefix(path: str | Path, pwd: Optional[str]=None) -> str:
     path = dlabspath(path)
     path_ = with_pathsep(path)
     pwd_ = with_pathsep(pwd)
-    common = commonprefix((path_, pwd_))
-    if common.endswith(sep) and common in {path_, pwd_}:
+    # both end with a separator, so this is "one is under (or is) the other"
+    if path_.startswith(pwd_) or pwd_.startswith(path_):
         # we are in subdir or above the path = use relative path
         location_prefix = relpath(path, pwd)
         # if benign "here" - cut off
