@@ -315,11 +315,9 @@ def test_asyncio_forked(temp_: str = "") -> None:
             sleep(0.01)
     finally:
         # the child exits on its own right after writing; make sure of it
-        # and reap it
-        try:
-            os.kill(pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
+        # and reap it.  Not reaped yet, so it is still there to signal, if
+        # only as a zombie.
+        os.kill(pid, signal.SIGKILL)
         os.waitpid(pid, 0)
     # see if it was a good one
     eq_(temp.read_text(), "I rule")
