@@ -16,6 +16,7 @@ import os
 import signal
 import sys
 import unittest.mock
+import warnings
 from locale import getpreferredencoding
 from threading import (
     Lock,
@@ -277,34 +278,51 @@ def test_asyncio_forked(temp_: str = "") -> None:
     temp = Path(temp_)
     runner = Runner()
     try:
-        pid = os.fork()
+        with warnings.catch_warnings():
+            # Python >= 3.12 warns in the parent, after the fork, when the
+            # process has threads (e.g. under coverage).  Our DeprecationWarning
+            # -> error filter would then make the parent skip while the child
+            # already runs.  Forking here is the point of the test.
+            warnings.filterwarnings(
+                "ignore", ".*use of fork\\(\\) may lead to deadlocks",
+                DeprecationWarning)
+            pid = os.fork()
     except BaseException as exc:
         # .fork availability is "Unix", and there are cases where it is "not supported"
         # so we will just skip if no forking is possible
         raise SkipTest(f"Cannot fork: {exc}")
-    # if does not fail (in original or in a fork) -- we are good
-    try:
-        runner.run([sys.executable, '--version'], protocol=StdOutCapture)
-        if pid == 0:
+    if pid == 0:
+        # child: whatever happens, never return into the test session --
+        # an xdist worker copy that survives would report this test a
+        # second time and crash the controller
+        status = 1
+        try:
+            runner.run([sys.executable, '--version'], protocol=StdOutCapture)
             temp.write_text("I rule")
-    except:
-        if pid == 0:
+            status = 0
+        except BaseException:
             temp.write_text("I suck")
-    if pid != 0:
-       # parent: look after the child
-       t0 = time()
-       try:
-           while not temp.exists() or temp.stat().st_size < 6:
-               if time() - t0 > 5:
-                   raise AssertionError("Child process did not create a file we expected!")
-       finally:
-           # kill the child
-           os.kill(pid, signal.SIGTERM)
-       # see if it was a good one
-       eq_(temp.read_text(), "I rule")
-    else:
-       # sleep enough so parent just kills me the kid before I continue doing bad deeds
-       sleep(10)
+        finally:
+            os._exit(status)
+    # parent: it must work here as well
+    runner.run([sys.executable, '--version'], protocol=StdOutCapture)
+    # look after the child
+    t0 = time()
+    try:
+        while not temp.exists() or temp.stat().st_size < 6:
+            if time() - t0 > 5:
+                raise AssertionError("Child process did not create a file we expected!")
+            sleep(0.01)
+    finally:
+        # the child exits on its own right after writing; make sure of it
+        # and reap it
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        os.waitpid(pid, 0)
+    # see if it was a good one
+    eq_(temp.read_text(), "I rule")
 
 
 def test_done_deprecation() -> None:
