@@ -33,6 +33,11 @@ def test_generic_result_renderer():
         # plain message makes it through
         (dict(message='funky', error_message='extra-funky'),
          ['<action-unspecified>(<status-unspecified>): [funky] [extra-funky]']),
+        # ... but not when the message already says it
+        (dict(message='it broke -caused by- disk full', error_message='it broke'),
+         ['<action-unspecified>(<status-unspecified>): [it broke -caused by- disk full]\n']),
+        (dict(message=('%s broke badly', 'it'), error_message=('%s broke', 'it')),
+         ['<action-unspecified>(<status-unspecified>): [it broke badly]\n']),
     ]
     if on_windows:
         testcases.extend([
