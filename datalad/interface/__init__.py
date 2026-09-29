@@ -61,6 +61,7 @@ _group_2dataset = (
         ('datalad.distribution.install', 'Install'),
         ('datalad.local.rerun', 'Rerun'),
         ('datalad.local.run_procedure', 'RunProcedure'),
+        ('datalad.local.split', 'Split'),
     ])
 
 _group_3misc = (
