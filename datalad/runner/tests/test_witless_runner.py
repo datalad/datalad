@@ -22,6 +22,10 @@ from threading import (
     Lock,
     Thread,
 )
+from time import (
+    sleep,
+    time,
+)
 from typing import Any
 
 import pytest
@@ -37,7 +41,6 @@ from datalad.tests.utils_pytest import (
     integration,
     ok_,
     ok_file_has_content,
-    signal_timeout,
     skip_if_on_windows,
     swallow_logs,
     with_tempfile,
@@ -276,10 +279,10 @@ def test_asyncio_forked(temp_: str = "") -> None:
     runner = Runner()
     try:
         with warnings.catch_warnings():
-            # Python >= 3.12 warns in the parent, after the fork, when the
-            # process has threads (e.g. under coverage).  Our DeprecationWarning
-            # -> error filter would then make the parent skip while the child
-            # already runs.  Forking here is the point of the test.
+            # Python >= 3.12 warns in the parent, after forking, if there are
+            # threads (e.g. under coverage).  Turned into an error by our
+            # filterwarnings, it would make the parent skip -- leaving the
+            # child to continue as a duplicate of the pytest(-xdist) process.
             warnings.filterwarnings(
                 "ignore", ".*use of fork\\(\\) may lead to deadlocks",
                 DeprecationWarning)
@@ -288,32 +291,31 @@ def test_asyncio_forked(temp_: str = "") -> None:
         # .fork availability is "Unix", and there are cases where it is "not supported"
         # so we will just skip if no forking is possible
         raise SkipTest(f"Cannot fork: {exc}")
-    if pid == 0:  # pragma: no cover -- child leaves via os._exit(), unrecorded
-        # child: whatever happens, never return into the test session --
-        # an xdist worker copy that survives would report this test a
-        # second time and crash the controller
-        status = 1
-        try:
-            runner.run([sys.executable, '--version'], protocol=StdOutCapture)
-            temp.write_text("I rule")
-            status = 0
-        except BaseException:
-            temp.write_text("I suck")
-        finally:
-            os._exit(status)
-    # parent: it must work here as well
-    runner.run([sys.executable, '--version'], protocol=StdOutCapture)
-    # the child exits on its own right after writing its verdict: reap it
+    # if does not fail (in original or in a fork) -- we are good
     try:
-        with signal_timeout(5):
-            _, status = os.waitpid(pid, 0)
-    except TimeoutError:  # pragma: no cover -- only if the child hangs
-        os.kill(pid, signal.SIGKILL)
-        os.waitpid(pid, 0)
-        raise AssertionError("Child process did not finish in time")
-    # see if it was a good one
-    eq_(temp.read_text(), "I rule")
-    eq_(os.waitstatus_to_exitcode(status), 0)
+        runner.run([sys.executable, '--version'], protocol=StdOutCapture)
+        if pid == 0:
+            temp.write_text("I rule")
+    except:
+        if pid == 0:
+            temp.write_text("I suck")
+    if pid != 0:
+       # parent: look after the child
+       t0 = time()
+       try:
+           while not temp.exists() or temp.stat().st_size < 6:
+               if time() - t0 > 5:
+                   raise AssertionError("Child process did not create a file we expected!")
+       finally:
+           # kill the child
+           os.kill(pid, signal.SIGTERM)
+       # see if it was a good one
+       eq_(temp.read_text(), "I rule")
+    else:
+       # sleep enough so parent just kills me the kid before I continue doing bad deeds
+       sleep(10)
+       # and should it survive: never return into the test session
+       os._exit(1)
 
 
 def test_done_deprecation() -> None:
