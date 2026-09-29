@@ -2539,11 +2539,6 @@ def test_ro_operations(path=None):
 
     # make a clone
     repo2 = repo.clone(repo.path, op.join(path, 'clone'))
-    # keep the auto-maintenance `fetch` below may trigger in the foreground:
-    # a detached one races the `chmod -R` (its objects/maintenance.lock
-    # vanishing mid-walk, seen with git 2.55)
-    repo2.config.set('maintenance.autoDetach', 'false', scope='local')
-    repo2.config.set('gc.autoDetach', 'false', scope='local')
     repo2.get('file1')
 
     # progress forward original repo and fetch (but nothing else) it into repo2
