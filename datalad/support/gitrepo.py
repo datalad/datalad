@@ -106,6 +106,7 @@ from datalad.utils import (
     on_windows,
     optional_args,
     path_is_subpath,
+    path_startswith,
     posix_relpath,
 )
 
@@ -247,7 +248,7 @@ def _normalize_path(base_dir: str, path: str) -> str:
         # are interpreted as being relative to self.path already.
         return path
 
-    if not path.startswith(base_dir):
+    if not path_startswith(path, base_dir):
         raise FileNotInRepositoryError(msg="Path outside repository: %s"
                                            % base_dir, filename=path)
 
