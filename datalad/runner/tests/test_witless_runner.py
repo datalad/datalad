@@ -22,10 +22,6 @@ from threading import (
     Lock,
     Thread,
 )
-from time import (
-    sleep,
-    time,
-)
 from typing import Any
 
 import pytest
@@ -41,6 +37,7 @@ from datalad.tests.utils_pytest import (
     integration,
     ok_,
     ok_file_has_content,
+    signal_timeout,
     skip_if_on_windows,
     swallow_logs,
     with_tempfile,
@@ -306,21 +303,17 @@ def test_asyncio_forked(temp_: str = "") -> None:
             os._exit(status)
     # parent: it must work here as well
     runner.run([sys.executable, '--version'], protocol=StdOutCapture)
-    # look after the child
-    t0 = time()
+    # the child exits on its own right after writing its verdict: reap it
     try:
-        while not temp.exists() or temp.stat().st_size < 6:
-            if time() - t0 > 5:
-                raise AssertionError("Child process did not create a file we expected!")
-            sleep(0.01)
-    finally:
-        # the child exits on its own right after writing; make sure of it
-        # and reap it.  Not reaped yet, so it is still there to signal, if
-        # only as a zombie.
+        with signal_timeout(5):
+            _, status = os.waitpid(pid, 0)
+    except TimeoutError:  # pragma: no cover -- only if the child hangs
         os.kill(pid, signal.SIGKILL)
         os.waitpid(pid, 0)
+        raise AssertionError("Child process did not finish in time")
     # see if it was a good one
     eq_(temp.read_text(), "I rule")
+    eq_(os.waitstatus_to_exitcode(status), 0)
 
 
 def test_done_deprecation() -> None:
