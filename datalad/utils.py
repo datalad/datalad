@@ -1819,6 +1819,24 @@ def with_pathsep(path: str) -> str:
     return path + sep if not path.endswith(sep) else path
 
 
+def common_str_prefix(strings: Sequence[str]) -> str:
+    """Return the longest common leading substring of all `strings`
+
+    A plain character-wise comparison, i.e. what os.path.commonprefix()
+    (deprecated in Python 3.15) does.  Use it only for strings which are
+    not paths: for paths, character-wise prefixes are misleading (``/a/b``
+    vs ``/a/bc``) -- use `path_startswith` or ``os.path.commonpath``.
+    """
+    if not strings:
+        return ''
+    # the common prefix of all is the common prefix of the extremes
+    s1, s2 = min(strings), max(strings)
+    for i, c in enumerate(s1):
+        if c != s2[i]:
+            return s1[:i]
+    return s1
+
+
 def get_path_prefix(path: str | Path, pwd: Optional[str]=None) -> str:
     """Get path prefix (for current directory)
 
@@ -1830,7 +1848,8 @@ def get_path_prefix(path: str | Path, pwd: Optional[str]=None) -> str:
     path = dlabspath(path)
     path_ = with_pathsep(path)
     pwd_ = with_pathsep(pwd)
-    # both end with a separator, so this is "one is under (or is) the other"
+    # both end with a separator, so this is "one is under (or is) the other".
+    # Not path_startswith(): pwd may be relative here
     if path_.startswith(pwd_) or pwd_.startswith(path_):
         # we are in subdir or above the path = use relative path
         location_prefix = relpath(path, pwd)
