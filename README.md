@@ -25,12 +25,12 @@
 ## Distribution
 
 [![Anaconda](https://anaconda.org/conda-forge/datalad/badges/version.svg)](https://anaconda.org/conda-forge/datalad)
-[![Arch (AUR)](https://repology.org/badge/version-for-repo/aur/datalad.svg?header=Arch%20%28%41%55%52%29)](https://repology.org/project/datalad/versions)
+[![Arch (AUR)](https://img.shields.io/aur/version/python-datalad?label=Arch%20%28AUR%29)](https://aur.archlinux.org/packages/python-datalad)
 [![Debian Stable](https://badges.debian.net/badges/debian/stable/datalad/version.svg)](https://packages.debian.org/stable/datalad)
 [![Debian Unstable](https://badges.debian.net/badges/debian/unstable/datalad/version.svg)](https://packages.debian.org/unstable/datalad)
-[![Fedora Rawhide package](https://repology.org/badge/version-for-repo/fedora_rawhide/datalad.svg?header=Fedora%20%28rawhide%29)](https://repology.org/project/datalad/versions)
-[![Gentoo (::science)](https://repology.org/badge/version-for-repo/gentoo_ovl_science/datalad.svg?header=Gentoo%20%28%3A%3Ascience%29)](https://repology.org/project/datalad/versions)
-[![PyPI package](https://repology.org/badge/version-for-repo/pypi/datalad.svg?header=PyPI)](https://repology.org/project/datalad/versions)
+[![Fedora Rawhide](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fmdapi.fedoraproject.org%2Frawhide%2Fsrcpkg%2Fpython-datalad&query=%24.version&label=Fedora%20Rawhide)](https://packages.fedoraproject.org/pkgs/python-datalad/)
+[![Gentoo (::science)](https://img.shields.io/badge/Gentoo-%3A%3Ascience-54487a)](https://github.com/gentoo/sci/tree/master/dev-vcs/datalad)
+[![PyPI](https://img.shields.io/pypi/v/datalad)](https://pypi.org/project/datalad/)
 
 # 10000-ft. overview
 
