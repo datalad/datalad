@@ -289,6 +289,8 @@ def test_rotree_rmtree_vanishing_file(d=None):
         assert not op.lexists(victim)
         # the rest of the tree was still processed
         assert bool(os.stat(keeper).st_mode & stat.S_IWRITE) is not ro
+        # writable again, to (re)create files in it
+        rotree(d, ro=False)
 
     Path(victim).write_text('content')
     orig_unlink = os.unlink
