@@ -11,6 +11,7 @@
 
 """
 
+import errno
 import inspect
 import logging
 import os
@@ -85,6 +86,7 @@ from datalad.utils import (
     partition,
     path_is_subpath,
     path_startswith,
+    rmtree,
     rotree,
     split_cmdline,
     swallow_logs,
@@ -296,6 +298,54 @@ def test_rotree(d=None):
     rotree(d, False)
     unlink(f)
     shutil.rmtree(d)
+
+
+@pytest.mark.ai_generated
+@with_tempfile(mkdir=True)
+def test_rotree_rmtree_vanishing_file(d=None):
+    # a file listed by os.walk/os.scandir but gone by the time it is acted
+    # upon, as e.g. .git/objects/maintenance.lock of a background
+    # `git maintenance run --auto`
+    d2 = op.join(d, 'd1', 'd2')
+    os.makedirs(d2)
+    victim = op.join(d2, 'maintenance.lock')
+    keeper = op.join(d2, 'keeper')
+    for f in (victim, keeper):
+        Path(f).write_text('content')
+
+    orig_chmod = os.chmod
+
+    def vanishing_chmod(p, *args, **kwargs):
+        if p == victim and op.lexists(victim):
+            os.unlink(victim)
+        return orig_chmod(p, *args, **kwargs)
+
+    for ro in (True, False):
+        Path(victim).write_text('content')
+        with patch('datalad.utils.os.chmod', vanishing_chmod):
+            rotree(d, ro=ro)
+        assert not op.lexists(victim)
+        # the rest of the tree was still processed
+        assert bool(os.stat(keeper).st_mode & stat.S_IWRITE) is not ro
+        # writable again, to (re)create files in it
+        rotree(d, ro=False)
+
+    Path(victim).write_text('content')
+    orig_unlink = os.unlink
+
+    def vanishing_unlink(p, *args, **kwargs):
+        if op.basename(p) == 'maintenance.lock':
+            # someone else removed it first
+            orig_unlink(p, *args, **kwargs)
+            raise FileNotFoundError(errno.ENOENT, 'vanished', p)
+        return orig_unlink(p, *args, **kwargs)
+
+    # no retry by try_multiple_dec is needed either
+    with patch('shutil.os.unlink', vanishing_unlink), \
+            patch('datalad.utils.sleep') as sleep_mock:
+        rmtree(d, chmod_files=True)
+    assert not op.lexists(d)
+    sleep_mock.assert_not_called()
 
 
 def test_swallow_outputs():
