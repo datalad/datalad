@@ -263,6 +263,7 @@ def test_rotree(d=None):
     shutil.rmtree(d)
 
 
+@pytest.mark.ai_generated
 @with_tempfile(mkdir=True)
 def test_rotree_rmtree_vanishing_file(d=None):
     # a file listed by os.walk/os.scandir but gone by the time it is acted
