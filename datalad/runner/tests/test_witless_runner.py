@@ -16,6 +16,7 @@ import os
 import signal
 import sys
 import unittest.mock
+import warnings
 from locale import getpreferredencoding
 from threading import (
     Lock,
@@ -277,7 +278,15 @@ def test_asyncio_forked(temp_: str = "") -> None:
     temp = Path(temp_)
     runner = Runner()
     try:
-        pid = os.fork()
+        with warnings.catch_warnings():
+            # Python >= 3.12 warns in the parent, after forking, if there are
+            # threads (e.g. under coverage).  Turned into an error by our
+            # filterwarnings, it would make the parent skip -- leaving the
+            # child to continue as a duplicate of the pytest(-xdist) process.
+            warnings.filterwarnings(
+                "ignore", ".*use of fork\\(\\) may lead to deadlocks",
+                DeprecationWarning)
+            pid = os.fork()
     except BaseException as exc:
         # .fork availability is "Unix", and there are cases where it is "not supported"
         # so we will just skip if no forking is possible
@@ -305,6 +314,8 @@ def test_asyncio_forked(temp_: str = "") -> None:
     else:
        # sleep enough so parent just kills me the kid before I continue doing bad deeds
        sleep(10)
+       # and should it survive: never return into the test session
+       os._exit(1)
 
 
 def test_done_deprecation() -> None:

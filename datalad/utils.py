@@ -486,18 +486,23 @@ def rotree(path: str | Path, ro: bool =True, chmod_files: bool =True) -> None:
     chmod_files : bool, optional
       Whether to operate also on files (not just directories)
     """
-    if ro:
-        chmod = lambda f: os.chmod(f, os.stat(f).st_mode & ~stat.S_IWRITE)
-    else:
-        chmod = lambda f: os.chmod(f, os.stat(f).st_mode | stat.S_IWRITE | stat.S_IREAD)
+    def chmod(f: str) -> None:
+        try:
+            mode = os.stat(f).st_mode
+            os.chmod(
+                f,
+                mode & ~stat.S_IWRITE if ro
+                else mode | stat.S_IWRITE | stat.S_IREAD)
+        except FileNotFoundError:
+            # a "broken" symlink, or something (e.g. a lock file of a
+            # background `git maintenance`) that vanished since os.walk
+            # listed it -- nothing to chmod either way
+            pass
 
     for root, dirs, files in os.walk(path, followlinks=False):
         if chmod_files:
             for f in files:
-                fullf = op.join(root, f)
-                # might be the "broken" symlink which would fail to stat etc
-                if exists(fullf):
-                    chmod(fullf)
+                chmod(op.join(root, f))
         chmod(root)
 
 
@@ -547,10 +552,29 @@ def rmtree(path: str | Path, chmod_files: bool | Literal["auto"] ='auto', childr
             # anyway is to prepend \\?\ to the path.
             # https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file?redirectedfrom=MSDN#win32-file-namespaces
             path = r'\\?\ '.strip() + path
+        if not args and not {'ignore_errors', 'onerror', 'onexc'} & set(kwargs):
+            kwargs[_RMTREE_ERROR_HANDLER_KW] = _rmtree_ignore_vanished
         _rmtree(path, *args, **kwargs)
     else:
         # just remove the symlink
         unlink(path)
+
+
+# `onerror` is deprecated in favor of `onexc` since Python 3.12
+_RMTREE_ERROR_HANDLER_KW = 'onexc' if sys.version_info >= (3, 12) else 'onerror'
+
+
+def _rmtree_ignore_vanished(func: Callable[..., Any], path: str, exc: Any) -> None:
+    """shutil.rmtree error handler ignoring paths which vanished meanwhile
+
+    E.g. a lock file of a background `git maintenance` could be listed but
+    gone by the time it is to be removed.  Python >= 3.13 ignores those on
+    its own.
+    """
+    if isinstance(exc, tuple):  # `onerror` gets sys.exc_info()
+        exc = exc[1]
+    if not isinstance(exc, FileNotFoundError):
+        raise exc
 
 
 def rmdir(path: str | Path, *args: Any, **kwargs: Any) -> None:
@@ -1819,6 +1843,24 @@ def with_pathsep(path: str) -> str:
     return path + sep if not path.endswith(sep) else path
 
 
+def common_str_prefix(strings: Sequence[str]) -> str:
+    """Return the longest common leading substring of all `strings`
+
+    A plain character-wise comparison, i.e. what os.path.commonprefix()
+    (deprecated in Python 3.15) does.  Use it only for strings which are
+    not paths: for paths, character-wise prefixes are misleading (``/a/b``
+    vs ``/a/bc``) -- use `path_startswith` or ``os.path.commonpath``.
+    """
+    if not strings:
+        return ''
+    # the common prefix of all is the common prefix of the extremes
+    s1, s2 = min(strings), max(strings)
+    for i, c in enumerate(s1):
+        if c != s2[i]:
+            return s1[:i]
+    return s1
+
+
 def get_path_prefix(path: str | Path, pwd: Optional[str]=None) -> str:
     """Get path prefix (for current directory)
 
@@ -1830,8 +1872,9 @@ def get_path_prefix(path: str | Path, pwd: Optional[str]=None) -> str:
     path = dlabspath(path)
     path_ = with_pathsep(path)
     pwd_ = with_pathsep(pwd)
-    common = commonprefix((path_, pwd_))
-    if common.endswith(sep) and common in {path_, pwd_}:
+    # both end with a separator, so this is "one is under (or is) the other".
+    # Not path_startswith(): pwd may be relative here
+    if path_.startswith(pwd_) or pwd_.startswith(path_):
         # we are in subdir or above the path = use relative path
         location_prefix = relpath(path, pwd)
         # if benign "here" - cut off
