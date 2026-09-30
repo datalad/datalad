@@ -402,6 +402,11 @@ def test_normalize_path(git_path=None):
     result = _normalize_path(gr.path, op.join(git_path, "testfile"))
     eq_(result, "testfile", "_normalize_path() returned %s" % result)
 
+    # a sibling directory whose name merely starts with the repo's is not
+    # inside the repository
+    assert_raises(FileNotInRepositoryError, _normalize_path, gr.path,
+                  op.join(gr.path + "_sibling", "testfile"))
+
     # now we are inside, so
     # OLD PHILOSOPHY: relative paths are relative to cwd and have
     # to be converted to be relative to annex_path

@@ -11,6 +11,7 @@
 
 """
 
+import errno
 import inspect
 import logging
 import os
@@ -42,6 +43,7 @@ import pytest
 from datalad import cfg as dl_cfg
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.external_versions import external_versions
+from datalad.support.openfiles import get_real_uid
 from datalad.utils import (
     CMD_MAX_ARG,
     Path,
@@ -60,6 +62,7 @@ from datalad.utils import (
     generate_chunks,
     get_dataset_root,
     get_open_files,
+    common_str_prefix,
     get_path_prefix,
     get_sig_param_names,
     get_timestamp_suffix,
@@ -83,6 +86,7 @@ from datalad.utils import (
     partition,
     path_is_subpath,
     path_startswith,
+    rmtree,
     rotree,
     split_cmdline,
     swallow_logs,
@@ -232,6 +236,41 @@ def test_get_sig_param_names():
     assert_raises(ValueError, get_sig_param_names, f, ('mumba',))
 
 
+@pytest.mark.ai_generated
+def test_get_real_uid(monkeypatch):
+    """get_real_uid() prefers psutil over a faked os.getuid(), but falls
+    back to os.getuid() when psutil is unavailable."""
+    if not hasattr(os, 'getuid'):
+        # no real UID concept at all (e.g. Windows)
+        assert get_real_uid() is None
+        return
+
+    skip_if_no_module('psutil')
+    import psutil
+
+    import datalad.support.openfiles as openfiles_mod
+
+    # psutil.Process.uids() is POSIX-only; skip if not exposed (e.g. on
+    # some non-Linux/macOS POSIX-like platforms psutil doesn't cover)
+    if not hasattr(psutil.Process(), 'uids'):
+        pytest.skip("psutil.Process.uids() not available on this platform")
+    real_uid = psutil.Process().uids().real
+
+    eq_(get_real_uid(), real_uid)
+
+    # even if os.getuid() lies (e.g. faked by fakeroot), psutil wins
+    monkeypatch.setattr(os, 'getuid', lambda: real_uid + 1)
+    eq_(get_real_uid(), real_uid)
+
+    # no psutil -> falls back to (possibly faked) os.getuid()
+    monkeypatch.setattr(openfiles_mod, 'psutil', None)
+    eq_(get_real_uid(), real_uid + 1)
+
+    # no os.getuid() at all (e.g. Windows) -> None
+    monkeypatch.delattr(os, 'getuid', raising=False)
+    assert get_real_uid() is None
+
+
 @with_tempfile(mkdir=True)
 def test_rotree(d=None):
     d2 = opj(d, 'd1', 'd2')  # deep nested directory
@@ -248,7 +287,7 @@ def test_rotree(d=None):
     # see http://git-annex.branchable.com/bugs/decides_that_FS_is_crippled_
     # under_cowbuilder___40__symlinks_supported_etc__41__/#comment-60c3cbe2710d6865fb9b7d6e247cd7aa
     # so explicit 'or'
-    if not (ar.is_crippled_fs() or (os.getuid() == 0)):
+    if not (ar.is_crippled_fs() or (get_real_uid() == 0)):
         assert_raises(OSError, os.unlink, f)          # OK to use os.unlink
         assert_raises(OSError, unlink, f)   # and even with waiting and trying!
         assert_raises(OSError, shutil.rmtree, d)
@@ -259,6 +298,54 @@ def test_rotree(d=None):
     rotree(d, False)
     unlink(f)
     shutil.rmtree(d)
+
+
+@pytest.mark.ai_generated
+@with_tempfile(mkdir=True)
+def test_rotree_rmtree_vanishing_file(d=None):
+    # a file listed by os.walk/os.scandir but gone by the time it is acted
+    # upon, as e.g. .git/objects/maintenance.lock of a background
+    # `git maintenance run --auto`
+    d2 = op.join(d, 'd1', 'd2')
+    os.makedirs(d2)
+    victim = op.join(d2, 'maintenance.lock')
+    keeper = op.join(d2, 'keeper')
+    for f in (victim, keeper):
+        Path(f).write_text('content')
+
+    orig_chmod = os.chmod
+
+    def vanishing_chmod(p, *args, **kwargs):
+        if p == victim and op.lexists(victim):
+            os.unlink(victim)
+        return orig_chmod(p, *args, **kwargs)
+
+    for ro in (True, False):
+        Path(victim).write_text('content')
+        with patch('datalad.utils.os.chmod', vanishing_chmod):
+            rotree(d, ro=ro)
+        assert not op.lexists(victim)
+        # the rest of the tree was still processed
+        assert bool(os.stat(keeper).st_mode & stat.S_IWRITE) is not ro
+        # writable again, to (re)create files in it
+        rotree(d, ro=False)
+
+    Path(victim).write_text('content')
+    orig_unlink = os.unlink
+
+    def vanishing_unlink(p, *args, **kwargs):
+        if op.basename(p) == 'maintenance.lock':
+            # someone else removed it first
+            orig_unlink(p, *args, **kwargs)
+            raise FileNotFoundError(errno.ENOENT, 'vanished', p)
+        return orig_unlink(p, *args, **kwargs)
+
+    # no retry by try_multiple_dec is needed either
+    with patch('shutil.os.unlink', vanishing_unlink), \
+            patch('datalad.utils.sleep') as sleep_mock:
+        rmtree(d, chmod_files=True)
+    assert not op.lexists(d)
+    sleep_mock.assert_not_called()
 
 
 def test_swallow_outputs():
@@ -944,6 +1031,19 @@ def _p(p: str) -> str:
         else:
             return pm
     return p
+
+
+def test_common_str_prefix():
+    eq_(common_str_prefix([]), '')
+    eq_(common_str_prefix(['abc']), 'abc')
+    eq_(common_str_prefix(['abc', 'abd']), 'ab')
+    eq_(common_str_prefix(('abd', 'abc', 'ab')), 'ab')
+    eq_(common_str_prefix(['abc', 'abc']), 'abc')
+    eq_(common_str_prefix(['abc', 'xyz']), '')
+    eq_(common_str_prefix(['', 'abc']), '')
+    # character-wise, NOT path-aware -- which is why it must not be used
+    # for paths
+    eq_(common_str_prefix(['/a/bc', '/a/bd']), '/a/b')
 
 
 def test_path_startswith():
