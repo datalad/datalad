@@ -60,6 +60,7 @@ from datalad.utils import (
     generate_chunks,
     get_dataset_root,
     get_open_files,
+    common_str_prefix,
     get_path_prefix,
     get_sig_param_names,
     get_timestamp_suffix,
@@ -944,6 +945,19 @@ def _p(p: str) -> str:
         else:
             return pm
     return p
+
+
+def test_common_str_prefix():
+    eq_(common_str_prefix([]), '')
+    eq_(common_str_prefix(['abc']), 'abc')
+    eq_(common_str_prefix(['abc', 'abd']), 'ab')
+    eq_(common_str_prefix(('abd', 'abc', 'ab')), 'ab')
+    eq_(common_str_prefix(['abc', 'abc']), 'abc')
+    eq_(common_str_prefix(['abc', 'xyz']), '')
+    eq_(common_str_prefix(['', 'abc']), '')
+    # character-wise, NOT path-aware -- which is why it must not be used
+    # for paths
+    eq_(common_str_prefix(['/a/bc', '/a/bd']), '/a/b')
 
 
 def test_path_startswith():

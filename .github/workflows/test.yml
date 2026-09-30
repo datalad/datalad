@@ -86,6 +86,9 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
+          # Only kicks in when no final release matches, i.e. for the newest
+          # Python entry in tools/ci/test-jobs.yml before its x.y.0 is out.
+          allow-prereleases: true
 
       - name: Show git describe output to ensure that we did fetch all the tags
         run: git describe

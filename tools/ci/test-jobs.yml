@@ -54,8 +54,10 @@
   extra-envs:
     LC_ALL: ru_RU.UTF-8
 
-# Newest Python we claim to support.
-- python-version: '3.14'
+# Newest Python we claim to support.  While it is still a pre-release,
+# test.yml's `allow-prereleases` lets setup-python fall back to the latest
+# rc/beta.
+- python-version: '3.15'
   extra-envs: {}
 
 # SSH connection multiplexing off, and pathspecs passed via a file.
@@ -171,6 +173,10 @@
     DATALAD_TESTS_GITCONFIG: "\n[annex]\n stalldetection = 1KB/120s\n"
 
 - python-version: '3.13'
+  cron-only: true
+  extra-envs: {}
+
+- python-version: '3.14'
   cron-only: true
   extra-envs: {}
 
