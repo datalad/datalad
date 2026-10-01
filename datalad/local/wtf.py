@@ -202,13 +202,16 @@ def _get_fs_type(loc, path, _was_warned=[]):
 
 
 def _get_mountpoint(path, partitions):
-    """Return the partition with the longest mountpoint containing `path`"""
+    """Return the partition with the longest mountpoint containing `path`
+
+    Among identical mountpoints, the last one listed (the one in effect) wins.
+    """
     match = None
     for p in partitions:
         mp = Path(p.mountpoint)
         if (mp == path or mp in path.parents) and (
                 match is None or
-                len(mp.parents) > len(Path(match.mountpoint).parents)):
+                len(mp.parents) >= len(Path(match.mountpoint).parents)):
             match = p
     return match
 

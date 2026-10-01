@@ -12,8 +12,10 @@
 
 import os
 import tempfile
+from collections import namedtuple
 from os.path import join as opj
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -241,3 +243,24 @@ def test_describe_system_cpus_affinity_failure(monkeypatch):
     cpus = _describe_system()['cpus']
     eq_(cpus['count'], os.cpu_count())
     assert_not_in('affinity', cpus)
+
+
+def test_get_fs_type():
+    pytest.importorskip('psutil')
+    Part = namedtuple('Part', ['mountpoint', 'fstype'])
+    path = Path('/build', 'pkg')
+
+    def check(phys, all_):
+        with patch('psutil.disk_partitions',
+                   lambda all=False: all_ if all else phys):
+            return _get_fs_type('X', path)
+
+    # nothing matches (e.g. in a chroot) - no details, no exception
+    eq_(check([], [Part('/proc', 'proc')]), {'path': path})
+    # only found among all mounts
+    eq_(check([Part('/home', 'ext4')],
+              [Part('/', 'overlay')])['type'], 'overlay')
+    # longest mountpoint wins, and the last among identical ones
+    eq_(check([Part('/', 'ext4'), Part('/build', 'xfs'),
+               Part('/build', 'btrfs'), Part('/build/other', 'ext3')],
+              [])['type'], 'btrfs')
