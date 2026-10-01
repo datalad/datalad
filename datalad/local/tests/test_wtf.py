@@ -11,7 +11,9 @@
 
 
 import os
+import tempfile
 from os.path import join as opj
+from pathlib import Path
 
 import pytest
 
@@ -25,6 +27,7 @@ from datalad.local.wtf import (
     SECTION_CALLABLES,
     _describe_annex,
     _describe_system,
+    _get_fs_type,
 )
 from datalad.support.external_versions import external_versions
 from datalad.tests.utils_pytest import (
@@ -85,9 +88,15 @@ def test_wtf(topdir=None):
         assert_not_in(_HIDDEN, cmo.out)  # all is shown
         assert_in('user.name: ', cmo.out)
         if external_versions['psutil']:
-            if external_versions['psutil'] < '6.0.0':
-                # filesystems detail should be reported, unless 6.0.0 where
-                # it was removed. See https://github.com/giampaolo/psutil/issues/2109
+            # filesystems detail should be reported, unless psutil 6.0.0+
+            # where it was removed (see
+            # https://github.com/giampaolo/psutil/issues/2109), or the
+            # mountpoints cannot be determined (e.g. in a chroot), see
+            # https://github.com/datalad/datalad/issues/7950
+            if any('max_pathlength' in _get_fs_type(l, p)
+                   for l, p in (('CWD', Path.cwd()),
+                                ('TMP', Path(tempfile.gettempdir())),
+                                ('HOME', Path.home()))):
                 assert_in('max_pathlength:', cmo.out)
         else:
             assert_in("Hint: install psutil", cmo.out)
