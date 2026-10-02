@@ -11,7 +11,11 @@
 
 
 import os
+import tempfile
+from collections import namedtuple
 from os.path import join as opj
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -25,6 +29,7 @@ from datalad.local.wtf import (
     SECTION_CALLABLES,
     _describe_annex,
     _describe_system,
+    _get_fs_type,
 )
 from datalad.support.external_versions import external_versions
 from datalad.tests.utils_pytest import (
@@ -85,9 +90,15 @@ def test_wtf(topdir=None):
         assert_not_in(_HIDDEN, cmo.out)  # all is shown
         assert_in('user.name: ', cmo.out)
         if external_versions['psutil']:
-            if external_versions['psutil'] < '6.0.0':
-                # filesystems detail should be reported, unless 6.0.0 where
-                # it was removed. See https://github.com/giampaolo/psutil/issues/2109
+            # filesystems detail should be reported, unless psutil 6.0.0+
+            # where it was removed (see
+            # https://github.com/giampaolo/psutil/issues/2109), or the
+            # mountpoints cannot be determined (e.g. in a chroot), see
+            # https://github.com/datalad/datalad/issues/7950
+            if any('max_pathlength' in _get_fs_type(l, p)
+                   for l, p in (('CWD', Path.cwd()),
+                                ('TMP', Path(tempfile.gettempdir())),
+                                ('HOME', Path.home()))):
                 assert_in('max_pathlength:', cmo.out)
         else:
             assert_in("Hint: install psutil", cmo.out)
@@ -232,3 +243,24 @@ def test_describe_system_cpus_affinity_failure(monkeypatch):
     cpus = _describe_system()['cpus']
     eq_(cpus['count'], os.cpu_count())
     assert_not_in('affinity', cpus)
+
+
+def test_get_fs_type():
+    pytest.importorskip('psutil')
+    Part = namedtuple('Part', ['mountpoint', 'fstype'])
+    path = Path('/build', 'pkg')
+
+    def check(phys, all_):
+        with patch('psutil.disk_partitions',
+                   lambda all=False: all_ if all else phys):
+            return _get_fs_type('X', path)
+
+    # nothing matches (e.g. in a chroot) - no details, no exception
+    eq_(check([], [Part('/proc', 'proc')]), {'path': path})
+    # only found among all mounts
+    eq_(check([Part('/home', 'ext4')],
+              [Part('/', 'overlay')])['type'], 'overlay')
+    # longest mountpoint wins, and the last among identical ones
+    eq_(check([Part('/', 'ext4'), Part('/build', 'xfs'),
+               Part('/build', 'btrfs'), Part('/build/other', 'ext3')],
+              [])['type'], 'btrfs')
