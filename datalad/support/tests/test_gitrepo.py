@@ -160,24 +160,23 @@ def test_GitRepo_bare(path=None, empty_dir=None, non_empty_dir=None, empty_dot_g
 
     import gc
 
+    def check_bare_repo(gr):
+        assert_equal(gr.dot_git, gr.pathobj)
+        assert_true(gr.bare)
+        assert_true(gr.config.getbool("core", "bare"))
+        assert_false((gr.pathobj / '.git').exists())
+        assert_false(gr.call_git_success(['status'], expect_stderr=True))
+
     # create a bare repo:
     gr = GitRepo(path, create=True, bare=True)
-    assert_equal(gr.dot_git, gr.pathobj)
-    assert_true(gr.bare)
-    assert_true(gr.config.getbool("core", "bare"))
-    assert_false((gr.pathobj / '.git').exists())
-    assert_false(gr.call_git_success(['status'], expect_stderr=True))
+    check_bare_repo(gr)
 
     # kill the object and try to get a new instance on an existing bare repo:
     del gr
     gc.collect()
 
     gr = GitRepo(path, create=False)
-    assert_equal(gr.dot_git, gr.pathobj)
-    assert_true(gr.bare)
-    assert_true(gr.config.getbool("core", "bare"))
-    assert_false((gr.pathobj / '.git').exists())
-    assert_false(gr.call_git_success(['status'], expect_stderr=True))
+    check_bare_repo(gr)
 
     # an empty dir is not a bare repo:
     assert_raises(InvalidGitRepositoryError, GitRepo, empty_dir,
@@ -901,13 +900,18 @@ def test_GitRepo_dirty(path=None):
     ok_(repo.dirty)
 
 
-@with_tempfile(mkdir=True)
-def test_GitRepo_get_merge_base(src=None):
+def _create_committed_file_repo(src):
     repo = GitRepo(src, create=True)
     with open(op.join(src, 'file.txt'), 'w') as f:
         f.write('load')
     repo.add('*')
     repo.commit('committing')
+    return repo
+
+
+@with_tempfile(mkdir=True)
+def test_GitRepo_get_merge_base(src=None):
+    repo = _create_committed_file_repo(src)
 
     assert_raises(ValueError, repo.get_merge_base, [])
     branch1 = repo.get_active_branch()
@@ -940,11 +944,7 @@ def test_GitRepo_get_merge_base(src=None):
 @with_tempfile(mkdir=True)
 def test_GitRepo_git_get_branch_commits_(src=None):
 
-    repo = GitRepo(src, create=True)
-    with open(op.join(src, 'file.txt'), 'w') as f:
-        f.write('load')
-    repo.add('*')
-    repo.commit('committing')
+    repo = _create_committed_file_repo(src)
     # go in a branch with a name that matches the file to require
     # proper disambiguation
     repo.call_git(['checkout', '-b', 'file.txt'])
