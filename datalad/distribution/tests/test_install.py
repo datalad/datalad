@@ -271,6 +271,14 @@ def test_install_simple_local(src_repo=None, path=None, *, type_):
         rmtree(path)
 
 
+def _assert_info_dataset_installed(ds, path):
+    ok_startswith(ds.path, path)
+    ok_(ds.is_installed())
+    ok_(GitRepo.is_valid_repo(ds.path))
+    assert_repo_status(ds.path, annex=None)
+    assert_in('INFO.txt', ds.repo.get_indexed_files())
+
+
 @known_failure_githubci_win
 @with_tree(tree={'test.dat': "doesn't matter",
                  'INFO.txt': "some info",
@@ -293,11 +301,7 @@ def test_install_dataset_from_just_source(src_repo=None, path=None):
         with chpwd(path, mkdir=True):
             ds = install(source=url)
 
-        ok_startswith(ds.path, path)
-        ok_(ds.is_installed())
-        ok_(GitRepo.is_valid_repo(ds.path))
-        assert_repo_status(ds.path, annex=None)
-        assert_in('INFO.txt', ds.repo.get_indexed_files())
+        _assert_info_dataset_installed(ds, path)
 
         # cleanup before next iteration
         rmtree(path)
@@ -315,11 +319,7 @@ def test_install_dataset_from_instance(src=None, dst=None):
     clone = install(source=origin, path=dst)
 
     assert_is_instance(clone, Dataset)
-    ok_startswith(clone.path, dst)
-    ok_(clone.is_installed())
-    ok_(GitRepo.is_valid_repo(clone.path))
-    assert_repo_status(clone.path, annex=None)
-    assert_in('INFO.txt', clone.repo.get_indexed_files())
+    _assert_info_dataset_installed(clone, dst)
 
 
 @known_failure_githubci_win
@@ -334,11 +334,7 @@ def test_install_dataset_from_just_source_via_path(path=None):
     with chpwd(path, mkdir=True):
         ds = install(url)
 
-    ok_startswith(ds.path, path)
-    ok_(ds.is_installed())
-    ok_(GitRepo.is_valid_repo(ds.path))
-    assert_repo_status(ds.path, annex=None)
-    assert_in('INFO.txt', ds.repo.get_indexed_files())
+    _assert_info_dataset_installed(ds, path)
 
 
 @with_tree(tree={
@@ -583,14 +579,18 @@ def test_implicit_install(src=None, dst=None):
     origin_subsub.save("file3.txt")
     origin_top.save(recursive=True)
 
+    def get_uninstalled_sub_subsub(ds):
+        sub = Dataset(opj(ds.path, "sub"))
+        ok_(not sub.is_installed())
+        subsub = Dataset(opj(sub.path, "subsub"))
+        ok_(not subsub.is_installed())
+        return sub, subsub
+
     # first, install toplevel:
     ds = install(dst, source=src)
     ok_(ds.is_installed())
 
-    sub = Dataset(opj(ds.path, "sub"))
-    ok_(not sub.is_installed())
-    subsub = Dataset(opj(sub.path, "subsub"))
-    ok_(not subsub.is_installed())
+    sub, subsub = get_uninstalled_sub_subsub(ds)
 
     # fail on obscure non-existing one
     assert_raises(IncompleteResultsError, ds.install, source='obscure')
@@ -612,10 +612,7 @@ def test_implicit_install(src=None, dst=None):
     # again first toplevel:
     ds = install(dst, source=src)
     ok_(ds.is_installed())
-    sub = Dataset(opj(ds.path, "sub"))
-    ok_(not sub.is_installed())
-    subsub = Dataset(opj(sub.path, "subsub"))
-    ok_(not subsub.is_installed())
+    sub, subsub = get_uninstalled_sub_subsub(ds)
 
     # now implicit but without an explicit dataset to install into
     # (deriving from CWD):
