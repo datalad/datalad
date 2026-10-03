@@ -17,8 +17,16 @@ avoiding double-registration issues when testing the plugin itself.
 
 import pytest
 
+from datalad.pytest_plugin import pytest_ignore_collect
+
 # Enable pytester fixture for plugin testing
 pytest_plugins = ["pytester"]
+
+
+@pytest.mark.ai_generated
+def test_ignore_collect_defers_on_directories(tmp_path):
+    """False here would veto pytest's own norecursedirs/venv filtering"""
+    assert pytest_ignore_collect(tmp_path) is None
 
 
 @pytest.mark.ai_generated
