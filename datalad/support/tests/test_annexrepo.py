@@ -120,9 +120,9 @@ from datalad.tests.utils_pytest import (
     skip_if_root,
     skip_nomultiplex_ssh,
     slow,
-    turtle,
     swallow_logs,
     swallow_outputs,
+    turtle,
     with_parametric_batch,
     with_sameas_remote,
     with_tempfile,
@@ -1472,26 +1472,25 @@ def test_annex_drop(src=None, dst=None):
     ok_(ar.file_has_content(testfile))
     eq_(len([f for f in ar.fsck(fast=True) if f['file'] == testfile]), 1)
 
+    def check_drop_result(result, **expected_fields):
+        assert_false(ar.file_has_content(testfile))
+        ok_(isinstance(result, list))
+        eq_(len(result), 1)
+        eq_(result[0]['command'], 'drop')
+        eq_(result[0]['success'], True)
+        for field, value in expected_fields.items():
+            eq_(result[0][field], value)
+
     # drop file by name:
     result = ar.drop([testfile])
-    assert_false(ar.file_has_content(testfile))
-    ok_(isinstance(result, list))
-    eq_(len(result), 1)
-    eq_(result[0]['command'], 'drop')
-    eq_(result[0]['success'], True)
-    eq_(result[0]['file'], testfile)
+    check_drop_result(result, file=testfile)
 
     ar.get(testfile)
 
     # drop file by key:
     testkey = ar.get_file_annexinfo(testfile)['key']
     result = ar.drop([testkey], key=True)
-    assert_false(ar.file_has_content(testfile))
-    ok_(isinstance(result, list))
-    eq_(len(result), 1)
-    eq_(result[0]['command'], 'drop')
-    eq_(result[0]['success'], True)
-    eq_(result[0]['key'], testkey)
+    check_drop_result(result, key=testkey)
 
     # insufficient arguments:
     assert_raises(TypeError, ar.drop)
