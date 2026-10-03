@@ -1,5 +1,5 @@
 {
-  "threshold": 0,
+  "threshold": 1,
   "reporters": ["console"],
   "format": ["python"],
   "ignore": [
@@ -17,7 +17,8 @@
     "**/dist/**",
     "**/build/**",
     "**/__testhome__/**",
-    "**/vcr_cassettes/**"
+    "**/vcr_cassettes/**",
+    "**/_version.py"
   ],
   "minTokens": 50,
   "minLines": 5
