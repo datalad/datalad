@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        env: [lint, typing]
+        env: [lint, typing, duplication]
 
     steps:
     - name: Set up environment
