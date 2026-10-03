@@ -118,15 +118,15 @@ def test_repo_diff(path=None, norepo=None):
 
     # untracked stuff
     create_tree(ds.path, {'deep': {'down': 'untracked', 'down2': 'tobeadded'}})
+    deep_untracked_files = {
+        ut.Path(ds.repo.pathobj / 'deep' / 'down'): {
+            'state': 'untracked',
+            'type': 'file'},
+        ut.Path(ds.repo.pathobj / 'deep' / 'down2'): {
+            'state': 'untracked',
+            'type': 'file'}}
     # default is to report all files
-    eq_(ds.repo.diff(fr='HEAD', to=None),
-        {
-            ut.Path(ds.repo.pathobj / 'deep' / 'down'): {
-                'state': 'untracked',
-                'type': 'file'},
-            ut.Path(ds.repo.pathobj / 'deep' / 'down2'): {
-                'state': 'untracked',
-                'type': 'file'}})
+    eq_(ds.repo.diff(fr='HEAD', to=None), deep_untracked_files)
     # but can be made more compact
     eq_(ds.repo.diff(fr='HEAD', to=None, untracked='normal'),
         {
@@ -137,14 +137,7 @@ def test_repo_diff(path=None, norepo=None):
     # again a unmatching path constrained will give an empty report
     eq_(ds.repo.diff(fr='HEAD', to=None, paths=['other']), {})
     # perfect match and anything underneath will do
-    eq_(ds.repo.diff(fr='HEAD', to=None, paths=['deep']),
-        {
-            ut.Path(ds.repo.pathobj / 'deep' / 'down'): {
-                'state': 'untracked',
-                'type': 'file'},
-            ut.Path(ds.repo.pathobj / 'deep' / 'down2'): {
-                'state': 'untracked',
-                'type': 'file'}})
+    eq_(ds.repo.diff(fr='HEAD', to=None, paths=['deep']), deep_untracked_files)
 
 
 def _dirty_results(res):
