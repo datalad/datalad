@@ -171,13 +171,17 @@ def test_rerun_empty_branch(path=None):
     assert_status("impossible", ds.rerun(on_failure="ignore"))
 
 
+def _skip_if_managed_branch(ds, **rerun_kwargs):
+    if ds.repo.is_managed_branch():
+        assert_status('impossible',
+                      ds.rerun(on_failure="ignore", **rerun_kwargs))
+        raise SkipTest("Test incompatible with adjusted branch")
+
+
 @with_tempfile(mkdir=True)
 def test_rerun_onto(path=None):
     ds = Dataset(path).create()
-    if ds.repo.is_managed_branch():
-        assert_status('impossible',
-                      ds.rerun(onto="triggers-abort", on_failure="ignore"))
-        raise SkipTest("Test incompatible with adjusted branch")
+    _skip_if_managed_branch(ds, onto="triggers-abort")
 
     # Make sure we have more than one commit. The one commit case is checked
     # elsewhere.
@@ -276,10 +280,7 @@ def test_rerun_chain(path=None):
 @with_tempfile(mkdir=True)
 def test_rerun_just_one_commit(path=None):
     ds = Dataset(path).create()
-    if ds.repo.is_managed_branch():
-        assert_status('impossible',
-                      ds.rerun(branch="triggers-abort", on_failure="ignore"))
-        raise SkipTest("Test incompatible with adjusted branch")
+    _skip_if_managed_branch(ds, branch="triggers-abort")
 
     ds.repo.checkout("orph", options=["--orphan"])
     ds.repo.call_git(["reset", "--hard"])
@@ -445,10 +446,7 @@ def test_rerun_unavailable_input(path=None):
 @with_tempfile(mkdir=True)
 def test_rerun_branch(path=None):
     ds = Dataset(path).create()
-    if ds.repo.is_managed_branch():
-        assert_status('impossible',
-                      ds.rerun(branch="triggers-abort", on_failure="ignore"))
-        raise SkipTest("Test incompatible with adjusted branch")
+    _skip_if_managed_branch(ds, branch="triggers-abort")
 
     ds.repo.tag("prerun")
 
