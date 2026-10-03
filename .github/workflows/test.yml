@@ -287,7 +287,11 @@ jobs:
           fi
           echo "COVERAGE=$COVERAGE" >> "$GITHUB_ENV"
           if [ "$COVERAGE" = 1 ]
-          then PYTEST_OPTS=( "${PYTEST_OPTS[@]}" --cov=datalad --cov-report=xml )
+          then
+            PYTEST_OPTS=( "${PYTEST_OPTS[@]}" --cov=datalad --cov-report=xml )
+            # .coveragerc is not found from __testhome__/ on its own
+            export COVERAGE_RCFILE="$GITHUB_WORKSPACE/.coveragerc"
+            echo "COVERAGE_RCFILE=$COVERAGE_RCFILE" >> "$GITHUB_ENV"
           fi
 
           mkdir -p __testhome__
@@ -297,15 +301,6 @@ jobs:
           # logs.
           set -x
           http_proxy=
-          # The coverage-bin wrappers re-exec datalad's entry points under
-          # `coverage run`, so they are only useful when collecting coverage.
-          # They are bash scripts relying on a POSIX shebang being honored on
-          # exec -- true for Linux/macOS but not for Windows (this also
-          # matches how AppVeyor ran things: its Windows jobs never used this
-          # wrapper either).
-          if [ "$COVERAGE" = 1 ] && [ "$RUNNER_OS" != Windows ]
-          then PATH=$PWD/../tools/coverage-bin:$PATH
-          fi
           $PYTEST_WRAPPER python \
             -m pytest "${PYTEST_OPTS[@]}" \
             -c ../tox.ini \

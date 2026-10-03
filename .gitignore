@@ -4,6 +4,7 @@
 datalad.build/
 /.idea
 .coverage
+.coverage.*
 coverage.xml
 /venv*
 /cfgs
