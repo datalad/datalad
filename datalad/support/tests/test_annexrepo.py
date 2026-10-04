@@ -750,7 +750,8 @@ def test_AnnexRepo_always_commit(path=None):
     out_list = list(repo.call_annex_items_(['log']))
     eq_(len(out_list), 1)
 
-    quote = lambda s: s.replace('"', r'\"')
+    # as git-annex C-quotes a path in its human-readable output
+    quote = lambda s: s.replace('\\', r'\\').replace('"', r'\"').replace('\t', r'\t')
     def assert_in_out(filename, out):
         filename_quoted = quote(filename)
         if repo._check_version_kludges('quotepath-respected') == "no":
