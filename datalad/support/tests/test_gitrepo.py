@@ -351,9 +351,10 @@ def test_GitRepo_commit_long_message(path=None):
     create_tree(path, {'file': 'content'})
     gr.add('file')
     # longer than a single command line argument may be on Linux (128KiB),
-    # as e.g. a `run` record listing many expanded inputs
-    msg = "Long message ΔЙ\n\n" + "\n".join(
-        "input/file{:06d}".format(i) for i in range(20000))
+    # as e.g. a `run` record listing many expanded inputs.  Non-ASCII only
+    # where git output gets decoded as UTF-8, not with the Windows code page.
+    msg = "Long message{}\n\n".format("" if on_windows else " ΔЙ") \
+        + "\n".join("input/file{:06d}".format(i) for i in range(20000))
     gr.commit(msg, files=['file'])
     assert_repo_status(gr)
     eq_(gr.format_commit("%B").strip(), msg)

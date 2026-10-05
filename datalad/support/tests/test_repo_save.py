@@ -153,10 +153,10 @@ def test_save_annex_add_batch(path=None):
     ds = Dataset(path).create(**ckwa)
     create_tree(ds.path, {'tracked': 'tracked'})
     ds.save(to_git=True, **ckwa)
-    untracked = ['file1', ' lead and trail ', op.join('sub', 'file2')]
+    untracked = ['file1', ' leading space', op.join('sub', 'file2')]
     create_tree(ds.path, {
         'file1': 'file1',
-        ' lead and trail ': 'lead and trail',
+        ' leading space': 'leading space',
         'sub': {'file2': 'file2'},
         'tracked': 'modified',
     })
