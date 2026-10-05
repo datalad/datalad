@@ -658,6 +658,17 @@
             "avatar_url": [
                 "https://avatars.githubusercontent.com/u/3453757?v=4"
             ]
+        },
+        {
+            "login": "yarikoptic-gitmate",
+            "name": "GitMate for @yarikoptic",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://github.com/yarikoptic-gitmate",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/41385986?v=4"
+            ]
         }
     ],
     "contributorsPerLine": 7
