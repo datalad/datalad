@@ -26,6 +26,10 @@ from collections.abc import (
     Mapping,
     Sequence,
 )
+from contextlib import (
+    contextmanager,
+    nullcontext,
+)
 from functools import wraps
 from itertools import chain
 from os import (
@@ -103,6 +107,7 @@ from datalad.utils import (
     generate_file_chunks,
     getpwd,
     is_interactive,
+    make_tempfile,
     on_windows,
     optional_args,
     path_is_subpath,
@@ -392,6 +397,20 @@ def normalize_paths(func, match_return_type=True, map_filenames_back=False,
 
 def _prune_deeper_repos(repos: list[Path]) -> list[Path]:
     return repos
+
+
+@contextmanager
+def commit_message_file(msg: str) -> Iterator[str]:
+    """Provide `msg` in a temporary file, to pass it to git via `-F <file>`
+
+    A single command line argument is limited in length (128KiB on Linux),
+    which a commit message listing many files, e.g. a `run` record, can
+    exceed.
+    """
+    with make_tempfile() as path:
+        # encoded the way subprocess encodes command line arguments
+        Path(path).write_bytes(os.fsencode(msg))
+        yield path
 
 
 class GitProgress(WitlessProtocol):
@@ -1467,8 +1486,6 @@ class GitRepo(CoreGitRepo):
         if _datalad_msg:
             msg = self._get_prefixed_commit_msg(msg)
 
-        if msg:
-            options += ["-m", msg]
         cmd.extend(options)
 
         # set up env for commit
@@ -1485,16 +1502,18 @@ class GitRepo(CoreGitRepo):
         # here, but with pathspec_from_file it is no longer needed.
         # store pre-commit state to be able to check if anything was committed
         try:
-            # Note: call_git operates via joining call_git_items_ and that one wipes out
-            # .stdout from exception and collects/repopulates stderr only. Let's use
-            # _call_git which returns both outputs and collects/re-populates both stdout
-            # **and** stderr
-            _ = self._call_git(
-                    cmd,
-                    files=files,
-                    env=env,
-                    pathspec_from_file=True,
-            )
+            with commit_message_file(msg) if msg else nullcontext() \
+                    as msg_file:
+                # Note: call_git operates via joining call_git_items_ and that one wipes out
+                # .stdout from exception and collects/repopulates stderr only. Let's use
+                # _call_git which returns both outputs and collects/re-populates both stdout
+                # **and** stderr
+                _ = self._call_git(
+                        cmd + (['--file', msg_file] if msg_file else []),
+                        files=files,
+                        env=env,
+                        pathspec_from_file=True,
+                )
         except CommandError as e:
             # real errors first
             if "did not match any file(s) known to git" in e.stderr:

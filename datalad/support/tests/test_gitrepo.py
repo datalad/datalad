@@ -346,6 +346,20 @@ def test_GitRepo_commit(path=None):
 
 
 @with_tempfile
+def test_GitRepo_commit_long_message(path=None):
+    gr = GitRepo(path)
+    create_tree(path, {'file': 'content'})
+    gr.add('file')
+    # longer than a single command line argument may be on Linux (128KiB),
+    # as e.g. a `run` record listing many expanded inputs
+    msg = "Long message ΔЙ\n\n" + "\n".join(
+        "input/file{:06d}".format(i) for i in range(20000))
+    gr.commit(msg, files=['file'])
+    assert_repo_status(gr)
+    eq_(gr.format_commit("%B").strip(), msg)
+
+
+@with_tempfile
 def test_GitRepo_get_indexed_files(path=None):
 
     gr = GitRepo(path)
