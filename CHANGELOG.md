@@ -1,4 +1,32 @@
 
+<a id='changelog-1.6.6'></a>
+# 1.6.6 (2026-10-05)
+
+## 🐛 Bug Fixes
+
+- `wtf` no longer warns, and `test_wtf` no longer fails, when filesystem
+  details cannot be determined, e.g. in a chroot during package builds.
+  Fixes [#7950](https://github.com/datalad/datalad/issues/7950)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- `status` no longer reports a file with a tab in its name as deleted, and
+  the rest of its name after the tab as added, which also broke `save` and
+  `run` on such files; `AnnexRepo.unannex()` now returns such paths (and paths
+  with a backslash) unmangled.
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- `datalad run` no longer fails with "File unknown to git" when an output is an untracked directory containing only empty subdirectories (as e.g. snakemake creates them).  Fixes [#7955](https://github.com/datalad/datalad/issues/7955) (by [@just-meng](https://github.com/just-meng))
+
+## 🧪 Tests
+
+- CI coverage now includes the `datalad` and special remote processes run by
+  tests, via coverage's `patch = subprocess` instead of `tools/coverage-bin`.
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- `OBSCURE_FILENAME` includes a tab, and on UTF-8 filesystems again includes
+  unicode characters, which it had lacked since 1.3.2.
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.6.5'></a>
 # 1.6.5 (2026-09-30)
 
