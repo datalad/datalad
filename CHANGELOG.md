@@ -1,4 +1,65 @@
 
+<a id='changelog-1.6.6'></a>
+# 1.6.6 (2026-10-05)
+
+## 🐛 Bug Fixes
+
+- `wtf` no longer warns, and `test_wtf` no longer fails, when filesystem
+  details cannot be determined, e.g. in a chroot during package builds.
+  Fixes [#7950](https://github.com/datalad/datalad/issues/7950)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- `status` no longer reports a file with a tab in its name as deleted, and
+  the rest of its name after the tab as added, which also broke `save` and
+  `run` on such files; `AnnexRepo.unannex()` now returns such paths (and paths
+  with a backslash) unmangled.
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- `datalad run` no longer fails with "File unknown to git" when an output is an untracked directory containing only empty subdirectories (as e.g. snakemake creates them).  Fixes [#7955](https://github.com/datalad/datalad/issues/7955) (by [@just-meng](https://github.com/just-meng))
+
+## 🧪 Tests
+
+- CI coverage now includes the `datalad` and special remote processes run by
+  tests, via coverage's `patch = subprocess` instead of `tools/coverage-bin`.
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- `OBSCURE_FILENAME` includes a tab, and on UTF-8 filesystems again includes
+  unicode characters, which it had lacked since 1.3.2.
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-1.6.5'></a>
+# 1.6.5 (2026-09-30)
+
+## 🐛 Bug Fixes
+
+- Open-file detection (used by e.g. `save`) compared its own UID via
+  `os.getuid()` against `psutil`-reported UIDs of other processes.  Under
+  UID-faking wrappers such as `fakeroot` (used during Debian package
+  builds), the two disagreed, so every process -- including our own --
+  was filtered out and no open file was ever detected.
+  [PR #7941](https://github.com/datalad/datalad/pull/7941)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- `update --how=reset` (and `--how=merge`) now resolves the corresponding branch
+  when determining the update target on adjusted branches (Windows / crippled
+  filesystems). Previously the adjusted branch name was used to build a
+  nonexistent `<remote>/adjusted/...` ref, so the update aborted with
+  "Could not determine update target".
+  Fixes [#7873](https://github.com/datalad/datalad/issues/7873).
+  (by [@just-meng](https://github.com/just-meng))
+
+- CI: Prepare for Python 3.15 and replace deprecated os.path.commonprefix.  [PR #7944](https://github.com/datalad/datalad/pull/7944) (by [@yarikoptic-gitmate](https://github.com/yarikoptic-gitmate))
+
+- `GitRepo` no longer takes an absolute path in a sibling directory whose name
+  merely starts with the repository's (e.g. `/tmp/repo2/f` for `/tmp/repo`) as
+  being inside the repository, and raises `FileNotInRepositoryError` instead.
+  [PR #7944](https://github.com/datalad/datalad/pull/7944) (by [@yarikoptic-gitmate](https://github.com/yarikoptic-gitmate))
+
+- `rotree` and `rmtree` in `datalad.utils` no longer fail on files that vanish
+  while they walk the tree, e.g. lock files of a background `git maintenance`.
+  [PR #7945](https://github.com/datalad/datalad/pull/7945)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.6.4'></a>
 # 1.6.4 (2026-09-24)
 

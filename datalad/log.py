@@ -26,6 +26,7 @@ from os.path import (
 
 from .support import ansi_colors as colors
 from .utils import (
+    common_str_prefix,
     is_interactive,
     optional_args,
 )
@@ -158,7 +159,7 @@ class TraceBack(object):
         if self.collide:
             # lets remove part which is common with previous invocation
             prev_next = sftb
-            common_prefix = os.path.commonprefix((self.__prev, sftb))
+            common_prefix = common_str_prefix((self.__prev, sftb))
             common_prefix2 = self.__prefix_re.sub('', common_prefix)
 
             if common_prefix2 != "":

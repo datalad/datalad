@@ -1489,13 +1489,13 @@ with_parametric_batch = pytest.mark.parametrize("batch", [False, True])
 # filesystems across different OSs.  Start with the most obscure
 OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
 # Those will be tried to be added to the base name if filesystem allows
-OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"', '<', '>']
+OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"', '<', '>', '\t']
 UNICODE_FILENAME = u"ΔЙקم๗あ"
 
 # OSX is exciting -- some I guess FS might be encoding differently from decoding
 # so Й might get recoded
 # (ref: https://github.com/datalad/datalad/pull/1921#issuecomment-385809366)
-if not (FILESYSTEM_SUPPORTS_UTF8 := (sys.getfilesystemencoding().lower() == 'utf-8')):
+if FILESYSTEM_SUPPORTS_UTF8 := (sys.getfilesystemencoding().lower() == 'utf-8'):
     if on_osx:
         # TODO: figure it really out
         UNICODE_FILENAME = UNICODE_FILENAME.replace(u"Й", u"")
@@ -1970,6 +1970,47 @@ def maybe_adjust_repo(repo):
         repo.call_annex(["upgrade"])
         repo.config.reload(force=True)
         repo.adjust()
+
+
+def maybe_unadjust_repo(repo):
+    """Check out `repo`'s *corresponding* branch (the real history beneath
+    the adjusting commit), the inverse of `maybe_adjust_repo`.
+
+    Call this function before you need to modify the commit history of a source/
+    sibling repo that has been created on a crippled FS (e.g. Windows CI).
+    A crippled FS forces every repo onto the adjusted branch. A plain
+    ``git reset --hard`` must land on the corresponding branch (not the adjusted
+    view). On a repo that is not adjusted it is a no-op.
+
+    Caveats:
+
+    - only faithful for asserting SHA-identity after a history-rewrite. If you
+      try to assert content-identity, you'll need to materialize the content first
+      via e.g. ``git checkout -- .``.
+
+    - only plain ``git`` keeps the repo unadjusted. DataLad's ``save``, ``update``
+      and ``push`` run ``git annex sync`` internally, which re-adjusts the branch
+      on a crippled filesystem.
+    """
+    if repo.is_managed_branch():
+        corr_branch = repo.get_corresponding_branch()
+        adjusted = repo.get_active_branch()
+        repo.call_git(["checkout", corr_branch])
+        repo.call_git(["branch", "-D", adjusted])
+
+
+def corresponding_hexsha(repo, ref="HEAD"):
+    """Hexsha of ``ref``, read from the corresponding branch when adjusted.
+
+    A plain ``get_hexsha(HEAD)`` on an adjusted repo returns the SHA of the git-annex
+    "adjusting" commit which is just the view. To read the SHA of the real history,
+    HEAD-relative refs need to be resolved against the corresponding branch instead.
+    On a normal branch it is a plain ``get_hexsha(ref)``.
+    """
+    if (corr := repo.get_corresponding_branch()) and (
+            ref == "HEAD" or ref.startswith(("HEAD~", "HEAD^", "HEAD@"))):
+        ref = corr + ref[len("HEAD"):]
+    return repo.get_hexsha(ref)
 
 
 @lru_cache()

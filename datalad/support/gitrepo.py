@@ -33,7 +33,6 @@ from os import (
     linesep,
 )
 from os.path import (
-    commonprefix,
     curdir,
     dirname,
     exists,
@@ -107,6 +106,7 @@ from datalad.utils import (
     on_windows,
     optional_args,
     path_is_subpath,
+    path_startswith,
     posix_relpath,
 )
 
@@ -248,7 +248,7 @@ def _normalize_path(base_dir: str, path: str) -> str:
         # are interpreted as being relative to self.path already.
         return path
 
-    if commonprefix([path, base_dir]) != base_dir:
+    if not path_startswith(path, base_dir):
         raise FileNotInRepositoryError(msg="Path outside repository: %s"
                                            % base_dir, filename=path)
 
@@ -2472,7 +2472,7 @@ class GitRepo(CoreGitRepo):
                 # make sure this method never talks about non-dataset
                 # content
                 continue
-            props, rpath = r.split('\t')
+            props, rpath = r.split('\t', 1)
             mode, gitsha, stage = props.split(' ')
             if stage not in ('0', '2'):
                 # we either have non-merge situation, or a simple merge
@@ -2893,8 +2893,9 @@ class GitRepo(CoreGitRepo):
             else:
                 raise ValueError(
                     'unknown value for `untracked`: {}'.format(untracked))
+            # the path is everything after the first tab: it may contain tabs
             props_re = re.compile(
-                r'(?P<type>[0-9]+) (?P<sha>.*) (.*)\t(?P<fname>.*)$')
+                r'(?P<type>[0-9]+) (?P<sha>[^ ]*) ([^\t]*)\t(?P<fname>.*)$')
         else:
             cmd = ['ls-tree', ref, '-z', '-r', '--full-tree', '-l']
             props_re = re.compile(

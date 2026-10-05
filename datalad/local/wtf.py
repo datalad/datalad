@@ -173,15 +173,17 @@ def _get_fs_type(loc, path, _was_warned=[]):
     res = {'path': path}
     try:
         from psutil import disk_partitions
-        parts = {Path(p.mountpoint): p  for p in disk_partitions()}
-        match = None
-        for mp in parts:
-            # if the mountpoint is the test path or its parent
-            # take it, whenever there is no match, or a longer match
-            if (mp == path or mp in path.parents) and (
-                    match is None or len(mp.parents) > len(match.parents)):
-                match = mp
-        match = parts[match]
+
+        # Consider physical devices first.  Inside a chroot (e.g. a package
+        # build environment) the root might not be such a device, or not a
+        # mountpoint at all, so fall back to all mounts before giving up.
+        for all_parts in (False, True):
+            match = _get_mountpoint(path, disk_partitions(all=all_parts))
+            if match is not None:
+                break
+        else:
+            lgr.debug("Could not find a mountpoint for %s", path)
+            return res
         for sattr, tattr in (('fstype', 'type'),
                              ('maxpath', 'max_pathlength'),
                              ('opts', 'mount_opts')):
@@ -197,6 +199,21 @@ def _get_fs_type(loc, path, _was_warned=[]):
             # Rely on side-effect of [] as default arg
             _was_warned.append("warned")
     return res
+
+
+def _get_mountpoint(path, partitions):
+    """Return the partition with the longest mountpoint containing `path`
+
+    Among identical mountpoints, the last one listed (the one in effect) wins.
+    """
+    match = None
+    for p in partitions:
+        mp = Path(p.mountpoint)
+        if (mp == path or mp in path.parents) and (
+                match is None or
+                len(mp.parents) >= len(Path(match.mountpoint).parents)):
+            match = p
+    return match
 
 
 def _describe_environment():

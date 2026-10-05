@@ -10,6 +10,8 @@ import datetime
 import os
 import platform
 import sys
+from email.utils import parseaddr
+from importlib.metadata import metadata
 from os import (
     linesep,
     makedirs,
@@ -142,11 +144,15 @@ class BuildManPage(Command):
         #appname = self._parser.prog
         appname = 'datalad'
 
-        # Get author info from package metadata (works with pyproject.toml)
-        from importlib.metadata import metadata
+        # Get author info from package metadata (works with pyproject.toml).
+        # PEP 621 metadata without a separate maintainer combines name+email
+        # into a single 'Author-email' field (e.g. "Name <email>"), so parse
+        # it instead of assuming it is a bare email address.
         pkg_metadata = metadata(getattr(self, 'mod_name', appname))
-        author = pkg_metadata.get('Author') or 'The DataLad Team and Contributors'
-        author_email = pkg_metadata.get('Author-email') or 'team@datalad.org'
+        author_name, author_email = parseaddr(
+            pkg_metadata.get('Author-email') or 'team@datalad.org')
+        author = pkg_metadata.get('Author') or author_name \
+            or 'The DataLad Team and Contributors'
 
         sections = {
             'Authors': """{0} is developed by {1} <{2}>.""".format(
