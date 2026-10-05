@@ -7,6 +7,8 @@ on:
     branches:
       # Create a release whenever a PR is merged into one of these branches:
       - maint
+      # for MAJOR.MINOR.0 releases, once maint is merged into master
+      - master
     types:
       - closed
   # Allow manually triggering a release via a "Run workflow" button on the
@@ -20,19 +22,36 @@ jobs:
     if: >
       github.event_name == 'workflow_dispatch'
          || (github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'release'))
+    env:
+      # pull_request_target runs (and by default checks out) the default
+      # branch (maint) whichever branch the PR was merged into, so name the
+      # branch to release explicitly
+      RELEASE_BRANCH: ${{ github.event.pull_request.base.ref || github.ref_name }}
     steps:
       - name: Checkout source
         uses: actions/checkout@v7
         with:
+          ref: ${{ env.RELEASE_BRANCH }}
           token: ${{ secrets.GITMATE_GITHUB_TOKEN }}
           # Check out all history so that the previous release tag can be
           # found:
           fetch-depth: 0
 
+      - name: Check that maint is merged into master
+        if: env.RELEASE_BRANCH == 'master'
+        run: |
+          # otherwise the release would either lack the fixes from maint or
+          # reuse the version of the latest release from maint
+          if ! git merge-base --is-ancestor origin/maint HEAD; then
+            echo "::error::'master' is missing commits from 'maint'. Merge 'maint' into 'master' before releasing from 'master'."
+            exit 1
+          fi
+
       - name: Install pandoc
         run: sudo apt-get update && sudo apt-get install -y pandoc
 
       - name: Prepare release
+        id: release
         uses: datalad/release-action/release@v1
         with:
           token: ${{ secrets.GITMATE_GITHUB_TOKEN }}
@@ -42,3 +61,15 @@ jobs:
             perl -pli -e "s/^version:.*/version: $new_version/" CITATION.cff
             git add docs/source/changelog.rst CITATION.cff
             git commit -m '[skip ci] Update docs/source/changelog.rst and CITATION.cff'
+
+      - name: Fast-forward maint to the new release
+        if: env.RELEASE_BRANCH == 'master'
+        run: |
+          # maint carries bug fixes for the latest release.  Without --force
+          # the push is refused unless it is a fast-forward.
+          if ! git push origin "$NEW_TAG^{commit}:refs/heads/maint"; then
+            echo "::error::Could not fast-forward 'maint' to $NEW_TAG; it got commits meanwhile. Merge 'maint' into 'master', then fast-forward 'maint' to 'master'."
+            exit 1
+          fi
+        env:
+          NEW_TAG: ${{ steps.release.outputs.new-tag }}
