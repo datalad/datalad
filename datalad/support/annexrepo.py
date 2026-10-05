@@ -23,6 +23,7 @@ from multiprocessing import cpu_count
 from os import linesep
 from os.path import (
     curdir,
+    dirname,
     exists,
     isdir,
 )
@@ -3561,13 +3562,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         if git is True:
             yield from GitRepo._save_add(self, files, git_opts=git_opts)
         else:
-            for r in self._call_annex_records(
-                    ['add'] + options,
-                    files=list(files.keys()),
-                    # TODO
-                    jobs=None,
-                    total_nbytes=sum(expected_additions.values())
-                    if expected_additions else None):
+            for r in self._save_add_annex_records(
+                    files, options, expected_additions):
                 yield get_status_dict(
                     action=r.get('command', 'add'),
                     refds=self.pathobj,
@@ -3579,6 +3575,69 @@ class AnnexRepo(GitRepo, RepoInterface):
                     message='\n'.join(r['error-messages'])
                     if 'error-messages' in r else None,
                     logger=lgr)
+
+    def _save_add_annex_records(self, files, options, expected_additions=None):
+        """Run `git annex add` on `files` for `_save_add()`, yield JSON records
+
+        Untracked files are fed via stdin to a single `git annex add --batch`,
+        so that many of them neither run into command line length limits, nor
+        start git-annex anew for every chunk of a split command line.
+
+        Any other path is given to `git annex add` on its command line.  Unlike
+        that, batch mode does not limit itself to paths that are untracked or
+        modified compared to the index, but (re-)adds any path, e.g. moves an
+        unmodified file tracked in Git into the annex.  It also does not descend
+        into directories, and does not skip files within nested repositories,
+        but adds them to this repository, or, for a file in a submodule, dies
+        without staging what it reported as added.
+        """
+        # whether a directory is, or is within, a repository nested in this one
+        in_nested_repo = {'': False}
+
+        def _in_nested_repo(d):
+            if d not in in_nested_repo:
+                in_nested_repo[d] = lexists(opj(self.path, d, '.git')) \
+                    or _in_nested_repo(dirname(d))
+            return in_nested_repo[d]
+
+        batch_files = []
+        cmdline_files = []
+        for f, props in files.items():
+            if props.get('state') == 'untracked' \
+                    and not isdir(opj(self.path, f)) \
+                    and not _in_nested_repo(dirname(f)):
+                batch_files.append(f)
+            else:
+                cmdline_files.append(f)
+
+        def _total_nbytes(fs):
+            return sum(expected_additions[f] for f in fs) \
+                if expected_additions else None
+
+        if batch_files:
+            records = self._call_annex_records(
+                # status() does not report ignored files as untracked.  Batch
+                # mode would otherwise check each file with `git check-ignore`,
+                # which costs a pass over the entire index per file.
+                ['add', '--batch', '-z', '--no-check-gitignore'] + options,
+                # encoded the way subprocess encodes command line arguments
+                stdin=b''.join(os.fsencode(f) + b'\0' for f in batch_files),
+                total_nbytes=_total_nbytes(batch_files))
+            yield from records
+            # instead of a record, batch mode outputs an empty line for a file
+            # it skips, e.g. an ignored or a vanished one.  Non-batch mode
+            # reports the latter as not found, so do we.
+            reported = set(chain.from_iterable(
+                r.get('input', []) for r in records))
+            yield from _fake_json_for_non_existing(
+                [f for f in batch_files
+                 if f not in reported and not lexists(opj(self.path, f))],
+                'add')
+        if cmdline_files:
+            yield from self._call_annex_records(
+                ['add'] + options,
+                files=cmdline_files,
+                total_nbytes=_total_nbytes(cmdline_files))
 
     def _save_post(self, message, files, partial_commit,
                    amend=False, allow_empty=False):
