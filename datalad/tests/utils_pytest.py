@@ -1489,13 +1489,13 @@ with_parametric_batch = pytest.mark.parametrize("batch", [False, True])
 # filesystems across different OSs.  Start with the most obscure
 OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
 # Those will be tried to be added to the base name if filesystem allows
-OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"', '<', '>']
+OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"', '<', '>', '\t']
 UNICODE_FILENAME = u"ΔЙקم๗あ"
 
 # OSX is exciting -- some I guess FS might be encoding differently from decoding
 # so Й might get recoded
 # (ref: https://github.com/datalad/datalad/pull/1921#issuecomment-385809366)
-if not (FILESYSTEM_SUPPORTS_UTF8 := (sys.getfilesystemencoding().lower() == 'utf-8')):
+if FILESYSTEM_SUPPORTS_UTF8 := (sys.getfilesystemencoding().lower() == 'utf-8'):
     if on_osx:
         # TODO: figure it really out
         UNICODE_FILENAME = UNICODE_FILENAME.replace(u"Й", u"")
