@@ -1928,13 +1928,12 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
 
         options = options[:] if options else []
-        prefix = 'unannex'
-        suffix = 'ok'
+        # --json, since the human-readable output C-quotes paths (e.g., with
+        # a tab or a backslash)
         return [
-            # we cannot .split here since filename could have spaces
-            self._unquote_annex_path(line[len(prefix) + 1 : -(len(suffix) + 1)])
-            for line in self.call_annex_items_(['unannex'] + options, files=files)
-            if line.split()[0] == prefix and line.split()[-1] == suffix
+            r['file']
+            for r in self.call_annex_records(['unannex'] + options, files=files)
+            if r.get('success')
         ]
 
     @normalize_paths(map_filenames_back=True)

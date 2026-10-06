@@ -12,14 +12,19 @@
 
 __docformat__ = 'restructuredtext'
 
+import errno
 import os
 import os.path as op
+import shutil
+import ssl
 import sys
 import time
 from abc import (
     ABCMeta,
     abstractmethod,
 )
+from collections import Counter
+from http.client import IncompleteRead
 from logging import getLogger
 from os.path import (
     exists,
@@ -27,8 +32,13 @@ from os.path import (
 )
 from os.path import join as opj
 
+import botocore.exceptions as botocore_exc
 import msgpack
+import requests.exceptions as requests_exc
+import urllib3.exceptions as urllib3_exc
+from humanize import naturalsize
 
+from datalad.dochelpers import single_or_plural
 from datalad.downloaders import CREDENTIAL_TYPES
 
 from .. import cfg
@@ -41,6 +51,7 @@ from ..support.exceptions import (
     DownloadError,
     IncompleteDownloadError,
     UnaccountedDownloadError,
+    iter_exception_chain,
 )
 from ..support.locking import (
     InterProcessLock,
@@ -56,6 +67,120 @@ from ..utils import (
 from .credentials import CompositeCredential
 
 lgr = getLogger('datalad.downloaders')
+
+
+def _errnos(*names):
+    """Errnos for those of `names` which are known on this platform"""
+    return {getattr(errno, name) for name in names if hasattr(errno, name)}
+
+
+# connection failures which OSError does not map to ConnectionError itself
+_TRANSIENT_ERRNOS = _errnos('EHOSTUNREACH', 'ENETDOWN', 'ENETRESET', 'ENETUNREACH')
+_OUT_OF_SPACE_ERRNOS = _errnos('ENOSPC', 'EDQUOT', 'EFBIG')
+_MAX_RETRY_DELAY = 60  # seconds
+
+_TRANSIENT_EXCEPTIONS = (
+    ConnectionError, TimeoutError, IncompleteRead,
+    # the peer went away, unlike e.g. with a bad certificate
+    ssl.SSLEOFError, ssl.SSLZeroReturnError,
+    requests_exc.ChunkedEncodingError, requests_exc.ConnectionError,
+    requests_exc.Timeout,
+    urllib3_exc.ProtocolError, urllib3_exc.TimeoutError,
+    botocore_exc.ConnectionError, botocore_exc.ConnectionClosedError,
+    botocore_exc.IncompleteReadError, botocore_exc.ResponseStreamingError,
+)
+
+
+def is_transient_download_error(exc):
+    """Whether `exc`, or anything it was raised from, is worth retrying
+
+    Only ``__cause__`` counts: a failure raised while merely handling a
+    transient one is not transient itself.
+    """
+    return any(
+        isinstance(e, _TRANSIENT_EXCEPTIONS)
+        or (isinstance(e, OSError) and e.errno in _TRANSIENT_ERRNOS)
+        for e in iter_exception_chain(exc)
+    )
+
+
+def _is_out_of_space_error(exc):
+    return any(
+        isinstance(e, OSError) and e.errno in _OUT_OF_SPACE_ERRNOS
+        for e in iter_exception_chain(exc)
+    )
+
+
+def _get_free_space(path):
+    """Free space (bytes) on the file system `path` resides on, None if unknown
+    """
+    try:
+        return shutil.disk_usage(op.dirname(op.abspath(path))).free
+    except OSError as e:
+        lgr.debug("Could not determine free space for %s: %s",
+                  path, CapturedException(e))
+        return None
+
+
+def _free_space_note(free_space, path):
+    return "only %s free on the file system holding %s" % (
+        naturalsize(free_space), op.dirname(path) or os.curdir)
+
+
+def _warn_if_not_enough_space(url, path, target_size):
+    if not target_size:
+        return
+    free_space = _get_free_space(path)
+    if free_space is not None and free_space < target_size:
+        lgr.warning(
+            "Downloading %s requires %s, but there is %s -- the download "
+            "is likely to fail", url, naturalsize(target_size),
+            _free_space_note(free_space, path))
+
+
+def _get_transfer_error(exc, url, filepath, fp, target_size):
+    """The DownloadError to raise for `exc`; an IncompleteDownloadError if
+    worth retrying"""
+    try:
+        # tell() counts buffered bytes, fstat() what boto3 wrote at offsets
+        stored = max(fp.tell(), os.fstat(fp.fileno()).st_size)
+    except (OSError, ValueError) as e:
+        lgr.debug("Could not determine how much of %s was written: %s",
+                  filepath, CapturedException(e))
+        stored = None
+    out_of_space = _is_out_of_space_error(exc)
+    details = []
+    if stored is not None:
+        details.append("%s of %s stored" % (
+            naturalsize(stored),
+            naturalsize(target_size) if target_size else "an unknown total"))
+    free_space = _get_free_space(filepath)
+    if free_space is not None and (
+            out_of_space
+            or (stored is not None and target_size
+                and free_space < target_size - stored)):
+        details.append(_free_space_note(free_space, filepath))
+    suffix = " (%s)" % ", ".join(details) if details else ""
+    if out_of_space:
+        return DownloadError("Ran out of space while downloading %s into %s%s"
+                             % (url, filepath, suffix))
+    if is_transient_download_error(exc):
+        return IncompleteDownloadError("Transfer of %s was interrupted%s"
+                                       % (url, suffix))
+    return DownloadError("Failed to download %s into %s%s"
+                         % (url, filepath, suffix))
+
+
+def _backoff(failures, kind, ce, retries):
+    """Count a failure of `kind`; back off and return True if to retry it"""
+    failures[kind] += 1
+    if failures[kind] > retries:
+        return False
+    delay = min(0.5 * (failures[kind] ** 1.2), _MAX_RETRY_DELAY)
+    lgr.info("Retrying from the start (%d out of %d) in %.1f seconds after: %s",
+             failures[kind], retries, delay, ce.format_with_cause())
+    time.sleep(delay)
+    return True
 
 
 # TODO: remove headers, HTTP specific
@@ -149,14 +274,18 @@ class BaseDownloader(object, metaclass=ABCMeta):
             lgr.debug("set credential context as %s", url)
             self.credential.set_context(auth_url=url)
 
-        attempt, incomplete_attempt, server_error_attempt = 0, 0, 0
+        retries = cfg.obtain('datalad.downloaders.retry')
+        failures = Counter()
+        attempt = 0
         result = None
         credential_was_refreshed = False
         while True:
             attempt += 1
-            if attempt > 20:
+            # each kind of failure in `failures` may use up all `retries`
+            if attempt > 20 + 3 * retries:
                 # are we stuck in a loop somehow? I think logic doesn't allow this atm
-                raise RuntimeError("Got to the %d'th iteration while trying to download %s" % (attempt, url))
+                raise DownloadError(
+                    "Failed to download %s in %d attempts" % (url, attempt - 1))
             exc_info = None
             msg_types = ''
             supported_auth_types = []
@@ -179,13 +308,18 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 lgr.log(5, "Calling out into %s for %s", method, url)
                 result = method(url, **kwargs)
                 # assume success if no puke etc
+                if failures:
+                    lgr.info("Access to %s succeeded after %s", url,
+                             single_or_plural('retry', 'retries',
+                                              failures.total(),
+                                              include_count=True))
                 break
             except AccessDeniedError as e:
                 ce = CapturedException(e)
-                if hasattr(e, 'status') and e.status == 429:
+                if e.status == 429:
                     # Too many requests.
-                    # We can retry by continuing the loop.
-                    time.sleep(0.5*(attempt**1.2))
+                    if not _backoff(failures, 'throttled', ce, retries):
+                        raise
                     continue
 
                 if isinstance(e, AnonymousAccessDeniedError):
@@ -235,29 +369,20 @@ class BaseDownloader(object, metaclass=ABCMeta):
                         # and redo connect/download attempt
                 continue
 
+            except UnaccountedDownloadError:
+                raise  # more than announced: a retry would get the same
             except IncompleteDownloadError as e:
                 ce = CapturedException(e)
                 exc_info = sys.exc_info()
-                incomplete_attempt += 1
-                if incomplete_attempt > 5:
-                    # give up
+                if not _backoff(failures, 'incomplete', ce, retries):
                     raise
-                lgr.debug("Failed to download fully, will try again: %s", ce)
-                # TODO: may be fail earlier than after 20 attempts in such a case?
             except AccessFailedError as e:
-                # Handle retryable server errors (5xx)
-                if hasattr(e, 'status') and e.status is not None and 500 <= e.status < 600:
+                # server errors (5xx), or a session failing to connect
+                if (is_transient_download_error(e) if e.status is None
+                        else 500 <= e.status < 600):
                     ce = CapturedException(e)
-                    server_error_attempt += 1
-                    if server_error_attempt > 5:
-                        # give up after 5 retries
+                    if not _backoff(failures, 'server', ce, retries):
                         raise
-                    lgr.debug(
-                        "Server error (status %d), will retry (attempt %d): %s",
-                        e.status, server_error_attempt, ce
-                    )
-                    # Exponential backoff similar to 429 handling
-                    time.sleep(0.5 * (server_error_attempt ** 1.2))
                     continue
                 # Non-retryable AccessFailedError
                 raise
@@ -437,7 +562,8 @@ class BaseDownloader(object, metaclass=ABCMeta):
 
         if target_size and target_size != downloaded_size:
             raise (IncompleteDownloadError if target_size > downloaded_size else UnaccountedDownloadError)(
-                "Downloaded size %d differs from originally announced %d" % (downloaded_size, target_size))
+                "Download of %s finished with %d bytes, %d were announced"
+                % (url, downloaded_size, target_size))
 
     def _download(self, url, path=None, overwrite=False, size=None, stats=None):
         """Download content into a file
@@ -490,6 +616,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
         # FETCH CONTENT
         # TODO: pbar = ui.get_progressbar(size=response.headers['size'])
         temp_filepath = self._get_temp_download_filename(filepath)
+        _warn_if_not_enough_space(url, temp_filepath, target_size)
         try:
             if exists(temp_filepath):
                 # eventually we might want to continue the download
@@ -498,14 +625,32 @@ class BaseDownloader(object, metaclass=ABCMeta):
                     "It will be overridden" % temp_filepath)
                 # TODO.  also logic below would clean it up atm
 
-            with open(temp_filepath, 'wb') as fp:
-                # TODO: url might be a bit too long for the beast.
-                # Consider to improve to make it animated as well, or shorten here
-                pbar = ui.get_progressbar(label=url, fill_text=filepath, total=target_size)
+            # TODO: url might be a bit too long for the beast.
+            # Consider to improve to make it animated as well, or shorten here
+            pbar = ui.get_progressbar(label=url, fill_text=filepath, total=target_size)
+            # not `with`: after ENOSPC, close() would fail again and mask it
+            fp = open(temp_filepath, 'wb')
+            transfer_failed = True
+            try:
                 t0 = time.time()
                 downloader_session.download(fp, pbar, size=size)
+                fp.flush()  # for a deferred ENOSPC to be diagnosed below
                 downloaded_time = time.time() - t0
-                pbar.finish()
+                transfer_failed = False
+            except DownloadError:
+                raise
+            except Exception as e:
+                raise _get_transfer_error(
+                    e, url, filepath, fp, target_size) from e
+            finally:
+                pbar.finish()  # also on failure, lest a retry stack up bars
+                try:
+                    fp.close()
+                except OSError as e:
+                    if not transfer_failed:
+                        raise
+                    lgr.debug("Failed to close %s: %s", temp_filepath,
+                              CapturedException(e))
             downloaded_size = os.stat(temp_filepath).st_size
 
             # (headers.get('Content-type', "") and headers.get('Content-Type')).startswith('text/html')
@@ -525,12 +670,14 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 stats.overwritten += int(existed)
                 stats.downloaded_size += downloaded_size
                 stats.downloaded_time += downloaded_time
-        except (AccessDeniedError, IncompleteDownloadError) as e:
+        except DownloadError as e:
+            e.filepath = filepath
             raise
         except Exception as e:
             ce = CapturedException(e)
-            lgr.error("Failed to download %s into %s: %s", url, filepath, ce)
-            raise DownloadError(ce) from e # for now
+            lgr.debug("Failed to download %s into %s: %s", url, filepath, ce)
+            raise DownloadError("Failed to download %s into %s" % (url, filepath),
+                                filepath=filepath) from e
         finally:
             if exists(temp_filepath):
                 # clean up
@@ -558,7 +705,12 @@ class BaseDownloader(object, metaclass=ABCMeta):
         # TODO: may be move all the path dealing logic here
         # but then it might require sending request anyways for Content-Disposition
         # so probably nah
-        lgr.info("Downloading %r into %r", url, path)
+        if not path:
+            lgr.info("Downloading '%s' into the current directory", url)
+        elif isdir(path) or path.endswith((os.sep, '/')):
+            lgr.info("Downloading '%s' into directory '%s'", url, path)
+        else:
+            lgr.info("Downloading '%s' into '%s'", url, path)
         return self.access(self._download, url, path=path, **kwargs)
 
     @property
@@ -640,12 +792,15 @@ class BaseDownloader(object, metaclass=ABCMeta):
 
             self._verify_download(url, downloaded_size, target_size, None, content=content)
 
-        except (AccessDeniedError, IncompleteDownloadError) as e:
+        except DownloadError:
             raise
         except Exception as e:
             ce = CapturedException(e)
-            lgr.error("Failed to fetch %s: %s", url, ce)
-            raise DownloadError(ce) from e  # for now
+            lgr.debug("Failed to fetch %s: %s", url, ce)
+            if is_transient_download_error(e):
+                raise IncompleteDownloadError(
+                    "Transfer of %s was interrupted" % url) from e
+            raise DownloadError("Failed to fetch %s" % url) from e
 
         if cache:
             # apparently requests' CaseInsensitiveDict is not serialazable

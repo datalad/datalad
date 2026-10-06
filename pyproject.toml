@@ -42,6 +42,12 @@ classifiers = [
     "Natural Language :: English",
     "Operating System :: POSIX",
     "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "Programming Language :: Unix Shell",
     "Topic :: Communications :: File Sharing",
     "Topic :: Education",
@@ -99,7 +105,7 @@ devel-docs = [
 ]
 devel-utils = [
     "asv",             # benchmarks
-    "coverage!=7.6.5,!=7.13.1",  # 7.13.1: ConfigError with '..' in config paths on macOS
+    "coverage>=7.10.6,!=7.13.1",  # 7.10.6: `patch = subprocess` fixes; 7.13.1: ConfigError with '..' in config paths on macOS
     "gprof2dot",       # rendering cProfile output as a graph image
     "psutil",
     "pytest-xdist",    # parallelize pytest runs etc

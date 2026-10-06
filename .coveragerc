@@ -1,3 +1,6 @@
+[run]
+# also measure Python subprocesses: datalad CLI, special remotes, ...
+patch = subprocess
 [paths]
 source =
     datalad/

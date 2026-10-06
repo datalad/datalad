@@ -334,6 +334,7 @@ def test_run_from_subds_gh3551(path=None):
 @with_tree(tree={
     "output_file": "",
     "output_empty": {},
+    "output_emptysubdirs": {"sub": {}},
     # to ensure that we do unlock etc the other outputs
     "output_withfile": {"f": "content"},
 })
@@ -344,12 +345,15 @@ def test_run_empty_output(path=None):
     # https://git-annex.branchable.com/bugs/git_diff_in_adj_unlock_reports_diff_for_empty_file/
     with chpwd(ds.path):
         assert_in_results(
-            run("echo content> output_empty/f",
-                outputs=["output_file", "output_empty", "output_withfile"],
+            run("echo content> output_empty/f"
+                " && echo content> output_emptysubdirs/sub/f",
+                outputs=["output_file", "output_empty",
+                         "output_emptysubdirs", "output_withfile"],
                 return_type="list", result_filter=None, result_xfm=None),
             action="save",
             status="ok")
     ok_(ds.repo.file_has_content("output_empty/f"))
+    ok_(ds.repo.file_has_content("output_emptysubdirs/sub/f"))
 
 
 @with_tempfile(mkdir=True)

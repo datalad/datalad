@@ -10,7 +10,14 @@
 """Test wtf"""
 
 
+import os
+import tempfile
+from collections import namedtuple
 from os.path import join as opj
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
 
 from datalad import __version__
 from datalad.api import (
@@ -20,6 +27,9 @@ from datalad.api import (
 from datalad.local.wtf import (
     _HIDDEN,
     SECTION_CALLABLES,
+    _describe_annex,
+    _describe_system,
+    _get_fs_type,
 )
 from datalad.support.external_versions import external_versions
 from datalad.tests.utils_pytest import (
@@ -31,6 +41,7 @@ from datalad.tests.utils_pytest import (
     assert_not_in,
     chpwd,
     eq_,
+    ok_,
     ok_startswith,
     skip_if_no_module,
     swallow_outputs,
@@ -79,9 +90,15 @@ def test_wtf(topdir=None):
         assert_not_in(_HIDDEN, cmo.out)  # all is shown
         assert_in('user.name: ', cmo.out)
         if external_versions['psutil']:
-            if external_versions['psutil'] < '6.0.0':
-                # filesystems detail should be reported, unless 6.0.0 where
-                # it was removed. See https://github.com/giampaolo/psutil/issues/2109
+            # filesystems detail should be reported, unless psutil 6.0.0+
+            # where it was removed (see
+            # https://github.com/giampaolo/psutil/issues/2109), or the
+            # mountpoints cannot be determined (e.g. in a chroot), see
+            # https://github.com/datalad/datalad/issues/7950
+            if any('max_pathlength' in _get_fs_type(l, p)
+                   for l, p in (('CWD', Path.cwd()),
+                                ('TMP', Path(tempfile.gettempdir())),
+                                ('HOME', Path.home()))):
                 assert_in('max_pathlength:', cmo.out)
         else:
             assert_in("Hint: install psutil", cmo.out)
@@ -167,3 +184,83 @@ def test_wtf(topdir=None):
         assert_not_in('user.name', pyperclip.paste())
         assert_in(_HIDDEN, pyperclip.paste())  # by default no sensitive info
         assert_in("cmd:annex:", pyperclip.paste())  # but the content is there
+
+
+_ANNEX_VERSION_OUTPUT = (
+    "git-annex version: 10.20260316\n"
+    "build flags: Assistant Webapp MagicMime Testsuite\n"
+    "dependency versions: aws-0.25.2 DAV-1.3.4\n"
+    "operating system: linux x86_64\n"
+)
+
+
+@pytest.mark.parametrize("eol", ["\n", "\r\n"], ids=["lf", "crlf"])
+def test_describe_annex_line_endings(eol, monkeypatch):
+    """Parse git-annex's output whichever line ending it uses
+
+    The separator is git-annex's business, not the local platform's, so
+    splitting on os.linesep dropped everything but `version` wherever the
+    two disagreed -- which on Windows is always, leaving `datalad wtf` with
+    no build flags, backends or remote types to report.
+    """
+    stdout = _ANNEX_VERSION_OUTPUT.replace("\n", eol)
+    monkeypatch.setattr(
+        'datalad.cmd.GitWitlessRunner.run',
+        lambda self, *args, **kwargs: dict(stdout=stdout, stderr=''))
+
+    info = _describe_annex()
+    eq_(info['version'], '10.20260316')
+    eq_(info['build flags'],
+        ['Assistant', 'Webapp', 'MagicMime', 'Testsuite'])
+    eq_(info['operating system'], 'linux x86_64')
+
+
+def test_describe_system_cpus():
+    """Report both CPU counts, where the platform can tell them apart"""
+    cpus = _describe_system()['cpus']
+    eq_(cpus['count'], os.cpu_count())
+    if hasattr(os, 'sched_getaffinity'):
+        assert_greater(cpus['affinity'], 0)
+        # a process can be confined to a subset of the machine's CPUs,
+        # never granted more than exist
+        ok_(cpus['affinity'] <= cpus['count'])
+    else:
+        assert_not_in('affinity', cpus)
+
+
+@pytest.mark.skipif(not hasattr(os, 'sched_getaffinity'),
+                    reason="no os.sched_getaffinity on this platform")
+def test_describe_system_cpus_affinity_failure(monkeypatch):
+    """An unreadable affinity mask costs that one field, not the report
+
+    `datalad wtf` is what gets run when something is already wrong, so no
+    single probe in it may take the whole report down with it.
+    """
+    def _boom(pid):
+        raise OSError(1, "Operation not permitted")
+
+    monkeypatch.setattr(os, 'sched_getaffinity', _boom)
+    cpus = _describe_system()['cpus']
+    eq_(cpus['count'], os.cpu_count())
+    assert_not_in('affinity', cpus)
+
+
+def test_get_fs_type():
+    pytest.importorskip('psutil')
+    Part = namedtuple('Part', ['mountpoint', 'fstype'])
+    path = Path('/build', 'pkg')
+
+    def check(phys, all_):
+        with patch('psutil.disk_partitions',
+                   lambda all=False: all_ if all else phys):
+            return _get_fs_type('X', path)
+
+    # nothing matches (e.g. in a chroot) - no details, no exception
+    eq_(check([], [Part('/proc', 'proc')]), {'path': path})
+    # only found among all mounts
+    eq_(check([Part('/home', 'ext4')],
+              [Part('/', 'overlay')])['type'], 'overlay')
+    # longest mountpoint wins, and the last among identical ones
+    eq_(check([Part('/', 'ext4'), Part('/build', 'xfs'),
+               Part('/build', 'btrfs'), Part('/build/other', 'ext3')],
+              [])['type'], 'btrfs')

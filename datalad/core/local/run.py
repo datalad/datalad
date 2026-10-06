@@ -819,9 +819,10 @@ def _unlock_or_remove(dset_path, paths, remove=False):
                 res["status"] == "error"
                 # not every error result comes with this key
                 and res.get("error_message") == "File unknown to git"
-                and op.isdir(res["path"]) and not os.listdir(res["path"])
+                and op.isdir(res["path"])
+                and not any(files for _, _, files in os.walk(res["path"]))
             ):
-                lgr.debug("Empty directory %(path)s is not known to git, skipping unlock", res)
+                lgr.debug("Directory %(path)s without files is not known to git, skipping unlock", res)
                 continue
             yield res
     # Avoid `datalad remove` because it calls git-rm underneath, which will

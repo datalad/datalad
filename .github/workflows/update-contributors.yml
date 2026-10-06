@@ -37,7 +37,7 @@ jobs:
           # see CONTRIBUTING.md:Recognizing contributions.
           # To extend this list, check for non-human logins in
           # https://api.github.com/repos/datalad/datalad/contributors
-          skip_users: manbat bhanuprasad14 yetanothertestuser bobknob23987 claude Copilot
+          skip_users: manbat bhanuprasad14 yetanothertestuser bobknob23987 claude Copilot yarikoptic-gitmate
 
           # INFO, DEBUG, ERROR, WARNING, etc.
           log_level: DEBUG

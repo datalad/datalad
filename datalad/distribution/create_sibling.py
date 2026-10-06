@@ -12,7 +12,6 @@
 __docformat__ = 'restructuredtext'
 
 import logging
-import os
 import shlex
 from os.path import curdir
 from os.path import join as opj
@@ -415,7 +414,12 @@ def _ls_remote_path(ssh, path):
             return None
         else:
             raise  # It's an unexpected failure here
-    return [l for l in out.split(os.linesep) if l]
+    # `ls -A1` ran under `sh` on the *remote*, which separates with "\n".
+    # os.linesep is the local platform's, so a Windows client talking to a
+    # POSIX server used to get the whole listing back as a single "line".
+    # Not splitlines(): it also breaks on \x0b, \x0c, \x85 and U+2028/9,
+    # which are legal in POSIX file names.
+    return [l for l in out.split("\n") if l]
 
 
 @build_doc
