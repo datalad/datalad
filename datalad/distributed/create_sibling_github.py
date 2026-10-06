@@ -73,6 +73,7 @@ class _GitHub(_GitHubLike):
                     user=orguser,
                     repo=reponame)),
             headers=self.request_headers,
+            timeout=self.request_timeout,
         )
         # make sure any error-like situation causes noise
         r.raise_for_status()

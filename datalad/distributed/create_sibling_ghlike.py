@@ -64,6 +64,9 @@ class _GitHubLike(object):
     response_code_repo_created = requests.codes.created
     # auth failure
     response_code_unauthorized = requests.codes.forbidden
+    # (connect, read) timeouts in seconds for all requests to the platform;
+    # without one, a request whose response is lost hangs forever
+    request_timeout = (30, 120)
 
     # extra config settings to be used for a remote pointing to the
     # target platform
@@ -209,7 +212,7 @@ class _GitHubLike(object):
 
         endpoint = urljoin(self.api_url, self.get_authenticated_user_endpoint)
         headers = self.request_headers
-        r = requests.get(endpoint, headers=headers)
+        r = requests.get(endpoint, headers=headers, timeout=self.request_timeout)
         # make sure any error-like situation causes noise
         r.raise_for_status()
         self._user_info = r.json()
@@ -362,6 +365,7 @@ class _GitHubLike(object):
                     user=orguser,
                     repo=reponame)),
             headers=self.request_headers,
+            timeout=self.request_timeout,
         )
         # make sure any error-like situation causes noise
         r.raise_for_status()
@@ -495,6 +499,7 @@ class _GitHubLike(object):
             endpoint,
             json=data,
             headers=headers,
+            timeout=self.request_timeout,
         )
         return self.repo_create_response(r)
 

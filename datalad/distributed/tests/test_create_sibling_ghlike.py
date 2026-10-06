@@ -268,3 +268,27 @@ def test_is_repo_already_exists_gitea():
     # Gitea: wrong status code -> False
     r = _mock_response(requests.codes.unprocessable)
     assert not obj._is_repo_already_exists(r, {'message': 'already exist'})
+
+
+@pytest.mark.ai_generated
+def test_requests_have_timeout():
+    # without a timeout a lost response leaves the call hanging forever
+    from datalad.distributed.create_sibling_github import _GitHub
+    obj = _GitHub.__new__(_GitHub)
+    obj.api_url = 'https://api.example.com/'
+    obj.request_headers = {}
+    obj._user_info = None
+    # 403: repo_create_response() reports an error record rather than raising
+    r = _mock_response(requests.codes.forbidden)
+    r.json.return_value = {'message': 'nope', 'login': 'someone'}
+    with patch('requests.get', return_value=r) as get, \
+            patch('requests.post', return_value=r) as post, \
+            patch('requests.delete', return_value=r) as delete:
+        eq_(obj.authenticated_user['login'], 'someone')
+        obj.repo_get_request('org', 'repo')
+        obj.repo_create_request('repo', 'org', private=False)
+        obj.repo_delete_request('org', 'repo')
+    calls = get.call_args_list + post.call_args_list + delete.call_args_list
+    eq_(len(calls), 4)
+    for call in calls:
+        eq_(call.kwargs.get('timeout'), _GitHub.request_timeout)
