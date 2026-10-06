@@ -658,6 +658,17 @@
             "avatar_url": [
                 "https://avatars.githubusercontent.com/u/3453757?v=4"
             ]
+        },
+        {
+            "login": "helli33",
+            "name": "helli33",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://github.com/helli33",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/228642342?v=4"
+            ]
         }
     ],
     "contributorsPerLine": 7
