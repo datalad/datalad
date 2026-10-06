@@ -23,6 +23,7 @@ from multiprocessing import cpu_count
 from os import linesep
 from os.path import (
     curdir,
+    dirname,
     exists,
     isdir,
 )
@@ -99,6 +100,7 @@ from .exceptions import (
 from .external_versions import external_versions
 from .gitrepo import (
     GitRepo,
+    commit_message_options,
     normalize_path,
     normalize_paths,
     to_options,
@@ -3561,13 +3563,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         if git is True:
             yield from GitRepo._save_add(self, files, git_opts=git_opts)
         else:
-            for r in self._call_annex_records(
-                    ['add'] + options,
-                    files=list(files.keys()),
-                    # TODO
-                    jobs=None,
-                    total_nbytes=sum(expected_additions.values())
-                    if expected_additions else None):
+            for r in self._save_add_annex_records(
+                    files, options, expected_additions):
                 yield get_status_dict(
                     action=r.get('command', 'add'),
                     refds=self.pathobj,
@@ -3579,6 +3576,63 @@ class AnnexRepo(GitRepo, RepoInterface):
                     message='\n'.join(r['error-messages'])
                     if 'error-messages' in r else None,
                     logger=lgr)
+
+    def _save_add_annex_records(self, files, options, expected_additions=None):
+        """Run `git annex add` on `files` for `_save_add()`, yield JSON records
+
+        Untracked files are fed via stdin to a single `git annex add --batch`,
+        so that many of them neither run into command line length limits, nor
+        start git-annex anew for every chunk of a split command line.  Any other
+        path is given on the command line, as batch mode handles some paths
+        differently: https://github.com/con/git-annex/issues/299
+        """
+        # whether a directory is, or is within, a repository nested in this one
+        in_nested_repo = {'': False}
+
+        def _in_nested_repo(d):
+            if d not in in_nested_repo:
+                in_nested_repo[d] = lexists(opj(self.path, d, '.git')) \
+                    or _in_nested_repo(dirname(d))
+            return in_nested_repo[d]
+
+        batch_files = []
+        cmdline_files = []
+        for f, props in files.items():
+            # status() determined the type without following symlinks;
+            # either mode adds a symlink to a directory as a symlink
+            if props.get('state') == 'untracked' \
+                    and props.get('type') != 'directory' \
+                    and not _in_nested_repo(dirname(f)):
+                batch_files.append(f)
+            else:
+                cmdline_files.append(f)
+
+        def _total_nbytes(fs):
+            return sum(expected_additions[f] for f in fs) \
+                if expected_additions else None
+
+        if batch_files:
+            records = self._call_annex_records(
+                # status() does not report ignored files as untracked, and the
+                # check is costly: https://github.com/con/git-annex/issues/299
+                ['add', '--batch', '-z', '--no-check-gitignore'] + options,
+                # encoded the way subprocess encodes command line arguments
+                stdin=b''.join(os.fsencode(f) + b'\0' for f in batch_files),
+                total_nbytes=_total_nbytes(batch_files))
+            yield from records
+            # batch mode outputs an empty line for a skipped file; report a
+            # vanished one as not found, as non-batch mode does
+            reported = set(chain.from_iterable(
+                r.get('input', []) for r in records))
+            yield from _fake_json_for_non_existing(
+                [f for f in batch_files
+                 if f not in reported and not lexists(opj(self.path, f))],
+                'add')
+        if cmdline_files:
+            yield from self._call_annex_records(
+                ['add'] + options,
+                files=cmdline_files,
+                total_nbytes=_total_nbytes(cmdline_files))
 
     def _save_post(self, message, files, partial_commit,
                    amend=False, allow_empty=False):
@@ -3622,12 +3676,12 @@ class AnnexRepo(GitRepo, RepoInterface):
                 'GIT_AUTHOR_EMAIL': author_email,
                 'GIT_AUTHOR_DATE': author_date
             })
-            commit_cmd = ["commit-tree",
-                          corresponding_branch + "^{tree}",
-                          "-m", msg]
+            commit_cmd = ["commit-tree", corresponding_branch + "^{tree}"]
             if old_parent:
                 commit_cmd.extend(["-p", old_parent])
-            out, _ = self._call_git(commit_cmd, env=new_env, read_only=False)
+            with commit_message_options(msg) as msg_opts:
+                out, _ = self._call_git(
+                    commit_cmd + msg_opts, env=new_env, read_only=False)
             new_sha = out.strip()
 
             self.update_ref("refs/heads/" + corresponding_branch,
