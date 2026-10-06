@@ -177,9 +177,8 @@ def test_save_annex_add_batch(path=None):
     assert_not_in('--batch', cmdline_call.args[0])
     eq_(cmdline_call.kwargs['files'], ['tracked'])
 
-    # paths `git annex add --batch` would not handle like the non-batch mode
-    # does, are given on the command line: a directory, and a file within a
-    # repository nested in this one (not to be added to this repository)
+    # a directory and a file in a nested repository go on the command line,
+    # see https://github.com/con/git-annex/issues/299
     create_tree(ds.path, {'another': 'another', 'dir': {'file3': 'file3'}})
     nested = GitRepo(ds.pathobj / 'nested', create=True)
     create_tree(nested.path, {'innested': 'innested'})
