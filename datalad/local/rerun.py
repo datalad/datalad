@@ -45,7 +45,7 @@ from datalad.support.constraints import (
     EnsureStr,
 )
 from datalad.support.exceptions import CapturedException
-from datalad.support.gitrepo import commit_message_file
+from datalad.support.gitrepo import commit_message_options
 from datalad.support.json_py import load_stream
 from datalad.support.param import Parameter
 
@@ -510,10 +510,10 @@ def _rerun(dset, results, assume_ready=None, explicit=False,
                         ds_repo.checkout(new_parents[0])
                     if len(new_parents) > 1:
                         msg = ds_repo.format_commit("%B", res_hexsha)
-                        with commit_message_file(msg) as msg_file:
+                        with commit_message_options(msg) as msg_opts:
                             ds_repo.call_git(
-                                ["merge", "-F", msg_file,
-                                 "--no-ff", "--allow-unrelated-histories"] +
+                                ["merge"] + msg_opts +
+                                ["--no-ff", "--allow-unrelated-histories"] +
                                 new_parents[1:])
                     head = ds_repo.get_hexsha()
                     new_bases[res_hexsha] = head

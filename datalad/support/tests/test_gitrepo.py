@@ -34,6 +34,7 @@ from datalad.support.external_versions import external_versions
 from datalad.support.gitrepo import (
     GitRepo,
     _normalize_path,
+    commit_message_options,
     normalize_paths,
     to_options,
 )
@@ -343,6 +344,21 @@ def test_GitRepo_commit(path=None):
     assert_raises(FileNotInRepositoryError, gr.commit, files="untracked")
     # not existing file as well:
     assert_raises(FileNotInRepositoryError, gr.commit, files="not-existing")
+
+
+def test_commit_message_options():
+    with commit_message_options(None) as opts:
+        eq_(opts, [])
+    with commit_message_options("") as opts:
+        eq_(opts, ['-m', ""])
+    # a short single-line message stays visible in logged commands
+    with commit_message_options("Short message") as opts:
+        eq_(opts, ['-m', "Short message"])
+    for msg in ("x" * 81, "Subject\n\nbody"):
+        with commit_message_options(msg) as opts:
+            eq_(opts[0], '-F')
+            eq_(Path(opts[1]).read_bytes(), msg.encode())
+        assert_false(Path(opts[1]).exists())
 
 
 @with_tempfile

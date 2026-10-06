@@ -26,10 +26,7 @@ from collections.abc import (
     Mapping,
     Sequence,
 )
-from contextlib import (
-    contextmanager,
-    nullcontext,
-)
+from contextlib import contextmanager
 from functools import wraps
 from itertools import chain
 from os import (
@@ -400,17 +397,25 @@ def _prune_deeper_repos(repos: list[Path]) -> list[Path]:
 
 
 @contextmanager
-def commit_message_file(msg: str) -> Iterator[str]:
-    """Provide `msg` in a temporary file, to pass it to git via `-F <file>`
+def commit_message_options(msg: Optional[str]) -> Iterator[list[str]]:
+    """Provide options to pass commit message `msg` to git
 
-    A single command line argument is limited in length (128KiB on Linux),
-    which a commit message listing many files, e.g. a `run` record, can
-    exceed.
+    A short single-line message is given as `-m <msg>`, which keeps it visible
+    in logged commands.  Any other is given as `-F <file>` with a temporary
+    file, because a single command line argument is limited in length (128KiB
+    on Linux), which a commit message listing many files, e.g. a `run` record,
+    can exceed.  For no message (None), there are no options.
     """
+    if msg is None:
+        yield []
+        return
+    if '\n' not in msg and len(msg) <= 80:
+        yield ['-m', msg]
+        return
     with make_tempfile() as path:
         # encoded the way subprocess encodes command line arguments
         Path(path).write_bytes(os.fsencode(msg))
-        yield path
+        yield ['-F', path]
 
 
 class GitProgress(WitlessProtocol):
@@ -1502,14 +1507,14 @@ class GitRepo(CoreGitRepo):
         # here, but with pathspec_from_file it is no longer needed.
         # store pre-commit state to be able to check if anything was committed
         try:
-            with commit_message_file(msg) if msg else nullcontext() \
-                    as msg_file:
+            # no message option when amending without a new message
+            with commit_message_options(msg or None) as msg_opts:
                 # Note: call_git operates via joining call_git_items_ and that one wipes out
                 # .stdout from exception and collects/repopulates stderr only. Let's use
                 # _call_git which returns both outputs and collects/re-populates both stdout
                 # **and** stderr
                 _ = self._call_git(
-                        cmd + (['--file', msg_file] if msg_file else []),
+                        cmd + msg_opts,
                         files=files,
                         env=env,
                         pathspec_from_file=True,

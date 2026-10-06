@@ -100,7 +100,7 @@ from .exceptions import (
 from .external_versions import external_versions
 from .gitrepo import (
     GitRepo,
-    commit_message_file,
+    commit_message_options,
     normalize_path,
     normalize_paths,
     to_options,
@@ -3687,9 +3687,9 @@ class AnnexRepo(GitRepo, RepoInterface):
             commit_cmd = ["commit-tree", corresponding_branch + "^{tree}"]
             if old_parent:
                 commit_cmd.extend(["-p", old_parent])
-            with commit_message_file(msg) as msg_file:
+            with commit_message_options(msg) as msg_opts:
                 out, _ = self._call_git(
-                    commit_cmd + ["-F", msg_file], env=new_env, read_only=False)
+                    commit_cmd + msg_opts, env=new_env, read_only=False)
             new_sha = out.strip()
 
             self.update_ref("refs/heads/" + corresponding_branch,
