@@ -1,4 +1,14 @@
 
+<a id='changelog-1.7.1'></a>
+# 1.7.1 (2026-10-06)
+
+## 🚀 Enhancements and New Features
+
+- `addurls` accepts JSON Lines (one JSON object per line), e.g. as piped
+  from another command, via `--input-type jsonl` or a `.jsonl` file.
+  Fixes [#7939](https://github.com/datalad/datalad/issues/7939)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.7.0'></a>
 # 1.7.0 (2026-10-05)
 
