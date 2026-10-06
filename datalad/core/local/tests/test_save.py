@@ -46,10 +46,10 @@ from datalad.tests.utils_pytest import (
     create_tree,
     eq_,
     known_failure,
-    known_failure_windows,
     maybe_adjust_repo,
     neq_,
     ok_,
+    on_windows,
     patch,
     skip_if_adjusted_branch,
     skip_if_no_psutil,
@@ -58,6 +58,7 @@ from datalad.tests.utils_pytest import (
     swallow_outputs,
     with_tempfile,
     with_tree,
+    xfail_if_no_annex_magicmime,
 )
 from datalad.utils import (
     Path,
@@ -501,9 +502,22 @@ def test_add_subdataset(path=None, other=None):
     ok_(other_clone.is_installed())
 
 
-# CommandError: command '['git', '-c', 'receive.autogc=0', '-c', 'gc.auto=0', 'annex', 'add', '--json', '--', 'empty', 'file.txt']' failed with exitcode 1
-# Failed to run ['git', '-c', 'receive.autogc=0', '-c', 'gc.auto=0', 'annex', 'add', '--json', '--', 'empty', 'file.txt'] under 'C:\\Users\\appveyor\\AppData\\Local\\Temp\\1\\datalad_temp_tree_j2mk92y3'. Exit code=1.
-@known_failure_windows
+# mimetype= in annex.largefiles needs a git-annex built against libmagic;
+# git-annex's macOS wheel is not, and rejects the gitattributes outright.
+@xfail_if_no_annex_magicmime
+# On Windows it is built against libmagic and says so, and mimeencoding=
+# matching works there (cfg_text2git passes) -- but this mimetype= glob does
+# not match, and `some text` ends up annexed.  See datalad#7937.
+#
+# This replaces a @known_failure_windows dating from AppVeyor, where the
+# symptom was a CommandError from `annex add` rather than a wrong answer.
+# That marker *skipped* the test (datalad.tests.knownfailures.skip defaults to
+# True), which is why the change of symptom went unnoticed for so long.
+@pytest.mark.xfail(
+    on_windows,
+    reason="git-annex on Windows does not match annex.largefiles "
+           "mimetype= (datalad#7937)",
+)
 @with_tree(tree={
     'file.txt': 'some text',
     'empty': '',

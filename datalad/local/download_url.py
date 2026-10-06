@@ -206,7 +206,7 @@ class DownloadURL(Interface):
                     status="error",
                     message=str(ce),
                     type="file",
-                    path=path,
+                    path=getattr(e, 'filepath', None) or path,
                     exception=ce,
                     **common_report)
             else:

@@ -1,4 +1,268 @@
 
+<a id='changelog-1.7.0'></a>
+# 1.7.0 (2026-10-05)
+
+## 🚀 Enhancements and New Features
+
+- `add-archive-content` now takes any number of archives (or keys) in a
+  single invocation.  Their content is extracted and added within a single
+  commit, reusing the same batched git-annex processes, which is
+  substantially faster than invoking the command once per archive.  All
+  given archives are vetted before any of them is acted on, and original
+  archives (`--delete`) are removed only once all of them were added.
+  Addresses [#6590](https://github.com/datalad/datalad/issues/6590)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- `add-archive-content` now yields a result record for every given archive,
+  identifying it via `path` and `type='file'` (or `key` and `type='key'`
+  with `--key`), in addition to the dataset-level record it yielded before.
+  Result records about archives which can not be used now identify the
+  archive as well, instead of the dataset.  Two conditions which raised a
+  `RuntimeError` before -- the archive not being under annex control, and
+  its content not being available locally -- are now reported as
+  `impossible` result records.
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- `add-archive-content` gained `--overwrite-prior-check`
+  (`error` (default), `stats`, `ignore`), which guards the content one
+  archive added against the archives which follow it in the same
+  invocation.  Discarding it is only possible with
+  `--existing=overwrite`, and now leads to an error unless permitted;
+  `stats` permits it and reports the affected files as
+  `overwritten prior` in the statistics.  Files with identical content,
+  and the `--existing` suffix modes (which rename the incoming file
+  rather than discard anything), are never reported.
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- `push` gained a `--set-upstream`/`-u` option, analogous to
+  `git push -u`: after a successful push, it configures the current
+  branch to track the given sibling. Since "upstream" only makes sense
+  relative to one specific sibling, it requires `--to` to be given and
+  errors out otherwise.
+  Fixes [#7917](https://github.com/datalad/datalad/issues/7917)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🐛 Bug Fixes
+
+- `add-archive-content --delete-after` failed (`git rm` of a non-existing
+  path, followed by `OSError: Directory not empty`) and left a temporary
+  `.datalad*` directory behind, whenever it was invoked from a directory
+  other than the root of the dataset and the dataset was not given as a
+  `Dataset` instance.
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- `download-url` and other downloads retry a transfer interrupted by a dropped
+  connection, up to `datalad.downloaders.retry` times (default: 5), and on
+  failure report how much was stored and, if short, the free space.
+  Fixes [ReproNim/containers#169](https://github.com/ReproNim/containers/issues/169) via
+  [PR #7930](https://github.com/datalad/datalad/pull/7930)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Error messages, e.g. of `download-url`, no longer repeat the underlying
+  error.
+  [PR #7930](https://github.com/datalad/datalad/pull/7930)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🏠 Internal
+
+- A `DownloadError` message no longer includes that of its `__cause__`.
+  [PR #7930](https://github.com/datalad/datalad/pull/7930)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- The release workflow also releases from `master` (for `MAJOR.MINOR.0`),
+  requiring `maint` to be merged first and fast-forwarding `maint` afterwards.
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-1.6.6'></a>
+# 1.6.6 (2026-10-05)
+
+## 🐛 Bug Fixes
+
+- `wtf` no longer warns, and `test_wtf` no longer fails, when filesystem
+  details cannot be determined, e.g. in a chroot during package builds.
+  Fixes [#7950](https://github.com/datalad/datalad/issues/7950)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- `status` no longer reports a file with a tab in its name as deleted, and
+  the rest of its name after the tab as added, which also broke `save` and
+  `run` on such files; `AnnexRepo.unannex()` now returns such paths (and paths
+  with a backslash) unmangled.
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- `datalad run` no longer fails with "File unknown to git" when an output is an untracked directory containing only empty subdirectories (as e.g. snakemake creates them).  Fixes [#7955](https://github.com/datalad/datalad/issues/7955) (by [@just-meng](https://github.com/just-meng))
+
+## 🧪 Tests
+
+- CI coverage now includes the `datalad` and special remote processes run by
+  tests, via coverage's `patch = subprocess` instead of `tools/coverage-bin`.
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- `OBSCURE_FILENAME` includes a tab, and on UTF-8 filesystems again includes
+  unicode characters, which it had lacked since 1.3.2.
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-1.6.5'></a>
+# 1.6.5 (2026-09-30)
+
+## 🐛 Bug Fixes
+
+- Open-file detection (used by e.g. `save`) compared its own UID via
+  `os.getuid()` against `psutil`-reported UIDs of other processes.  Under
+  UID-faking wrappers such as `fakeroot` (used during Debian package
+  builds), the two disagreed, so every process -- including our own --
+  was filtered out and no open file was ever detected.
+  [PR #7941](https://github.com/datalad/datalad/pull/7941)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- `update --how=reset` (and `--how=merge`) now resolves the corresponding branch
+  when determining the update target on adjusted branches (Windows / crippled
+  filesystems). Previously the adjusted branch name was used to build a
+  nonexistent `<remote>/adjusted/...` ref, so the update aborted with
+  "Could not determine update target".
+  Fixes [#7873](https://github.com/datalad/datalad/issues/7873).
+  (by [@just-meng](https://github.com/just-meng))
+
+- CI: Prepare for Python 3.15 and replace deprecated os.path.commonprefix.  [PR #7944](https://github.com/datalad/datalad/pull/7944) (by [@yarikoptic-gitmate](https://github.com/yarikoptic-gitmate))
+
+- `GitRepo` no longer takes an absolute path in a sibling directory whose name
+  merely starts with the repository's (e.g. `/tmp/repo2/f` for `/tmp/repo`) as
+  being inside the repository, and raises `FileNotInRepositoryError` instead.
+  [PR #7944](https://github.com/datalad/datalad/pull/7944) (by [@yarikoptic-gitmate](https://github.com/yarikoptic-gitmate))
+
+- `rotree` and `rmtree` in `datalad.utils` no longer fail on files that vanish
+  while they walk the tree, e.g. lock files of a background `git maintenance`.
+  [PR #7945](https://github.com/datalad/datalad/pull/7945)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+<a id='changelog-1.6.4'></a>
+# 1.6.4 (2026-09-24)
+
+## 🚀 Enhancements and New Features
+
+- `GitRepo` gained a `dot_git_common` property, pointing to the `.git`
+  directory that a linked worktree checkout shares with the repository it came
+  from -- where `config` and `objects` live, unlike the per-worktree `dot_git`.
+  For any other repository it is the same as `dot_git`.
+  [PR #7931](https://github.com/datalad/datalad/pull/7931)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🐛 Bug Fixes
+
+- `save` and `copy-file` now also operate in a plain `git` worktree checkout.
+  Fixes [#7921](https://github.com/datalad/datalad/issues/7921) via
+  [PR #7931](https://github.com/datalad/datalad/pull/7931)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- `datalad wtf` parses `git annex version` output with `splitlines()` rather
+  than splitting on the *local* platform's `os.linesep`.  Where the two
+  disagreed -- on Windows, always -- the whole output stayed a single line
+  and everything but `version` was silently dropped, so the `git-annex`
+  section reported no build flags, backends, remote types or repository
+  versions.
+
+- `create_sibling` splits the remote `ls -A1` listing on `"\n"` rather than
+  the *local* `os.linesep`.  A Windows client talking to a POSIX server got
+  the whole listing back as one entry.  Latent: the only caller tests the
+  result for emptiness, which survived the bad split.
+
+## 🏠 Internal
+
+- `datalad wtf` reports `system.cpus`: `os.cpu_count()` and, where the
+  platform distinguishes them, the size of the process's CPU affinity mask.
+  The two differ under cgroups/containers/CI runners, and `AnnexRepo`
+  derives its default `--jobs` from the former.
+
+## 🧪 Tests
+
+- Windows and macOS testing moved off AppVeyor into `test.yml`'s own
+  matrix (`tools/ci/test-jobs.yml`), splitting `datalad` submodules the
+  same three ways AppVeyor's `Mac/WinP310core/a1/a2` jobs did to stay
+  under the job timeout.  OS-specific provisioning (APT/NeuroDebian,
+  Homebrew, NTFS long paths + an SSH server on Windows) was extracted
+  into shellcheck-able `tools/ci/test-env-{linux,macos,windows}.sh`
+  scripts.  AppVeyor and its AppVeyor-only helper scripts are removed.
+  Dropping AppVeyor exposed a few Windows-only test issues that had no
+  other CI signal:
+  - `addurls.py::get_subpaths`'s doctest hardcoded a POSIX `/` in its
+    expected output, but the function joins subpaths with
+    `os.path.sep`; rewritten to compare against a platform-agnostic
+    value instead.
+  - `test_run_merge_sub_under_plain_dir`'s existing
+    `is_managed_branch()`-gated `xfail` (for the git-annex limitation
+    in [issue #7905](https://github.com/datalad/datalad/issues/7905),
+    where `git annex sync` only propagates a nested submodule's
+    pointer update on adjusted/managed branches at the repo's top
+    level) was registered too late to cover the earlier assertions it
+    was also hitting; moved earlier so it covers the whole affected
+    span.
+  - `tools/ci/test-env-windows.sh`'s scratch `TMP`/`TEMP` directory was
+    hardcoded to `C:\DLTMP`, but GitHub's Windows runners check the
+    repository out to `D:`; `os.path.relpath()` cannot compute a
+    relative path across drive letters, so anything comparing a
+    checkout-drive path against a profile-drive temp path (as
+    `datalad run` does) raised `ValueError: path is on mount 'D:',
+    start on mount 'C:'`.  The scratch directory now derives its drive
+    from the checkout's own location instead of hardcoding `C:`.
+  [PR #7933](https://github.com/datalad/datalad/pull/7933)
+  (by [@yarikoptic-gitmate](https://github.com/yarikoptic-gitmate))
+
+- CI installs git-annex from the PyPI wheel by default, 2-3x faster to run
+  tests against than the standalone bundle, and covers the standalone and
+  conda builds on cron.  Each scenario now runs one full test selection
+  instead of a slow/not-slow pair.
+
+- Tests that need git-annex to match files by MIME type (`mimetype=` or
+  `mimeencoding=` in `annex.largefiles`, the latter used by the
+  `cfg_text2git` procedure) are marked `xfail` when git-annex was built
+  without MagicMime, which the macOS wheel is.  See #7936.
+
+- `test_add_mimetypes` is additionally `xfail` on Windows, where git-annex
+  *is* built against libmagic and `mimeencoding=` matching works, but
+  `mimetype=` does not match.  See #7937.  It previously carried
+  `@known_failure_windows` from the AppVeyor era, which skipped it outright
+  and so hid that the symptom had changed.
+
+- `test_files_split` is skipped on the NFS CI job.  Adding its 10k-file tree
+  over NFS trips git-annex's "changed while it was being added" check at
+  random, and argument-list splitting is filesystem-agnostic, so NFS added
+  flakiness rather than coverage.  It was never run there before: the job
+  used to exclude `@slow`.
+
+- `datalad wtf`'s CPU reporting is covered by tests, including that an
+  unreadable affinity mask costs that one field rather than taking the
+  whole report down -- `wtf` is what gets run when something is already
+  wrong, so none of its probes may raise.
+
+- `test_files_split` exercises the over-long-argument-list chunking against a
+  lowered `datalad.utils.CMD_MAX_ARG` and 200 files, rather than by
+  materialising 10 000 files with 101-character names: 124 s → 3 s for both
+  parametrizations.  The against-the-real-limit version is kept as
+  `test_files_split_heavy`, now `@turtle`.
+
+- `git-annex testremote` is called with `--fast --size=1KiB` in the RIA
+  tests.  The default key size is 1 MiB and neither flag was passed, so most
+  of the runtime was spent moving bytes rather than exercising the special
+  remote's protocol: `test_gitannex_local` goes 60 s → 3.4 s, which also
+  takes it under the 10 s its `@slow` marker stood for.
+
+- `test_rerun_merges.py` unpacks one created dataset per test from a
+  module-scoped tarball instead of calling `Dataset.create()` 15 times
+  (496 ms vs 17 ms each): 50.9 s → 42.7 s, i.e. −16%.  Each copy gets a fresh
+  `annex.uuid`, since otherwise every copy carries the tarball's and
+  git-annex reads a same-UUID remote as "me" -- `git annex copy --to` then
+  exits 0 having moved nothing.  Nothing here wires two copies together, so
+  that is insurance rather than a fix, and it costs ~2 s of the ~10 s saved.
+
+- `@turtle` tests run in CI again, in one dedicated matrix entry on base
+  Python and plain ubuntu.  Every other entry selects `not(turtle)`, so until
+  now they ran nowhere at all -- three tests that no job would have reported
+  on.  `PYTEST_MARKERS` in an entry's `extra-envs` overrides the selection;
+  it defaults to the previous `not(turtle)`.
+
+- Deleted `test_s3.py::_test_expiring_token`, which carried `@turtle` and
+  `@integration` but was `_`-prefixed and so never collected, and did little
+  but wait out a 900 s STS token.
+
 <a id='changelog-1.6.3'></a>
 # 1.6.3 (2026-09-17)
 

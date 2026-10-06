@@ -534,7 +534,13 @@ def _test_gitannex(host, store, dspath):
     # run git-annex-testremote
     # note, that we don't want to capture output. If something goes wrong we
     # want to see it in test build's output log.
-    ds.repo._call_annex(['testremote', 'store'], protocol=NoCapture)
+    #
+    # --fast skips the slowest checks and --size shrinks the test keys from
+    # the 1MiB default; what is under test here is the RIA special remote's
+    # protocol surface, and that is exercised the same either way, so the
+    # default size only bought us time spent moving bytes around.
+    ds.repo._call_annex(
+        ['testremote', '--fast', '--size=1KiB', 'store'], protocol=NoCapture)
 
 
 @turtle
@@ -544,7 +550,8 @@ def test_gitannex_ssh():
     _test_gitannex('datalad-test')
 
 
-@slow  # 41sec on travis
+# was `@slow  # 41sec on travis`; 60s -> 3.4s here once testremote stopped
+# shovelling 1MiB keys around, which is below the 10s the marker stands for
 def test_gitannex_local():
     _test_gitannex(None)
 

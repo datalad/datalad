@@ -19,7 +19,10 @@ import requests.auth
 from requests.utils import parse_dict_header
 
 from .. import __version__
-from ..dochelpers import borrowkwargs
+from ..dochelpers import (
+    borrowkwargs,
+    single_or_plural,
+)
 from ..log import LoggerHelper
 from ..support.cookies import cookies_db
 from ..support.exceptions import (
@@ -634,13 +637,15 @@ class HTTPDownloader(BaseDownloader):
                 if retry >= nretries:
                     #import epdb; epdb.serve()
                     if not _FTP_SUPPORT and url.startswith("ftp://"):
-                        msg_ftp = "For ftp:// support, install requests_ftp. "
+                        msg_ftp = ". For ftp:// support, install requests_ftp"
                     else:
                         msg_ftp = ""
 
                     raise AccessFailedError(
-                        "Failed to establish a new session %d times. %s"
-                        % (nretries, msg_ftp)) from exc
+                        "Failed to establish a new session in %s%s"
+                        % (single_or_plural('attempt', 'attempts', nretries,
+                                            include_count=True),
+                           msg_ftp)) from exc
                 lgr.warning(
                     "Caught exception %s. Will retry %d out of %d times",
                     ce, retry + 1, nretries)

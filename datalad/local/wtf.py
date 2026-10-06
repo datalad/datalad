@@ -110,7 +110,11 @@ def _describe_annex():
             message=ce.format_short(),
         )
     info = {}
-    for line in out['stdout'].split(os.linesep):
+    # splitlines(), not split(os.linesep): this is a subprocess's output, so
+    # its line ending is git-annex's business, not the local platform's.  On
+    # Windows the two disagreed and everything but `version` was silently
+    # dropped -- the whole output stayed one "line".
+    for line in out['stdout'].splitlines():
         key = line.split(':')[0]
         if not key:
             continue
@@ -134,11 +138,24 @@ def _describe_system():
         lgr.warning("Failed to get distribution information: %s", ce)
         dist = tuple()
 
+    # How many CPUs code may actually use is not always os.cpu_count():
+    # under a cgroup/affinity mask (containers, CI runners, taskset) that
+    # reports the machine's CPUs rather than this process's allowance, and
+    # AnnexRepo derives its default --jobs from it.  Report both where the
+    # platform can tell them apart.
+    cpus = {'count': os.cpu_count()}
+    if hasattr(os, 'sched_getaffinity'):
+        try:
+            cpus['affinity'] = len(os.sched_getaffinity(0))
+        except OSError as exc:
+            lgr.debug("Failed to get CPU affinity: %s", CapturedException(exc))
+
     return {
         'type': os.name,
         'name': pl.system(),
         'release': pl.release(),
         'version': pl.version(),
+        'cpus': cpus,
         'distribution': ' '.join([_t2s(dist),
                                   _t2s(pl.mac_ver()),
                                   _t2s(pl.win32_ver())]).rstrip(),
@@ -156,15 +173,17 @@ def _get_fs_type(loc, path, _was_warned=[]):
     res = {'path': path}
     try:
         from psutil import disk_partitions
-        parts = {Path(p.mountpoint): p  for p in disk_partitions()}
-        match = None
-        for mp in parts:
-            # if the mountpoint is the test path or its parent
-            # take it, whenever there is no match, or a longer match
-            if (mp == path or mp in path.parents) and (
-                    match is None or len(mp.parents) > len(match.parents)):
-                match = mp
-        match = parts[match]
+
+        # Consider physical devices first.  Inside a chroot (e.g. a package
+        # build environment) the root might not be such a device, or not a
+        # mountpoint at all, so fall back to all mounts before giving up.
+        for all_parts in (False, True):
+            match = _get_mountpoint(path, disk_partitions(all=all_parts))
+            if match is not None:
+                break
+        else:
+            lgr.debug("Could not find a mountpoint for %s", path)
+            return res
         for sattr, tattr in (('fstype', 'type'),
                              ('maxpath', 'max_pathlength'),
                              ('opts', 'mount_opts')):
@@ -180,6 +199,21 @@ def _get_fs_type(loc, path, _was_warned=[]):
             # Rely on side-effect of [] as default arg
             _was_warned.append("warned")
     return res
+
+
+def _get_mountpoint(path, partitions):
+    """Return the partition with the longest mountpoint containing `path`
+
+    Among identical mountpoints, the last one listed (the one in effect) wins.
+    """
+    match = None
+    for p in partitions:
+        mp = Path(p.mountpoint)
+        if (mp == path or mp in path.parents) and (
+                match is None or
+                len(mp.parents) >= len(Path(match.mountpoint).parents)):
+            match = p
+    return match
 
 
 def _describe_environment():

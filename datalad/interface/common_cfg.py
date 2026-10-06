@@ -28,6 +28,7 @@ from datalad.support.constraints import (
     EnsureInt,
     EnsureListOf,
     EnsureNone,
+    EnsureRange,
     EnsureStr,
 )
 from datalad.utils import on_windows
@@ -526,6 +527,15 @@ _definitions = {
                         'is explicitly configured'}),
         'type': EnsureInt(),
         'default': 3,
+    },
+    'datalad.downloaders.retry': {
+        'ui': ('question',
+               {'title': 'Number of retries of a failed download',
+                'text': 'How often to retry a download which was '
+                        'interrupted, could not connect, or got an HTTP 429 '
+                        'or 5xx response. A retry starts from the beginning'}),
+        'type': EnsureInt() & EnsureRange(min=0),
+        'default': 5,
     },
     'datalad.repo.backend': {
         'ui': ('question', {

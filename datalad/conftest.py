@@ -87,12 +87,19 @@ def setup_package():
         m.enter_context(patch.object(consts, "DATASETS_TOPURL", 'https://datasets-tests.datalad.org/'))
         m.enter_context(patch.dict(os.environ, {'DATALAD_DATASETS_TOPURL': consts.DATASETS_TOPURL}))
 
+        # maintenance.auto=false: fetch/commit/merge spawn
+        # `git maintenance run --auto`, which git >= 2.47 detaches by
+        # default.  It then races with whatever the test does next in
+        # the repository (e.g. `chmod -R` tripping over a vanishing
+        # .git/objects/maintenance.lock on NFS), and could fire in the
+        # middle of any test.
         m.enter_context(
             patch.dict(
                 os.environ,
                 {
                     "GIT_CONFIG_PARAMETERS":
-                    "'init.defaultBranch={}' 'clone.defaultRemoteName={}'"
+                    "'init.defaultBranch={}' 'clone.defaultRemoteName={}' "
+                    "'maintenance.auto=false'"
                     .format(DEFAULT_BRANCH, DEFAULT_REMOTE)
                 }
             )

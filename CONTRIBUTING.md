@@ -547,7 +547,8 @@ For the full list of configuration variables, see `datalad/config.py` or run
 
 ## Workflow
 
-- upon release of `MAJOR.MINOR.0`, `maint` branch needs to be fast-forwarded to that release
+- `MAJOR.MINOR.0` is released from `master` after merging `maint` into it;
+  the release workflow then fast-forwards `maint` to that release
 - bug fixes to functionality released within the `maint` branch should be
   submitted against `maint` branch
 - cherry-picking fixes from `master` into `maint` is allowed where needed
@@ -565,13 +566,14 @@ For the full list of configuration variables, see `datalad/config.py` or run
 ## Releasing with GitHub Actions, auto, and pull requests
 
 New releases of DataLad are created via a GitHub Actions workflow using [datalad/release-action](https://github.com/datalad/release-action), which was inspired by [`auto`](https://github.com/intuit/auto).
-Whenever a pull request is merged into `maint` that has the "`release`" label, that workflow updates the
+Whenever a pull request that has the "`release`" label is merged into `maint` (or, for a `MAJOR.MINOR.0` release, into `master`), that workflow updates the
 changelog based on the pull requests since the last release, commits the
 results, tags the new commit with the next version number, and creates a GitHub
 release for the tag.
 This in turn triggers a job for building an sdist & wheel for the project and uploading them to PyPI.
-The release workflow alternatively could be triggered by visiting [release workflow page](https://github.com/datalad/datalad/actions/workflows/release.yml) and pressing "Run workflow" and choosing corresponding (`maint`) branch to release.
+The release workflow alternatively could be triggered by visiting [release workflow page](https://github.com/datalad/datalad/actions/workflows/release.yml) and pressing "Run workflow" and choosing corresponding (`maint` or `master`) branch to release.
 Note that release workflow would fail if there were no commits since the most recent tagged release.
+A release from `master` fails unless `maint` is merged into `master`, and on success it fast-forwards `maint` to the new release.
 
 ### CHANGELOG entries and labelling pull requests
 
@@ -589,6 +591,13 @@ The section that workflow adds to the changelog depends on the `semver-` label a
 - `semver-tests` — for changes to tests
 - `semver-dependencies` — for updates to dependency versions
 - `semver-performance` — for performance improvements
+
+The version bump of a release is the highest one among the `semver-` labels
+of the PRs whose fragments are named `changelog.d/pr-NUMBER.md`.  Fragments
+named otherwise, e.g. as `scriv create` names them, still make it into the
+changelog but do not count for the bump; rename such a fragment to
+`pr-NUMBER.md` (for a single fragment, adding the `CHANGELOG-missing` label
+does that).
 
 #### Writing the entry
 

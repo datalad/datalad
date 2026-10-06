@@ -42,11 +42,14 @@ from _pytest.outcomes import (
 )
 
 from datalad import cfg as dl_cfg
+from datalad.distribution.dataset import Dataset
 from datalad.support import path as op
+from datalad.support.external_versions import external_versions
 from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils_pytest import (
     OBSCURE_FILENAMES,
     OBSCURE_PREFIX,
+    annex_has_magicmime,
     assert_cwd_unchanged,
     assert_dict_equal,
     assert_false,
@@ -56,13 +59,19 @@ from datalad.tests.utils_pytest import (
     assert_re_in,
     assert_str_equal,
     assert_true,
+    corresponding_hexsha,
     eq_,
     fs_supports_filename,
+    get_annex_build_flags,
     get_most_obscure_supported_name,
     ignore_nose_capturing_stdout,
     known_failure_githubci_win,
     known_failure_windows,
     local_testrepo_flavors,
+    maybe_adjust_repo,
+    maybe_unadjust_repo,
+    neq_,
+    nok_,
     nok_startswith,
     ok_,
     ok_broken_symlink,
@@ -82,6 +91,7 @@ from datalad.tests.utils_pytest import (
     serve_path_via_http,
     signal_timeout,
     skip_if,
+    skip_if_adjusted_branch,
     skip_if_no_module,
     skip_if_no_network,
     skip_if_on_windows,
@@ -771,3 +781,117 @@ def test_signal_timeout_noop_without_sigalrm(monkeypatch):
     # but with SIGALRM removed it must be a pure no-op.
     with signal_timeout(0.001):
         time.sleep(0.05)
+
+
+def _fresh_build_flags():
+    """get_annex_build_flags() bypassing its lru_cache"""
+    get_annex_build_flags.cache_clear()
+    try:
+        return get_annex_build_flags()
+    finally:
+        get_annex_build_flags.cache_clear()
+
+
+@skip_if(not external_versions['cmd:annex'])
+def test_get_annex_build_flags():
+    """Flags come back as a set, and agree with what git-annex reports"""
+    flags = _fresh_build_flags()
+    assert isinstance(flags, frozenset)
+    # every real build has some; and they are bare words, not a single blob
+    ok_(flags)
+    for flag in flags:
+        eq_(flag, flag.strip())
+        nok_(' ' in flag)
+    # a couple every build we support has had for years, as a sanity check
+    # that this is the "build flags" line and not some other one
+    assert_in('Testsuite', flags)
+    # and it agrees with the source wtf reads it from
+    from datalad.local.wtf import _describe_annex
+    eq_(flags, frozenset(_describe_annex()['build flags']))
+
+
+@skip_if(not external_versions['cmd:annex'])
+def test_annex_has_magicmime():
+    """The predicate just asks whether MagicMime is among the flags"""
+    eq_(annex_has_magicmime(),
+                 'MagicMime' in _fresh_build_flags())
+
+
+def test_get_annex_build_flags_without_annex(monkeypatch):
+    """Degrades to "no capabilities" rather than raising
+
+    _describe_annex() reports a version of 'not available' and no flags when
+    git-annex cannot be run; callers must then see an empty set rather than
+    a KeyError, so that a capability check simply comes out False.
+    """
+    monkeypatch.setattr('datalad.local.wtf._describe_annex',
+                        lambda: dict(version='not available', message='nope'))
+    eq_(_fresh_build_flags(), frozenset())
+    get_annex_build_flags.cache_clear()
+    try:
+        nok_(annex_has_magicmime())
+    finally:
+        get_annex_build_flags.cache_clear()
+
+
+#
+# Test the adjusted-branch helpers
+#
+
+@with_tempfile(mkdir=True)
+def test_corresponding_hexsha(path=None):
+    ds = Dataset(path).create()
+    maybe_adjust_repo(ds.repo)
+    corr = ds.repo.get_corresponding_branch()
+    old = ds.repo.get_hexsha(corr)
+
+    (ds.pathobj / "new.txt").write_text("NEW")
+    ds.save()
+    new = ds.repo.get_hexsha(corr)
+
+    neq_(old, new)
+    neq_(ds.repo.get_hexsha("HEAD"), new)
+
+    # valid non-HEAD refs that contain "HEAD" in the string
+    ds.repo.call_git(["branch", "myHEAD", new])
+    ds.repo.call_git(["update-ref", "ORIG_HEAD", new])
+
+    eq_(corresponding_hexsha(ds.repo), new)
+    eq_(corresponding_hexsha(ds.repo, corr), new)
+    eq_(corresponding_hexsha(ds.repo, old), old)
+    eq_(corresponding_hexsha(ds.repo, "HEAD~"), old)
+    eq_(corresponding_hexsha(ds.repo, "HEAD^"), old)
+    eq_(corresponding_hexsha(ds.repo, "HEAD@{0}"), new)
+    eq_(corresponding_hexsha(ds.repo, "myHEAD"), new)
+    eq_(corresponding_hexsha(ds.repo, "ORIG_HEAD"), new)
+
+    for bogus in ("bogus", "bogusHEAD", "HEAD~99"):
+        assert_raises(ValueError, corresponding_hexsha, ds.repo, bogus)
+
+
+@skip_if_adjusted_branch
+@with_tempfile(mkdir=True)
+def test_maybe_unadjust_repo_noop(path=None):
+    repo = Dataset(path).create().repo
+    branch, hexsha = repo.get_active_branch(), repo.get_hexsha("HEAD")
+    maybe_unadjust_repo(repo)
+    eq_(repo.get_active_branch(), branch)
+    eq_(repo.get_hexsha("HEAD"), hexsha)
+
+
+@with_tempfile(mkdir=True)
+def test_maybe_unadjust_repo(path=None):
+    ds = Dataset(path).create()
+    maybe_adjust_repo(ds.repo)
+    corr = ds.repo.get_corresponding_branch()
+    corr_hexsha = ds.repo.get_hexsha(corr)
+
+    maybe_unadjust_repo(ds.repo)
+    assert_false(ds.repo.is_managed_branch())
+    eq_(ds.repo.get_active_branch(), corr)
+    eq_(ds.repo.get_hexsha("HEAD"), corr_hexsha)
+
+    # idempotent: a second call is the no-op case
+    maybe_unadjust_repo(ds.repo)
+    eq_(ds.repo.get_active_branch(), corr)
+    eq_(ds.repo.get_hexsha("HEAD"), corr_hexsha)
