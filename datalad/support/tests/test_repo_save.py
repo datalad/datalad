@@ -186,9 +186,11 @@ def test_save_annex_add_batch(path=None):
     with patch.object(ds.repo, '_call_annex_records',
                       wraps=ds.repo._call_annex_records) as call_annex_records:
         res = list(ds.repo._save_add({
-            p: {'state': 'untracked', 'type': 'file'}
-            for p in ('another', 'dir', op.join('nested', 'innested'),
-                      'vanished')}))
+            p: {'state': 'untracked', 'type': t}
+            for p, t in (('another', 'file'),
+                         ('dir', 'directory'),
+                         (op.join('nested', 'innested'), 'file'),
+                         ('vanished', 'file'))}))
     batch_call, cmdline_call = call_annex_records.call_args_list
     eq_(batch_call.kwargs['stdin'], b'another\0vanished\0')
     eq_(cmdline_call.kwargs['files'], ['dir', op.join('nested', 'innested')])

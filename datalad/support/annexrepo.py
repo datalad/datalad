@@ -3604,8 +3604,10 @@ class AnnexRepo(GitRepo, RepoInterface):
         batch_files = []
         cmdline_files = []
         for f, props in files.items():
+            # status() determined the type without following symlinks;
+            # either mode adds a symlink to a directory as a symlink
             if props.get('state') == 'untracked' \
-                    and not isdir(opj(self.path, f)) \
+                    and props.get('type') != 'directory' \
                     and not _in_nested_repo(dirname(f)):
                 batch_files.append(f)
             else:
