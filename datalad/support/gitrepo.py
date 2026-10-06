@@ -125,7 +125,10 @@ from .network import (
     PathRI,
     is_ssh,
 )
-from .openfiles import get_files_open_for_writing
+from .openfiles import (
+    can_detect_open_files,
+    get_files_open_for_writing,
+)
 from .path import (
     get_filtered_paths_,
     get_parent_paths,
@@ -3754,7 +3757,7 @@ class GitRepo(CoreGitRepo):
             and *problems* – a list of open paths (removed from the list)
             or ``None``.
         """
-        if config == 'none':
+        if config == 'none' or not can_detect_open_files():
             return files, None
 
         abs_paths = [str(self.pathobj / ut.PurePosixPath(p)) for p in files]
