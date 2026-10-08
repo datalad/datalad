@@ -327,14 +327,17 @@ def test_extract_exclude_autometa_regexp():
         assert_dict_equal(d["meta_args"], expect)
 
 
-@pytest.mark.parametrize("input_type", ["csv", "tsv"])
+@pytest.mark.parametrize("input_type", ["csv", "tsv", "jsonl"])
 def test_extract_csv_json_equal(input_type):
-    delim = "\t" if input_type == "tsv" else ","
-
-    keys = ST_DATA["header"]
-    csv_rows = [delim.join(keys)]
-    csv_rows.extend(delim.join(str(row[k]) for k in keys)
-                    for row in ST_DATA["rows"])
+    if input_type == "jsonl":
+        # blank lines are to be ignored
+        lines = [json.dumps(row) for row in ST_DATA["rows"]] + [""]
+    else:
+        delim = "\t" if input_type == "tsv" else ","
+        keys = ST_DATA["header"]
+        lines = [delim.join(keys)]
+        lines.extend(delim.join(str(row[k]) for k in keys)
+                     for row in ST_DATA["rows"])
 
     kwds = dict(filename_format="{age_group}//{now_dead}//{name}.csv",
                 url_format="{name}_{debut_season}.com",
@@ -342,10 +345,10 @@ def test_extract_csv_json_equal(input_type):
 
     json_output = au.extract(
         *au._read(json_stream(ST_DATA["rows"]), "json"), **kwds)
-    csv_output = au.extract(
-        *au._read(csv_rows, input_type), **kwds)
+    other_output = au.extract(
+        *au._read(lines, input_type), **kwds)
 
-    eq_(json_output, csv_output)
+    eq_(json_output, other_output)
 
 
 def test_extract_wrong_input_type():
@@ -818,22 +821,27 @@ class TestAddurls(object):
         ok_exists(os.path.join(
             ds.path, "foo", "adir", "foo-again", "other-ds", "bdir", "a"))
 
-    @with_tree({"in": ""})
+    @with_tree({"in": "",
+                "in.jsonl": '{"url": "a", "name": "b"}\n[\n'})
     def test_addurls_invalid_input(self=None, path=None):
         ds = Dataset(path).create(force=True)
-        in_file = op.join(path, "in")
         for in_type in au.INPUT_TYPES:
+            # empty JSON Lines input is valid, it just has no rows
+            in_file = op.join(path, "in.jsonl" if in_type == "jsonl" else "in")
             with assert_raises(IncompleteResultsError) as exc:
                 ds.addurls(in_file, "{url}", "{name}", input_type=in_type,
                            result_renderer='disabled')
             assert_in("Failed to read", str(exc.value))
+            if in_type == "jsonl":
+                assert_in("line 2", str(exc.value))
 
     @with_tree({"in.csv": "url,name,subdir",
                 "in.tsv": "url\tname\tsubdir",
-                "in.json": "[]"})
+                "in.json": "[]",
+                "in.jsonl": ""})
     def test_addurls_no_rows(self=None, path=None):
         ds = Dataset(path).create(force=True)
-        for fname in ["in.csv", "in.tsv", "in.json"]:
+        for fname in ["in.csv", "in.tsv", "in.json", "in.jsonl"]:
             with swallow_logs(new_level=logging.WARNING) as cml:
                 assert_in_results(
                     ds.addurls(fname, "{url}", "{name}", result_renderer='disabled'),
@@ -856,6 +864,9 @@ class TestAddurls(object):
 
         self.check_addurls_stdin_input(json_text, "ext")
         self.check_addurls_stdin_input(json_text, "json")
+        self.check_addurls_stdin_input(
+            "\n".join(json.dumps(rec) for rec in json.loads(json_text)),
+            "jsonl")
 
         def make_delim_text(delim):
             row = "{name}" + delim + "{url}"

@@ -7,7 +7,10 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test saveds function"""
 
+import os
+import os.path as op
 import shutil
+from unittest.mock import patch
 
 from datalad.api import create
 from datalad.distribution.dataset import Dataset
@@ -142,6 +145,62 @@ def test_save_typechange(path=None):
     foo.write_text('some')
     ds.save(**ckwa)
     assert_repo_status(ds.repo)
+
+
+@with_tempfile
+def test_save_annex_add_batch(path=None):
+    ckwa = dict(result_renderer='disabled')
+    ds = Dataset(path).create(**ckwa)
+    create_tree(ds.path, {'tracked': 'tracked'})
+    ds.save(to_git=True, **ckwa)
+    untracked = ['file1', ' leading space', op.join('sub', 'file2')]
+    create_tree(ds.path, {
+        'file1': 'file1',
+        ' leading space': 'leading space',
+        'sub': {'file2': 'file2'},
+        'tracked': 'modified',
+    })
+    with patch.object(ds.repo, '_call_annex_records',
+                      wraps=ds.repo._call_annex_records) as call_annex_records:
+        res = ds.save(**ckwa)
+    assert_repo_status(ds.repo)
+    for name in untracked + ['tracked']:
+        assert_in_results(
+            res, action='add', status='ok', path=str(ds.pathobj / name))
+    # all untracked files are fed to a single `git annex add --batch`,
+    # a modified tracked file is given on the command line
+    batch_call, cmdline_call = [
+        c for c in call_annex_records.call_args_list if c.args[0][0] == 'add']
+    assert_in('--batch', batch_call.args[0])
+    eq_(sorted(batch_call.kwargs['stdin'].split(b'\0')[:-1]),
+        sorted(os.fsencode(n) for n in untracked))
+    assert_not_in('--batch', cmdline_call.args[0])
+    eq_(cmdline_call.kwargs['files'], ['tracked'])
+
+    # a directory and a file in a nested repository go on the command line,
+    # see https://github.com/con/git-annex/issues/299
+    create_tree(ds.path, {'another': 'another', 'dir': {'file3': 'file3'}})
+    nested = GitRepo(ds.pathobj / 'nested', create=True)
+    create_tree(nested.path, {'innested': 'innested'})
+    with patch.object(ds.repo, '_call_annex_records',
+                      wraps=ds.repo._call_annex_records) as call_annex_records:
+        res = list(ds.repo._save_add({
+            p: {'state': 'untracked', 'type': t}
+            for p, t in (('another', 'file'),
+                         ('dir', 'directory'),
+                         (op.join('nested', 'innested'), 'file'),
+                         ('vanished', 'file'))}))
+    batch_call, cmdline_call = call_annex_records.call_args_list
+    eq_(batch_call.kwargs['stdin'], b'another\0vanished\0')
+    eq_(cmdline_call.kwargs['files'], ['dir', op.join('nested', 'innested')])
+    assert_in_results(
+        res, action='add', status='ok', path=ds.pathobj / 'another')
+    assert_in_results(
+        res, action='add', status='ok', path=ds.pathobj / 'dir' / 'file3')
+    # as in non-batch mode, a file vanished since status() is an error
+    assert_in_results(
+        res, action='add', status='error', path=ds.pathobj / 'vanished')
+    eq_(len(res), 3)
 
 
 @with_tempfile

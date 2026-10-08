@@ -34,6 +34,7 @@ from datalad.support.external_versions import external_versions
 from datalad.support.gitrepo import (
     GitRepo,
     _normalize_path,
+    commit_message_options,
     normalize_paths,
     to_options,
 )
@@ -343,6 +344,36 @@ def test_GitRepo_commit(path=None):
     assert_raises(FileNotInRepositoryError, gr.commit, files="untracked")
     # not existing file as well:
     assert_raises(FileNotInRepositoryError, gr.commit, files="not-existing")
+
+
+def test_commit_message_options():
+    with commit_message_options(None) as opts:
+        eq_(opts, [])
+    with commit_message_options("") as opts:
+        eq_(opts, ['-m', ""])
+    # a short single-line message stays visible in logged commands
+    with commit_message_options("Short message") as opts:
+        eq_(opts, ['-m', "Short message"])
+    for msg in ("x" * 81, "Subject\n\nbody"):
+        with commit_message_options(msg) as opts:
+            eq_(opts[0], '-F')
+            eq_(Path(opts[1]).read_bytes(), msg.encode())
+        assert_false(Path(opts[1]).exists())
+
+
+@with_tempfile
+def test_GitRepo_commit_long_message(path=None):
+    gr = GitRepo(path)
+    create_tree(path, {'file': 'content'})
+    gr.add('file')
+    # longer than a single command line argument may be on Linux (128KiB),
+    # as e.g. a `run` record listing many expanded inputs.  Non-ASCII only
+    # where git output gets decoded as UTF-8, not with the Windows code page.
+    msg = "Long message{}\n\n".format("" if on_windows else " ΔЙ") \
+        + "\n".join("input/file{:06d}".format(i) for i in range(20000))
+    gr.commit(msg, files=['file'])
+    assert_repo_status(gr)
+    eq_(gr.format_commit("%B").strip(), msg)
 
 
 @with_tempfile
