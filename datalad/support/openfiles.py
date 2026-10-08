@@ -20,7 +20,6 @@ import logging
 import os
 import subprocess
 import sys
-from functools import lru_cache
 from pathlib import Path
 from typing import (
     Any,
@@ -39,16 +38,6 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
-
-@lru_cache  # to warn only once
-def can_detect_open_files() -> bool:
-    """Return whether *psutil*, needed for open-file detection, is available"""
-    if psutil is None:
-        lgr.warning(
-            "psutil is not installed; open-file detection will not be "
-            "available. Install it with: pip install datalad[misc]")
-    return psutil is not None
-
 
 def get_files_open_for_writing(
     paths: list[str | Path],
