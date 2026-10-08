@@ -63,50 +63,31 @@ def test_clean(d=None):
                      "somebogus2")
         assert_false(archives_path.exists())
 
+    def check_clean(path, message):
+        with chpwd(d):
+            res = clean(return_type='item-or-list',
+                        result_filter=lambda x: x['status'] == 'ok')
+            assert_equal(res['path'], str(path))
+            assert_equal(res['message'][0] % tuple(res['message'][1:]),
+                         message)
+            assert_false(path.exists())
+
     # and what about git annex temporary files?
     annex_tmp_path.mkdir(parents=True)
     (annex_tmp_path / "somebogus").write_text("load")
-    with chpwd(d):
-        res = clean(return_type='item-or-list',
-                    result_filter=lambda x: x['status'] == 'ok')
-        assert_equal(res['path'], str(annex_tmp_path))
-        assert_equal(res['message'][0] % tuple(res['message'][1:]),
-                     "Removed 1 temporary annex file: somebogus")
-        assert_false(annex_tmp_path.exists())
+    check_clean(annex_tmp_path, "Removed 1 temporary annex file: somebogus")
 
     (annex_trans_path / 'somebogus').mkdir(parents=True, exist_ok=True)
-    with chpwd(d):
-        res = clean(return_type='item-or-list',
-                    result_filter=lambda x: x['status'] == 'ok')
-        assert_equal(res['path'], str(annex_trans_path))
-        assert_equal(res['message'][0] % tuple(res['message'][1:]),
-                     "Removed 1 annex temporary transfer directory: somebogus")
-        assert_false(annex_trans_path.exists())
+    check_clean(annex_trans_path,
+                "Removed 1 annex temporary transfer directory: somebogus")
 
     # remove empty directories, too
     archives_path.mkdir(parents=True)
-    with chpwd(d):
-        res = clean(return_type='item-or-list',
-                    result_filter=lambda x: x['status'] == 'ok')
-        assert_equal(res['path'], str(archives_path))
-        assert_equal(res['message'][0] % tuple(res['message'][1:]),
-                     "Removed empty temporary archive directory")
-        assert_false(archives_path.exists())
+    check_clean(archives_path, "Removed empty temporary archive directory")
 
     annex_tmp_path.mkdir(parents=True)
-    with chpwd(d):
-        res = clean(return_type='item-or-list',
-                    result_filter=lambda x: x['status'] == 'ok')
-        assert_equal(res['path'], str(annex_tmp_path))
-        assert_equal(res['message'][0] % tuple(res['message'][1:]),
-                     "Removed empty temporary annex directory")
-        assert_false(annex_tmp_path.exists())
+    check_clean(annex_tmp_path, "Removed empty temporary annex directory")
 
     annex_trans_path.mkdir(parents=True)
-    with chpwd(d):
-        res = clean(return_type='item-or-list',
-                    result_filter=lambda x: x['status'] == 'ok')
-        assert_equal(res['path'], str(annex_trans_path))
-        assert_equal(res['message'][0] % tuple(res['message'][1:]),
-                     "Removed empty annex temporary transfer directory")
-        assert_false(annex_trans_path.exists())
+    check_clean(annex_trans_path,
+                "Removed empty annex temporary transfer directory")

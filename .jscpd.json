@@ -1,0 +1,25 @@
+{
+  "threshold": 1,
+  "reporters": ["console"],
+  "format": ["python"],
+  "ignore": [
+    "**/node_modules/**",
+    "**/.git/**",
+    "**/.git-meta/**",
+    "**/.tox/**",
+    "**/.venv/**",
+    "**/venv*/**",
+    "**/__pycache__/**",
+    "**/.eggs/**",
+    "**/*.egg-info/**",
+    "**/.npm/**",
+    "**/.tmp/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/__testhome__/**",
+    "**/vcr_cassettes/**",
+    "**/_version.py"
+  ],
+  "minTokens": 50,
+  "minLines": 5
+}

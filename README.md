@@ -8,7 +8,7 @@
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.03262/status.svg)](https://doi.org/10.21105/joss.03262)
 [![Test Status](https://github.com/datalad/datalad/actions/workflows/test.yml/badge.svg)](https://github.com/datalad/datalad/actions/workflows/test.yml)
 [![Extensions](https://github.com/datalad/datalad/actions/workflows/test_extensions.yml/badge.svg)](https://github.com/datalad/datalad/actions/workflows/test_extensions.yml)
-[![Linters](https://github.com/datalad/datalad/actions/workflows/lint.yml/badge.svg)](https://github.com/datalad/datalad/actions/workflows/lint.yml)
+[![Checks](https://github.com/datalad/datalad/actions/workflows/tox.yml/badge.svg)](https://github.com/datalad/datalad/actions/workflows/tox.yml)
 [![codecov.io](https://codecov.io/github/datalad/datalad/coverage.svg?branch=master)](https://codecov.io/github/datalad/datalad?branch=master)
 [![Documentation](https://readthedocs.org/projects/datalad/badge/?version=latest)](http://datalad.rtfd.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)

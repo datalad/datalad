@@ -94,14 +94,17 @@ def _test_setup_ds_in_store(io_cls, io_args, store=None):
     assert_raises(UnknownLayoutVersion,
                   create_ds_in_store, io, store, dsid, 'abc', '1')
 
+    def check_ds_layout(expected_version):
+        for p in [ds_path, archives, objects]:
+            assert_true(p.is_dir(), msg="Not a directory: %s" % str(p))
+        for p in [version_file]:
+            assert_true(p.is_file(), msg="Not a file: %s" % str(p))
+        assert_equal(version_file.read_text(), expected_version + "\n")
+
     # version 1
     create_store(io, store, '1')
     create_ds_in_store(io, store, dsid, '1', '1')
-    for p in [ds_path, archives, objects]:
-        assert_true(p.is_dir(), msg="Not a directory: %s" % str(p))
-    for p in [version_file]:
-        assert_true(p.is_file(), msg="Not a file: %s" % str(p))
-    assert_equal(version_file.read_text(), "1\n")
+    check_ds_layout('1')
 
     # conflicting version exists at target:
     assert_raises(ValueError, create_ds_in_store, io, store, dsid, '2', '1')
@@ -113,11 +116,7 @@ def _test_setup_ds_in_store(io_cls, io_args, store=None):
     rmtree(str(store))
     create_store(io, store, '1')
     create_ds_in_store(io, store, dsid, '2', '1')
-    for p in [ds_path, archives, objects]:
-        assert_true(p.is_dir(), msg="Not a directory: %s" % str(p))
-    for p in [version_file]:
-        assert_true(p.is_file(), msg="Not a file: %s" % str(p))
-    assert_equal(version_file.read_text(), "2\n")
+    check_ds_layout('2')
 
 
 def test_setup_ds_in_store():
