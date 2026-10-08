@@ -26,6 +26,7 @@ from collections.abc import (
     Mapping,
     Sequence,
 )
+from contextlib import contextmanager
 from functools import wraps
 from itertools import chain
 from os import (
@@ -103,6 +104,7 @@ from datalad.utils import (
     generate_file_chunks,
     getpwd,
     is_interactive,
+    make_tempfile,
     on_windows,
     optional_args,
     path_is_subpath,
@@ -125,7 +127,10 @@ from .network import (
     PathRI,
     is_ssh,
 )
-from .openfiles import get_files_open_for_writing
+from .openfiles import (
+    can_detect_open_files,
+    get_files_open_for_writing,
+)
 from .path import (
     get_filtered_paths_,
     get_parent_paths,
@@ -392,6 +397,28 @@ def normalize_paths(func, match_return_type=True, map_filenames_back=False,
 
 def _prune_deeper_repos(repos: list[Path]) -> list[Path]:
     return repos
+
+
+@contextmanager
+def commit_message_options(msg: Optional[str]) -> Iterator[list[str]]:
+    """Provide options to pass commit message `msg` to git
+
+    A short single-line message is given as `-m <msg>`, which keeps it visible
+    in logged commands.  Any other is given as `-F <file>` with a temporary
+    file, because a single command line argument is limited in length (128KiB
+    on Linux), which a commit message listing many files, e.g. a `run` record,
+    can exceed.  For no message (None), there are no options.
+    """
+    if msg is None:
+        yield []
+        return
+    if '\n' not in msg and len(msg) <= 80:
+        yield ['-m', msg]
+        return
+    with make_tempfile() as path:
+        # encoded the way subprocess encodes command line arguments
+        Path(path).write_bytes(os.fsencode(msg))
+        yield ['-F', path]
 
 
 class GitProgress(WitlessProtocol):
@@ -1467,8 +1494,6 @@ class GitRepo(CoreGitRepo):
         if _datalad_msg:
             msg = self._get_prefixed_commit_msg(msg)
 
-        if msg:
-            options += ["-m", msg]
         cmd.extend(options)
 
         # set up env for commit
@@ -1485,16 +1510,18 @@ class GitRepo(CoreGitRepo):
         # here, but with pathspec_from_file it is no longer needed.
         # store pre-commit state to be able to check if anything was committed
         try:
-            # Note: call_git operates via joining call_git_items_ and that one wipes out
-            # .stdout from exception and collects/repopulates stderr only. Let's use
-            # _call_git which returns both outputs and collects/re-populates both stdout
-            # **and** stderr
-            _ = self._call_git(
-                    cmd,
-                    files=files,
-                    env=env,
-                    pathspec_from_file=True,
-            )
+            # no message option when amending without a new message
+            with commit_message_options(msg or None) as msg_opts:
+                # Note: call_git operates via joining call_git_items_ and that one wipes out
+                # .stdout from exception and collects/repopulates stderr only. Let's use
+                # _call_git which returns both outputs and collects/re-populates both stdout
+                # **and** stderr
+                _ = self._call_git(
+                        cmd + msg_opts,
+                        files=files,
+                        env=env,
+                        pathspec_from_file=True,
+                )
         except CommandError as e:
             # real errors first
             if "did not match any file(s) known to git" in e.stderr:
@@ -3769,7 +3796,7 @@ class GitRepo(CoreGitRepo):
             and *problems* – a list of open paths (removed from the list)
             or ``None``.
         """
-        if config == 'none':
+        if config == 'none' or not can_detect_open_files():
             return files, None
 
         abs_paths = [str(self.pathobj / ut.PurePosixPath(p)) for p in files]

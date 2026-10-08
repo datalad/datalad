@@ -923,8 +923,9 @@ def test_server_error_retry(toppath=None, topurl=None):
 
     elapsed = time.time() - start_time
     # Ensure test runs fast (sleep is mocked) - fail if implementation changes
-    # and starts sleeping for real
-    assert elapsed < 1.0, f"Test took {elapsed:.1f}s, expected < 1s (is sleep mocked?)"
+    # and starts sleeping for real (~10s of backoff per scenario), with slack
+    # for slow CI runners
+    assert elapsed < 5.0, f"Test took {elapsed:.1f}s, expected < 5s (is sleep mocked?)"
 
 
 @pytest.mark.ai_generated

@@ -278,7 +278,8 @@ def test_incorrect_option(opts, err_str):
     ]
 )
 def test_script_shims(script):
-    runner = Runner()
+    # tests silence logging in subprocesses, but we want to see any warning
+    runner = Runner(env=dict(os.environ, DATALAD_LOG_LEVEL='WARNING'))
     if not on_windows:
 
         from shutil import which
@@ -286,6 +287,9 @@ def test_script_shims(script):
 
     # and let's check that it is our script
     out = runner.run([script, '--version'], protocol=StdOutErrCapture)
+    # and that it has nothing to warn about, e.g. missing optional psutil
+    # https://github.com/datalad/datalad/issues/7954
+    eq_(out['stderr'], '')
     version = out['stdout'].rstrip()
     mod, version = version.split(' ', 1)
     assert_equal(mod, 'datalad')

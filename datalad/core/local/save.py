@@ -44,7 +44,10 @@ from datalad.support.constraints import (
     EnsureStr,
 )
 from datalad.support.exceptions import CommandError
-from datalad.support.gitrepo import to_options
+from datalad.support.gitrepo import (
+    commit_message_options,
+    to_options,
+)
 from datalad.support.parallel import (
     ProducerConsumerProgressLog,
     no_subds_in_futures,
@@ -215,10 +218,10 @@ def _create_merge_commit(repo, pre_hexsha, msg):
                     "branches or reset to an unrelated state.")
         tree = repo.call_git_oneline(
             ["rev-parse", orig_post + "^{tree}"])
-        merge_hexsha = repo.call_git_oneline(
-            ["commit-tree", tree,
-             "-p", orig_pre, "-p", orig_post,
-             "-m", msg])
+        with commit_message_options(msg) as msg_opts:
+            merge_hexsha = repo.call_git_oneline(
+                ["commit-tree", tree,
+                 "-p", orig_pre, "-p", orig_post] + msg_opts)
         repo.update_ref("refs/heads/" + orig_branch, merge_hexsha)
         repo.call_git(["annex", "merge"])
     else:
@@ -237,11 +240,11 @@ def _create_merge_commit(repo, pre_hexsha, msg):
                     "switched branches or reset to an unrelated state.")
         tree = repo.call_git_oneline(
             ["rev-parse", current_head + "^{tree}"])
-        merge_hexsha = repo.call_git_oneline(
-            ["commit-tree", tree,
-             "-p", pre_hexsha,
-             "-p", current_head,
-             "-m", msg])
+        with commit_message_options(msg) as msg_opts:
+            merge_hexsha = repo.call_git_oneline(
+                ["commit-tree", tree,
+                 "-p", pre_hexsha,
+                 "-p", current_head] + msg_opts)
         branch = repo.get_active_branch()
         if branch:
             repo.update_ref(
