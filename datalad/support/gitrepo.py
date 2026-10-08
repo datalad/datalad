@@ -127,10 +127,7 @@ from .network import (
     PathRI,
     is_ssh,
 )
-from .openfiles import (
-    can_detect_open_files,
-    get_files_open_for_writing,
-)
+from .openfiles import get_files_open_for_writing
 from .path import (
     get_filtered_paths_,
     get_parent_paths,
@@ -3484,6 +3481,17 @@ class GitRepo(CoreGitRepo):
         """Like `save()` but working as a generator."""
         from datalad.interface.results import get_status_dict
 
+        openfiles_config = self.config.obtain("datalad.save.skip-openfiles")
+        if openfiles_config != 'none':
+            # fail before touching anything, rather than save files which
+            # might be open for writing and thus incomplete
+            external_versions.check(
+                'psutil',
+                msg=f"It is needed for datalad.save.skip-openfiles="
+                    f"{openfiles_config}. Install it with: "
+                    "pip install datalad[misc], or set "
+                    "datalad.save.skip-openfiles=none.")
+
         status_state = _get_save_status_state(
             self._save_pre(paths, _status, **kwargs) or {}
         )
@@ -3630,8 +3638,6 @@ class GitRepo(CoreGitRepo):
             compat_config = \
                 self.config.obtain("datalad.save.windows-compat-warning")
             to_add, problems = self._check_for_win_compat(to_add, compat_config)
-            openfiles_config = \
-                self.config.obtain("datalad.save.skip-openfiles")
             to_add, openfile_problems = \
                 self._check_for_openfiles(to_add, openfiles_config)
             lgr.debug(
@@ -3781,7 +3787,7 @@ class GitRepo(CoreGitRepo):
             and *problems* – a list of open paths (removed from the list)
             or ``None``.
         """
-        if config == 'none' or not can_detect_open_files():
+        if config == 'none':
             return files, None
 
         abs_paths = [str(self.pathobj / ut.PurePosixPath(p)) for p in files]

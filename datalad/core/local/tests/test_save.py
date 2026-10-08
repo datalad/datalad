@@ -28,7 +28,10 @@ from datalad.core.local.tests.test_run import (
 )
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import CommandError
+from datalad.support.exceptions import (
+    CommandError,
+    MissingExternalDependency,
+)
 from datalad.support.external_versions import external_versions
 from datalad.tests.utils_pytest import (
     DEFAULT_BRANCH,
@@ -52,6 +55,7 @@ from datalad.tests.utils_pytest import (
     on_windows,
     patch,
     skip_if_adjusted_branch,
+    skip_if_no_module,
     skip_if_no_psutil,
     skip_wo_symlink_capability,
     swallow_logs,
@@ -1378,7 +1382,6 @@ def _mock_open_for_writing(open_file_abspath):
     return _fake
 
 
-@skip_if_no_psutil
 @pytest.mark.ai_generated
 @with_tempfile
 def test_save_skip_openfiles(path=None):
@@ -1396,6 +1399,18 @@ def test_save_skip_openfiles(path=None):
     f_open.write_text('content1')
     f_closed.write_text('content2')
     ds.repo.config.set('datalad.save.skip-openfiles', 'error')
+    # without psutil open files cannot be detected: save must fail
+    # without saving anything (also the config modification)
+    hexsha = ds.repo.get_hexsha()
+    with patch.dict(external_versions._versions, {'psutil': None}):
+        with assert_raises(MissingExternalDependency) as cme:
+            ds.save(on_failure='ignore')
+    assert_in('datalad.save.skip-openfiles', str(cme.value))
+    eq_(ds.repo.get_hexsha(), hexsha)
+    assert_repo_status(ds.path, modified=['.datalad/config'],
+                       untracked=[f_open, f_closed])
+    # remaining checks need psutil
+    skip_if_no_module('psutil')
     ds.save('.datalad/config')
     with patch(
         'datalad.support.gitrepo.get_files_open_for_writing',
