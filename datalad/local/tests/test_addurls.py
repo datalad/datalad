@@ -653,6 +653,21 @@ class TestAddurls(object):
         for fname in ["foo-0", "bar-0", "foo-1"]:
             ok_exists(op.join(ds.path, fname))
 
+    @staticmethod
+    def _assert_collision_errors(ds, data):
+        with patch("sys.stdin", new=StringIO(json.dumps(data))):
+            assert_in_results(
+                ds.addurls("-", "{url}", "{name}", on_failure="ignore"),
+                action="addurls",
+                status="error")
+        with patch("sys.stdin", new=StringIO(json.dumps(data))):
+            assert_in_results(
+                ds.addurls("-", "{url}", "{name}",
+                           on_collision="error-if-different",
+                           on_failure="ignore"),
+                action="addurls",
+                status="error")
+
     @with_tempfile(mkdir=True)
     def test_addurls_url_on_collision_error_if_different(self=None, path=None):
         ds = Dataset(path).create(force=True)
@@ -661,19 +676,7 @@ class TestAddurls(object):
         data[0]["some_metadata"] = "1"
         data[1]["some_metadata"] = "2"
 
-        with patch("sys.stdin", new=StringIO(json.dumps(data))):
-            assert_in_results(
-                ds.addurls("-", "{url}", "{name}", on_failure="ignore"),
-                action="addurls",
-                status="error")
-
-        with patch("sys.stdin", new=StringIO(json.dumps(data))):
-            assert_in_results(
-                ds.addurls("-", "{url}", "{name}",
-                           on_collision="error-if-different",
-                           on_failure="ignore"),
-                action="addurls",
-                status="error")
+        self._assert_collision_errors(ds, data)
 
         with patch("sys.stdin", new=StringIO(json.dumps(data))):
             ds.addurls("-", "{url}", "{name}",
@@ -688,18 +691,7 @@ class TestAddurls(object):
         for row in data:
             row["name"] = "a"
 
-        with patch("sys.stdin", new=StringIO(json.dumps(data))):
-            assert_in_results(
-                ds.addurls("-", "{url}", "{name}", on_failure="ignore"),
-                action="addurls",
-                status="error")
-        with patch("sys.stdin", new=StringIO(json.dumps(data))):
-            assert_in_results(
-                ds.addurls("-", "{url}", "{name}",
-                           on_collision="error-if-different",
-                           on_failure="ignore"),
-                action="addurls",
-                status="error")
+        self._assert_collision_errors(ds, data)
 
         with patch("sys.stdin", new=StringIO(json.dumps(data))):
             ds.addurls("-", "{url}", "{name}-first",

@@ -308,36 +308,29 @@ def test_cfg_override(path=None):
         # use 'wtf' to dump the config
         # should be rewritten to use `configuration`
         cmd = ['datalad', 'wtf', '-S', 'configuration', '-s', 'some']
-        # control
-        out = Runner().run(cmd, protocol=StdOutErrCapture)['stdout']
-        assert_not_in('datalad.dummy: this', out)
-        # ensure that this is not a dataset's cfg manager
-        assert_not_in('datalad.dataset.id', out)
-        # env var
-        out = Runner(env=dict(os.environ, DATALAD_DUMMY='this')).run(
-            cmd, protocol=StdOutErrCapture)['stdout']
-        assert_in('datalad.dummy: this', out)
-        # cmdline arg
-        out = Runner().run([cmd[0], '-c', 'datalad.dummy=this'] + cmd[1:],
-                           protocol=StdOutErrCapture)['stdout']
-        assert_in('datalad.dummy: this', out)
+
+        def check_overrides(has_dataset_id):
+            # control
+            out = Runner().run(cmd, protocol=StdOutErrCapture)['stdout']
+            assert_not_in('datalad.dummy: this', out)
+            # whether this is a dataset's cfg manager
+            (assert_in if has_dataset_id else assert_not_in)(
+                'datalad.dataset.id', out)
+            # env var
+            out = Runner(env=dict(os.environ, DATALAD_DUMMY='this')).run(
+                cmd, protocol=StdOutErrCapture)['stdout']
+            assert_in('datalad.dummy: this', out)
+            # cmdline arg
+            out = Runner().run([cmd[0], '-c', 'datalad.dummy=this'] + cmd[1:],
+                               protocol=StdOutErrCapture)['stdout']
+            assert_in('datalad.dummy: this', out)
+
+        check_overrides(has_dataset_id=False)
 
         # now create a dataset in the path. the wtf plugin will switch to
         # using the dataset's config manager, which must inherit the overrides
         create(dataset=path, annex=False)
-        # control
-        out = Runner().run(cmd, protocol=StdOutErrCapture)['stdout']
-        assert_not_in('datalad.dummy: this', out)
-        # ensure that this is a dataset's cfg manager
-        assert_in('datalad.dataset.id', out)
-        # env var
-        out = Runner(env=dict(os.environ, DATALAD_DUMMY='this')).run(
-            cmd, protocol=StdOutErrCapture)['stdout']
-        assert_in('datalad.dummy: this', out)
-        # cmdline arg
-        out = Runner().run([cmd[0], '-c', 'datalad.dummy=this'] + cmd[1:],
-                           protocol=StdOutErrCapture)['stdout']
-        assert_in('datalad.dummy: this', out)
+        check_overrides(has_dataset_id=True)
 
         # set a config
         run_main([

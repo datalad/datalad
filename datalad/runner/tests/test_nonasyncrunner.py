@@ -224,9 +224,7 @@ def test_interactive_communication() -> None:
     assert_true(result_pool["process_exited_called"], True)
 
 
-def test_blocking_thread_exit() -> None:
-    read_queue: Queue[tuple[Any, IOState, bytes]] = queue.Queue()
-
+def _start_pipe_read_thread(read_queue, signal_queues=()):
     (read_descriptor, write_descriptor) = os.pipe()
     read_file = os.fdopen(read_descriptor, "rb")
     read_thread = ReadThread(
@@ -234,9 +232,15 @@ def test_blocking_thread_exit() -> None:
         user_info=read_descriptor,
         source=read_file,
         destination_queue=read_queue,
-        signal_queues=[]
+        signal_queues=list(signal_queues)
     )
     read_thread.start()
+    return read_thread, write_descriptor
+
+
+def test_blocking_thread_exit() -> None:
+    read_queue: Queue[tuple[Any, IOState, bytes]] = queue.Queue()
+    read_thread, write_descriptor = _start_pipe_read_thread(read_queue)
 
     os.write(write_descriptor, b"some data")
     assert_true(read_thread.is_alive())
@@ -261,17 +265,8 @@ def test_blocking_thread_exit() -> None:
 
 def test_blocking_read_exception_catching() -> None:
     read_queue: Queue[tuple[Any, IOState, Any]] = queue.Queue()
-
-    (read_descriptor, write_descriptor) = os.pipe()
-    read_file = os.fdopen(read_descriptor, "rb")
-    read_thread = ReadThread(
-        identifier="test thread",
-        user_info=read_descriptor,
-        source=read_file,
-        destination_queue=read_queue,
-        signal_queues=[read_queue]
-    )
-    read_thread.start()
+    read_thread, write_descriptor = _start_pipe_read_thread(
+        read_queue, signal_queues=[read_queue])
 
     os.write(write_descriptor, b"some data")
     assert_true(read_thread.is_alive())

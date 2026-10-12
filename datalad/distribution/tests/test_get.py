@@ -936,22 +936,20 @@ def test_get_data_auto_wanted_anything(path=None, ds_dir=None):
     # no content present:
     ok_(not any(ds.repo.file_has_content(file_list)))
 
+    def check_file1_file2_only(result):
+        eq_(set([basename(item.get('path')) for item in result]),
+            {'file1.txt', 'file2.txt'})
+        ok_(all(ds.repo.file_has_content(['file1.txt', 'file2.txt'])))
+        nok_(any(ds.repo.file_has_content(['file3.txt', 'file4.txt'])))
+
     ds.repo.set_preferred_content('wanted', 'exclude=file[3-4].txt', 'here')
     result = ds.get('.', data='auto')
-
-    eq_(set([basename(item.get('path')) for item in result]),
-        {'file1.txt', 'file2.txt'})
-    ok_(all(ds.repo.file_has_content(['file1.txt', 'file2.txt'])))
-    nok_(any(ds.repo.file_has_content(['file3.txt', 'file4.txt'])))
+    check_file1_file2_only(result)
 
     ds.drop('.')
 
     result = ds.get('.', data='auto-if-wanted')
-
-    eq_(set([basename(item.get('path')) for item in result]),
-        {'file1.txt', 'file2.txt'})
-    ok_(all(ds.repo.file_has_content(['file1.txt', 'file2.txt'])))
-    nok_(any(ds.repo.file_has_content(['file3.txt', 'file4.txt'])))
+    check_file1_file2_only(result)
 
     result = ds.get('.', data='anything')
     eq_(set([basename(item.get('path')) for item in result]),
