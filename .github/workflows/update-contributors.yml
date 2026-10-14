@@ -26,7 +26,8 @@ jobs:
           # Update lookup with GitHub metadata
           update_lookup: github
 
-          # Skip these users: spam/test accounts, and AI coding agents.
+          # Skip these users: AI coding agents, and accounts which have
+          # claimed a placeholder author email used somewhere in our history.
           # con/tributors only auto-skips accounts GitHub reports as
           # type "Bot" or whose login contains "[bot]" (dependabot[bot],
           # github-actions[bot], Copilot, ...).  "claude" (uid 81847) is a
@@ -35,9 +36,21 @@ jobs:
           # a commit to the account owning the *author* email, so an agent
           # only shows up here if it authored (not just co-authored) commits;
           # see CONTRIBUTING.md:Recognizing contributions.
+          #
+          # manbat, bhanuprasad14, yetanothertestuser, bobknob23987 and
+          # helli33 are "email squatters": they register placeholder
+          # addresses (test@example.com, bob@example.com, test@nowhere.com,
+          # committer@example.com) which appear as the author email of a
+          # handful of our commits, so GitHub credits them with those
+          # commits.  Which account owns a given address changes over time,
+          # so this list only grows.
+          #
           # To extend this list, check for non-human logins in
           # https://api.github.com/repos/datalad/datalad/contributors
-          skip_users: manbat bhanuprasad14 yetanothertestuser bobknob23987 claude Copilot yarikoptic-gitmate
+          # and confirm a suspected squat with
+          #   gh api 'repos/datalad/datalad/commits?author=LOGIN' \
+          #     --jq '.[] | "\(.sha[0:12]) \(.commit.author.email)"'
+          skip_users: manbat bhanuprasad14 yetanothertestuser bobknob23987 helli33 claude Copilot yarikoptic-gitmate
 
           # INFO, DEBUG, ERROR, WARNING, etc.
           log_level: DEBUG

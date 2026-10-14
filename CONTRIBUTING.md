@@ -494,14 +494,19 @@ trailers.  Therefore:
   account, which con/tributors then proposes to add to [.tributors](.tributors),
   [.all-contributorsrc](.all-contributorsrc) and the README --
   [PR #7922](https://github.com/datalad/datalad/pull/7922) is such a proposal.
+- Likewise, do commit under **your own** author email.  Sandboxes often
+  default to a placeholder such as `Test User <test@example.com>`, and such
+  addresses get registered by squatter accounts which GitHub then credits
+  with those commits --
+  [PR #7964](https://github.com/datalad/datalad/pull/7964) is such a proposal.
 
 As a backstop, such accounts are listed in `skip_users` of the
 [update-contributors workflow](.github/workflows/update-contributors.yml).
 `skip_users` only prevents *adding* an entry: con/tributors never prunes, and
 entries already present in `.all-contributorsrc` are copied back into
 `.tributors` regardless of `skip_users`.  A `[tributors]` pull request that
-proposes an AI assistant should therefore be **closed**, not merged and
-cleaned up afterwards.
+proposes an AI assistant or a squatter should therefore be **closed**, not
+merged and cleaned up afterwards.
 
 [gh-contributors-api]: https://docs.github.com/en/rest/repos/repos#list-repository-contributors
 
