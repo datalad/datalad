@@ -108,7 +108,7 @@ def pytest_configure(config):
         config.addinivalue_line("filterwarnings", warning)
 
 
-def pytest_ignore_collect(collection_path: Path) -> bool:
+def pytest_ignore_collect(collection_path: Path) -> bool | None:
     """Customize which files pytest collects.
 
     Skip old nose code and handle doctest collection carefully.
@@ -125,7 +125,10 @@ def pytest_ignore_collect(collection_path: Path) -> bool:
     # undesirable side effects when imported.  This hook should ensure that
     # only `test_*.py` files, `utils_pytest.py` files, and `*.py` files
     # containing doctests are imported during test collection.
-    if collection_path.name.startswith("test_") or collection_path.is_dir():
+    # firstresult hook: None defers to pytest's norecursedirs and venv filtering
+    if collection_path.is_dir():
+        return None
+    if collection_path.name.startswith("test_"):
         return False
     if collection_path.name == "utils_pytest.py":
         return False  # Allow utils_pytest.py to be collected
