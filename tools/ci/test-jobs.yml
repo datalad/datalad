@@ -244,6 +244,20 @@
   cron-only: true
   allow-failure: true
   extra-envs:
+    # No SSH tests here, same as in the scoped NFS job above, and for a
+    # reason beyond the gh-4172 stalls cited there: on Linux the SSH target
+    # is a docker container that `tools/ci/prep-travis-forssh.sh` starts
+    # with `-v /tmp:/tmp` during the "Provision OS-specific test
+    # environment" step -- *before* the next step NFS-mounts
+    # /tmp/nfsmount.  A docker bind mount is an rprivate rbind snapshot of
+    # the host mount tree taken at container start, so that later mount
+    # never propagates in; inside the container /tmp/nfsmount is the empty
+    # directory underneath it.  Every SSH-based test therefore fails with
+    # the paths it just created being invisible to the target ("does not
+    # appear to be a git repository", "ria-layout-version not found",
+    # NoSuchPathError).  That accounted for all 21 failures of this job.
+    # Mounting NFS before provisioning would fix it properly; see gh-7624.
+    DATALAD_TESTS_SSH: "0"
     # give much more time to complete on NFS
     _DL_TMPDIR: "/tmp/nfsmount"
     PYTEST_FAIL_SLOW: 1200
