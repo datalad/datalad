@@ -384,12 +384,17 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             STDERR_FILENO: LineSplitter(sep, keep_ends=True)
         }
 
-        for file_no, content in generator:
-            if file_no in (STDOUT_FILENO, STDERR_FILENO):
-                for line in line_splitter[file_no].process(content):
-                    yield file_no, line
-            else:
-                raise ValueError(f"unknown file number: {file_no}")
+        try:
+            for file_no, content in generator:
+                if file_no in (STDOUT_FILENO, STDERR_FILENO):
+                    for line in line_splitter[file_no].process(content):
+                        yield file_no, line
+                else:
+                    raise ValueError(f"unknown file number: {file_no}")
+        finally:
+            # If our consumer stopped early, stop the git process right away
+            # instead of leaving its pipes open until garbage collection.
+            generator.close()
 
         for file_no in (STDOUT_FILENO, STDERR_FILENO):
             remaining_content = line_splitter[file_no].finish_processing()
