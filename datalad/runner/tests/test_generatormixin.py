@@ -141,3 +141,62 @@ def test_failing_process():
     except CommandError:
         return
     assert_equal(2, 3)
+
+
+def _start_long_running_generator() -> tuple[_ResultGenerator, Any]:
+    # A process that writes one line and then keeps running, so that a
+    # consumer can stop reading while the process is still alive.
+    result_generator = run_command(
+        py2cmd(
+            "import sys, time; print('first', flush=True); time.sleep(60)"
+        ),
+        protocol=TestProtocol,
+        stdin=None,
+    )
+    assert isinstance(result_generator, _ResultGenerator)
+    process = result_generator.runner.process
+    fd, data = next(result_generator)
+    assert_equal(data.strip(), "first")
+    return result_generator, process
+
+
+def test_close_abandoned_generator() -> None:
+    result_generator, process = _start_long_running_generator()
+    runner = result_generator.runner
+
+    result_generator.close()
+
+    # the process is stopped and our ends of its pipes are closed
+    assert process.poll() is not None
+    assert process.stdout.closed
+    assert process.stderr.closed
+    assert runner.process is None
+    assert runner.generator is None
+    assert_raises(StopIteration, next, result_generator)
+    # closing again is a no-op
+    result_generator.close()
+
+
+def test_garbage_collected_generator_is_closed() -> None:
+    import gc
+
+    result_generator, process = _start_long_running_generator()
+    del result_generator
+    gc.collect()
+
+    assert process.poll() is not None
+    assert process.stdout.closed
+    assert process.stderr.closed
+
+
+def test_close_exhausted_generator() -> None:
+    result_generator = run_command(
+        py2cmd("print('done')"),
+        protocol=TestProtocol,
+        stdin=None,
+    )
+    assert isinstance(result_generator, _ResultGenerator)
+    outputs = list(result_generator)
+    assert_equal([data.strip() for _, data in outputs], ["done"])
+    result_generator.close()
+    assert_equal(result_generator.return_code, 0)

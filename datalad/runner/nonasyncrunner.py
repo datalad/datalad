@@ -155,6 +155,47 @@ class _ResultGenerator(Generator):
     def throw(self, exception_type, value=None, trace_back=None):
         return Generator.throw(self, exception_type, value, trace_back)
 
+    def close(self):
+        """Stop the subprocess and release its resources
+
+        This is called when a consumer abandons the generator before it is
+        exhausted, e.g. because ``any()`` or ``next()`` short-circuited. The
+        default ``Generator.close()`` would only raise ``GeneratorExit``
+        and leave the process, its pipes, and the reader threads behind.
+        """
+        with self.send_lock:
+            if self.state == self.GeneratorState.exhausted:
+                return
+            runner = self.runner
+            process = runner.process
+            if process is not None:
+                runner.close_stdin()
+                if process.poll() is None:
+                    process.terminate()
+                    try:
+                        process.wait(timeout=1.0)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait()
+                runner.ensure_stdin_stdout_stderr_closed()
+                runner.wait_for_threads()
+                runner._set_process_exited()
+            self.return_code = runner.return_code
+            self.result_queue.clear()
+            self.state = self.GeneratorState.exhausted
+            runner.owning_thread = None
+            with runner.generator_condition:
+                runner.generator = None
+                runner.generator_condition.notify()
+
+    def __del__(self):
+        # Unlike native generators, a class implementing the Generator ABC is
+        # not closed automatically when it is garbage collected.
+        try:
+            self.close()
+        except Exception:
+            pass
+
 
 class ThreadedRunner:
     """
