@@ -1323,16 +1323,20 @@ def test_gitattributes(path=None):
         # always comes out relative to the repo root, even if abs goes in
         {op.join('relative', 'ikethemike', 'probe'):
             {'tag': False, 'sec.key': 'val', 'bang': True}})
-    # whereas a pattern with a leading '/' that is no absolute path into
-    # that directory is anchored to it, as in gitattributes(5) (gh-7972)
-    gr.set_gitattributes([('/*.tsv', {'top': True})],
+    # a leading '/' anchors a pattern to that directory, as in
+    # gitattributes(5), and so does an absolute path into it (gh-7972)
+    gr.set_gitattributes([('/*.tsv', {'top': True}),
+                          (op.join(gr.path, 'relative', '*.csv'), {'top': True})],
                          attrfile=op.join('relative', '.gitattributes'))
     attrs = gr.get_gitattributes(
-        ['relative/top.tsv', 'relative/sub/deep.tsv', 'top.tsv'])
+        ['relative/top.tsv', 'relative/sub/deep.tsv', 'top.tsv',
+         'relative/top.csv', 'relative/sub/deep.csv'])
     eq_({p: a.get('top') for p, a in attrs.items()},
         {'relative/top.tsv': True,
          'relative/sub/deep.tsv': None,
-         'top.tsv': None})
+         'top.tsv': None,
+         'relative/top.csv': True,
+         'relative/sub/deep.csv': None})
     if get_encoding_info()['default'] != 'ascii' and not on_windows:
         # do not perform this on obscure systems without anything like UTF
         # it is not relevant whether a path actually exists, and paths
