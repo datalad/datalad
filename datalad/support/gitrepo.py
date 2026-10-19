@@ -2776,6 +2776,10 @@ class GitRepo(CoreGitRepo):
           returned by `get_gitattributes()`. Path patterns can use absolute paths,
           in which case they will be normalized relative to the directory
           that contains the target .gitattributes file (see `attrfile`).
+          Any other pattern with a leading '/' is anchored to that directory,
+          as in gitattributes(5): '/*.tsv' matches only the TSV files directly
+          in it, whereas '*.tsv' -- also what an absolute path to '*.tsv' in
+          it is normalized to -- matches them at any depth.
         attrfile: path
           Path relative to the repository root of the .gitattributes file the
           attributes shall be set in.
@@ -2796,9 +2800,15 @@ class GitRepo(CoreGitRepo):
                     f.write('\n')
 
             for pattern, attr in sorted(attrs, key=lambda x: x[0]):
-                # normalize the pattern relative to the target .gitattributes file
-                npath = _normalize_path(
-                    op.join(self.path, op.dirname(attrfile)), pattern)
+                try:
+                    # normalize the pattern relative to the target .gitattributes file
+                    npath = _normalize_path(attrdir, pattern)
+                except FileNotInRepositoryError:
+                    if not pattern.startswith('/'):
+                        raise
+                    # not an absolute path into attrdir, but a pattern
+                    # anchored to it (gh-7972)
+                    npath = pattern
                 # paths in gitattributes always have to be POSIX
                 npath = Path(npath).as_posix()
                 attrline = u''
