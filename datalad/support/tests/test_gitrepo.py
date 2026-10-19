@@ -1311,11 +1311,9 @@ def test_gitattributes(path=None):
     # attributes
     eq_(gr.get_gitattributes('.', index_only=True)['.'], {})
 
-    # we can send absolute path patterns and write to any file, and
-    # the patterns will be translated relative to the target file
-    gr.set_gitattributes([
-        (op.join(gr.path, 'relative', 'ikethemike/**'), {'bang': True})],
-        attrfile=op.join('relative', '.gitattributes'))
+    # we can write to any file, and patterns are relative to its directory
+    gr.set_gitattributes([('ikethemike/**', {'bang': True})],
+                         attrfile=op.join('relative', '.gitattributes'))
     # directory and file get created
     ok_(op.exists(op.join(gr.path, 'relative', '.gitattributes')))
     eq_(gr.get_gitattributes(
@@ -1324,19 +1322,18 @@ def test_gitattributes(path=None):
         {op.join('relative', 'ikethemike', 'probe'):
             {'tag': False, 'sec.key': 'val', 'bang': True}})
     # a leading '/' anchors a pattern to that directory, as in
-    # gitattributes(5), and so does an absolute path into it (gh-7972)
-    gr.set_gitattributes([('/*.tsv', {'top': True}),
-                          (op.join(gr.path, 'relative', '*.csv'), {'top': True})],
+    # gitattributes(5) (gh-7972)
+    gr.set_gitattributes([('/*.tsv', {'top': True})],
                          attrfile=op.join('relative', '.gitattributes'))
     attrs = gr.get_gitattributes(
-        ['relative/top.tsv', 'relative/sub/deep.tsv', 'top.tsv',
-         'relative/top.csv', 'relative/sub/deep.csv'])
+        ['relative/top.tsv', 'relative/sub/deep.tsv', 'top.tsv'])
     eq_({p: a.get('top') for p, a in attrs.items()},
         {'relative/top.tsv': True,
          'relative/sub/deep.tsv': None,
-         'top.tsv': None,
-         'relative/top.csv': True,
-         'relative/sub/deep.csv': None})
+         'top.tsv': None})
+    # patterns are written as given
+    eq_((gr.pathobj / 'relative' / '.gitattributes').read_text().splitlines(),
+        ['ikethemike/** bang', '/*.tsv top'])
     if get_encoding_info()['default'] != 'ascii' and not on_windows:
         # do not perform this on obscure systems without anything like UTF
         # it is not relevant whether a path actually exists, and paths

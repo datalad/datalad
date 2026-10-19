@@ -2773,13 +2773,12 @@ class GitRepo(CoreGitRepo):
           Each item is a 2-tuple, where the first element is a path pattern,
           and the second element is a dictionary with attribute key/value
           pairs. The attribute dictionary must use the same semantics as those
-          returned by `get_gitattributes()`. Path patterns are relative to the
-          directory that contains the target .gitattributes file (see
+          returned by `get_gitattributes()`. Path patterns are written as
+          given (with '/' as the directory separator), hence they are relative
+          to the directory that contains the target .gitattributes file (see
           `attrfile`), and a leading '/' anchors them to it, as in
           gitattributes(5): '/*.tsv' matches only the TSV files directly in
-          it, whereas '*.tsv' matches them at any depth. An absolute path
-          into that directory is anchored alike, e.g. that of '*.tsv' in it
-          is written as '/*.tsv'.
+          it, whereas '*.tsv' matches them at any depth.
         attrfile: path
           Path relative to the repository root of the .gitattributes file the
           attributes shall be set in.
@@ -2791,7 +2790,6 @@ class GitRepo(CoreGitRepo):
         attrdir = op.dirname(git_attributes_file)
         if not op.exists(attrdir):
             os.makedirs(attrdir)
-        attrdir_resolved = Path(attrdir).resolve()
 
         with open(git_attributes_file, mode + '+') as f:
             # for append, fix existing files that do not end with \n
@@ -2801,26 +2799,9 @@ class GitRepo(CoreGitRepo):
                     f.write('\n')
 
             for pattern, attr in sorted(attrs, key=lambda x: x[0]):
-                if pattern.startswith('/') or isabs(pattern):
-                    # anchored to attrdir, whether as a pattern with a leading
-                    # '/' or as an absolute path into attrdir (gh-7972)
-                    pathobj = Path(pattern)
-                    # realpath only the directory, as _normalize_path() does
-                    abspath = pathobj.parent.resolve() / pathobj.name
-                    if abspath.is_relative_to(attrdir_resolved):
-                        npath = '/' + abspath.relative_to(attrdir_resolved).as_posix()
-                    elif pattern.startswith('/'):
-                        npath = pattern
-                    else:
-                        # an absolute path elsewhere, e.g. on another drive
-                        raise FileNotInRepositoryError(
-                            msg="Path outside repository: %s" % attrdir,
-                            filename=pattern)
-                else:
-                    # normalize the pattern relative to the target .gitattributes file
-                    npath = _normalize_path(attrdir, pattern)
-                # paths in gitattributes always have to be POSIX
-                npath = Path(npath).as_posix()
+                # a pattern, not a path: a leading '/' anchors it to attrdir
+                # (gh-7972).  Patterns in gitattributes always have to be POSIX
+                npath = Path(pattern).as_posix()
                 attrline = u''
                 if npath.count(' '):
                     # quote patterns with spaces
