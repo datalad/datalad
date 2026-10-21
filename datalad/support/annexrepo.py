@@ -560,6 +560,10 @@ class AnnexRepo(GitRepo, RepoInterface):
             "yes" if ver >= '10.20230408' else \
             "maybe" if ver > '10.20230407' else \
             "no"
+        # --json/--json-error-messages were extended to a batch of commands,
+        # unannex among them, in the 10.20230626 release.  Our announced
+        # minimum (GIT_ANNEX_MIN_VERSION) is older than that.
+        kludges["unannex-json"] = ver >= '10.20230626'
         cls._version_kludges = kludges
         return kludges[key]
 
@@ -1930,12 +1934,24 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
 
         options = options[:] if options else []
-        # --json, since the human-readable output C-quotes paths (e.g., with
-        # a tab or a backslash)
+        if self._check_version_kludges('unannex-json'):
+            # --json, since the human-readable output C-quotes paths (e.g.,
+            # with a tab or a backslash)
+            return [
+                r['file']
+                for r in self.call_annex_records(['unannex'] + options, files=files)
+                if r.get('success')
+            ]
+        # No --json for unannex on this git-annex, so fall back to parsing the
+        # human-readable output.  Paths needing more than `"` quoting come back
+        # mangled -- that is what --json above avoids.
+        prefix = 'unannex'
+        suffix = 'ok'
         return [
-            r['file']
-            for r in self.call_annex_records(['unannex'] + options, files=files)
-            if r.get('success')
+            # we cannot .split here since filename could have spaces
+            self._unquote_annex_path(line[len(prefix) + 1 : -(len(suffix) + 1)])
+            for line in self.call_annex_items_(['unannex'] + options, files=files)
+            if line.split()[0] == prefix and line.split()[-1] == suffix
         ]
 
     @normalize_paths(map_filenames_back=True)

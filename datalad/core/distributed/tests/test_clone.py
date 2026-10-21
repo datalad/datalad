@@ -130,7 +130,7 @@ def test_invalid_args(path=None, otherpath=None, alienpath=None):
 
 
 @integration
-@skip_if_no_network
+@skip_if_no_network(url=consts.DATASETS_TOPURL)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_clone_crcns(tdir=None, ds_path=None):
@@ -148,7 +148,7 @@ def test_clone_crcns(tdir=None, ds_path=None):
 
 
 @integration
-@skip_if_no_network
+@skip_if_no_network(url=consts.DATASETS_TOPURL)
 @pytest.mark.xfail(on_osx and on_github, reason="spurious https://github.com/datalad/datalad/issues/7485")
 @with_tree(tree={'sub': {}})
 def test_clone_datasets_root(tdir=None):
@@ -564,7 +564,7 @@ def test_clone_report_permission_issue(tdir=None):
         )
 
 
-@skip_if_no_network
+@skip_if_no_network(url=consts.DATASETS_TOPURL)
 @with_tempfile
 def test_autoenabled_remote_msg(path=None):
     # Verify that no message about a remote not been enabled is displayed
