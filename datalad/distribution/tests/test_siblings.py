@@ -9,6 +9,8 @@
 
 """
 
+import logging
+
 import pytest
 
 from datalad.api import (
@@ -18,7 +20,10 @@ from datalad.api import (
     install,
     siblings,
 )
+from datalad.consts import DATALAD_SPECIAL_REMOTE
+from datalad.customremotes.base import init_datalad_remote
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.external_versions import external_versions
 from datalad.support.gitrepo import GitRepo
 from datalad.support.path import basename
 from datalad.support.path import join as opj
@@ -42,8 +47,10 @@ from datalad.tests.utils_pytest import (
     ok_,
     on_appveyor,
     serve_path_via_http,
+    swallow_logs,
     with_sameas_remote,
     with_tempfile,
+    with_testsui,
 )
 from datalad.utils import (
     Path,
@@ -429,15 +436,63 @@ def test_sibling_enable_sameas(repo=None, clone_path=None):
         message=("cannot enable sibling '%s', not known", 'wrong')
     )
     # works with the right name
-    res = ds_cloned.siblings(action="enable", name="r_rsync")
-    assert_status("ok", res)
-    # git-annex >= 10.20261026 does not use it before its configuration,
-    # created by this test, is verified
-    ds_cloned.repo.verify_remote("r_rsync", mode='mark-safe')
+    res = ds_cloned.siblings(
+        action="enable",
+        name="r_rsync",
+        result_renderer='disabled',
+        on_failure='ignore',
+    )
+    if external_versions['cmd:annex'] >= '10.20261026':
+        # but git-annex does not use it before its configuration is verified,
+        # with no interactive session to confirm it
+        assert_in_results(res, status='impossible', name="r_rsync")
+        # the configuration was created by this test
+        ok_(ds_cloned.repo.verify_remote("r_rsync", mode='mark-safe'))
+    else:
+        assert_status("ok", res)
     # and then there is nothing left to verify
-    ds_cloned.repo.verify_remote("r_rsync")
+    ok_(ds_cloned.repo.verify_remote("r_rsync"))
     ds_cloned.get(path=["f0"])
     ok_(ds_cloned.repo.file_has_content("f0"))
+
+
+@pytest.mark.skipif(
+    external_versions['cmd:annex'] < '10.20261026',
+    reason="git-annex does not verify special remotes")
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_sibling_enable_verify(path=None, clone_path=None):
+    ds = Dataset(path).create(result_renderer='disabled')
+    init_datalad_remote(ds.repo, DATALAD_SPECIAL_REMOTE)
+    ds_cloned = clone(ds.path, clone_path, result_renderer='disabled')
+    kwargs = dict(
+        action="enable",
+        name=DATALAD_SPECIAL_REMOTE,
+        result_renderer='disabled',
+        on_failure='ignore',
+    )
+    # git-annex does not use it before its configuration is verified, and
+    # without an interactive session to confirm it, git-annex's instructions
+    # are reported
+    res = ds_cloned.siblings(**kwargs)
+    assert_result_count(res, 1)
+    assert_in_results(res, action='enable-sibling', status='impossible')
+    assert_in("git-annex verifyremote {} --safe ".format(
+        DATALAD_SPECIAL_REMOTE), res[0]['message'])
+    # "no" marks it unsafe
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        res = with_testsui(responses=['no'])(ds_cloned.siblings)(**kwargs)
+        assert_in("You may be under attack", cml.out)
+    assert_in_results(
+        res, status='impossible',
+        message=("git-annex does not use sibling '%s', which was not "
+                 "verified as safe", DATALAD_SPECIAL_REMOTE))
+    # "yes" verifies it
+    res = with_testsui(responses=['yes'])(ds_cloned.siblings)(**kwargs)
+    assert_status('ok', res)
+    # and then there is nothing left to verify
+    ok_(ds_cloned.repo.verify_remote(DATALAD_SPECIAL_REMOTE))
+    assert_status('ok', ds_cloned.siblings(**kwargs))
 
 
 @with_tempfile(mkdir=True)
