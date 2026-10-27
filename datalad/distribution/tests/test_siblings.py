@@ -431,6 +431,11 @@ def test_sibling_enable_sameas(repo=None, clone_path=None):
     # works with the right name
     res = ds_cloned.siblings(action="enable", name="r_rsync")
     assert_status("ok", res)
+    # git-annex >= 10.20261026 does not use it before its configuration,
+    # created by this test, is verified
+    ds_cloned.repo.verify_remote("r_rsync")
+    # and then there is nothing left to verify
+    ds_cloned.repo.verify_remote("r_rsync")
     ds_cloned.get(path=["f0"])
     ok_(ds_cloned.repo.file_has_content("f0"))
 

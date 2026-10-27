@@ -970,7 +970,10 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
                           regex=False)
 
     # However, we now can retrieve content since clone should have enabled the
-    # special remote with new URL (or origin in case of HTTP).
+    # special remote with new URL (or origin in case of HTTP), once its
+    # configuration, created by this test, is verified (git-annex >=
+    # 10.20261026 does not use it before).
+    riaclone.repo.verify_remote('store-storage')
     res = riaclone.get('test.txt')
     assert_result_count(res, 1,
                         status='ok',
@@ -1004,6 +1007,7 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
                               "auto-enabled",
                           level="INFO",
                           regex=False)
+    riaclonesub.repo.verify_remote('store-storage')
     res = riaclonesub.get('testsub.txt')
     assert_result_count(res, 1,
                         status='ok',
@@ -1062,6 +1066,7 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
 
     subds = Dataset(ds.pathobj / 'sub')
     # special remote is fine:
+    subds.repo.verify_remote('store-storage')
     res = subds.get('test.txt')
     assert_result_count(res, 1,
                         status='ok',

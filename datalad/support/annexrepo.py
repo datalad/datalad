@@ -2113,6 +2113,49 @@ class AnnexRepo(GitRepo, RepoInterface):
                 raise e
         self.config.reload()
 
+    def verify_remote(self, name):
+        """Mark the current configuration of a special remote as verified
+
+        Since 10.20261026 (CVE-2026-112818) git-annex does not use a special
+        remote enabled with `enable_remote()` until its configuration is
+        verified, and while an autoenabled special remote is unverified, it
+        does not push to, or copy annexed files to, any remote.  This method
+        confirms whatever configuration git-annex presents, so use it only
+        for a special remote whose configuration you created yourself or have
+        reviewed.  To review and verify it directly with git-annex, run
+        ``git annex verifyremote NAME``, which displays the configuration,
+        and then, if it is a location you expected, the
+        ``git annex verifyremote NAME --safe ID`` command it suggests.
+
+        Does nothing with an older git-annex, or when the configuration has
+        not changed since it was last verified.
+
+        Parameters
+        ----------
+        name: str
+          name of the special remote
+        """
+        annex_version = external_versions['cmd:annex']
+        if annex_version < '10.20261026':
+            lgr.debug("Not verifying special remote %s: git-annex %s does not "
+                      "verify special remotes", name, annex_version)
+            return
+        # git-annex displays the configuration along with the command to
+        # confirm it, whose ID makes sure that it is that very configuration
+        # which gets verified.
+        # TODO: let the user confirm interactively, see gh-7975
+        out = self.call_annex(['verifyremote', name])
+        safe_id = re.search(
+            r'verifyremote {} --safe (\d+)'.format(re.escape(name)), out)
+        if not safe_id:
+            lgr.debug("Nothing to verify for special remote %s: %s",
+                      name, out.strip())
+            return
+        lgr.debug("Verifying configuration of special remote %s: %s",
+                  name, out.strip())
+        self.call_annex(['verifyremote', name, '--safe', safe_id.group(1)])
+        self.config.reload()
+
     def merge_annex(self, remote=None):  # do not use anymore, use localsync()
         self.localsync(remote)
 
