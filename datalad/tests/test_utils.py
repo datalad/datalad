@@ -900,13 +900,16 @@ def test_assure_unicode():
         if not ('7.5.0' <= external_versions['chardet'] < '7.5.2'):
             raise
     # but when we mix, it does still guess something allowing to decode
-    # (chardet < 7) or fails to decode (chardet >= 7 picks iso2022-jp-2
-    # which can't handle the koi8-r bytes):
+    # (chardet < 7) or fails to decode: chardet 7.0-7.6 pick iso2022-jp,
+    # which can't handle the koi8-r bytes (UnicodeDecodeError), and
+    # chardet >= 7.7, which checks that the data decodes with its answer,
+    # does not guess any encoding (ValueError):
     mixedin = mom_koi8r + u'東'.encode('iso2022_jp') + u'東'.encode('utf-8')
     try:
         ok_(isinstance(ensure_unicode(mixedin), str))
-    except UnicodeDecodeError:
-        pass  # chardet >= 7 misdetects, acceptable
+    except ValueError:  # UnicodeDecodeError is a ValueError too
+        if external_versions['chardet'] < '7':
+            raise
     # should fail if we request high confidence result
     # (chardet < 7: ValueError for low confidence;
     #  chardet >= 7: either ValueError or UnicodeDecodeError):
