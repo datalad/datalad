@@ -1,4 +1,90 @@
 
+<a id='changelog-1.7.2'></a>
+# 1.7.2 (2026-10-27)
+
+## 🚀 Enhancements and New Features
+
+- New `AnnexRepo.verify_remote()` confirms the configuration of a special
+  remote, which git-annex 10.20261026
+  ([CVE-2026-112818](https://git-annex.branchable.com/security/cross_repository_data_exfiltration_via_special_remote/))
+  requires before using one enabled with `enableremote`.  Use it only for
+  remotes you set up or reviewed.
+  ([PR #7973](https://github.com/datalad/datalad/pull/7973))
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🐛 Bug Fixes
+
+- `save` hands new files to a single `git annex add --batch` via stdin rather
+  than on command lines, which failed for many files under tight resource
+  limits, and started `git annex add` anew for every chunk of a long file list.
+  Fixes [#7568](https://github.com/datalad/datalad/issues/7568) and
+  [#5721](https://github.com/datalad/datalad/issues/5721)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- `save` and `run` no longer fail with "Argument list too long" for a commit
+  message over 128KiB, e.g. a `run` record listing many expanded inputs.
+  Fixes [#7611](https://github.com/datalad/datalad/issues/7611)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- `create-sibling-github`, `-gitea`, `-gogs` and `-gin` no longer hang forever
+  when a server's response is lost: their HTTP requests time out after 30 s
+  (connect) or 120 s (read).
+
+- `save` fails, without saving anything, if `datalad.save.skip-openfiles` is
+  set to anything but `none` while `psutil` is not installed.  Since 1.7.1 it
+  only warned and saved all files, including those possibly open for writing.
+  [PR #7966](https://github.com/datalad/datalad/pull/7966)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- `AnnexRepo.unannex()` works again on git-annex older than 10.20230626, such
+  as the 10.20230126 that Debian bookworm ships; since 1.6.6 it failed with
+  ``Invalid option `--json'``.
+  ([PR #7970](https://github.com/datalad/datalad/pull/7970))
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🏠 Internal
+
+- Code duplication in `datalad/` is now checked in CI, via a new
+  `tox -e duplication` (jscpd) environment which joins `lint` and `typing` in a
+  single `tox` workflow.
+  ([PR #7968](https://github.com/datalad/datalad/pull/7968))
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- The contributor-metadata workflow no longer proposes `helli33`, an account
+  which claimed placeholder author emails (`test@example.com` and friends)
+  used by a handful of our commits and is consequently credited with them by
+  GitHub.
+  ([PR #7969](https://github.com/datalad/datalad/pull/7969))
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- The NFS cron CI job no longer runs SSH tests, whose target container cannot
+  see the NFS mount.
+  ([PR #7970](https://github.com/datalad/datalad/pull/7970))
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🧪 Tests
+
+- Tests that clone from `///` skip, instead of failing, when the configured
+  datasets host is unreachable.
+  ([PR #7970](https://github.com/datalad/datalad/pull/7970))
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- Tests verify the special remotes they set up before using them, as
+  git-annex 10.20261026 requires.
+  ([PR #7973](https://github.com/datalad/datalad/pull/7973))
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- `test_assure_unicode` passes with chardet 7.7, which no longer guesses an
+  encoding for data it cannot decode.
+  ([PR #7974](https://github.com/datalad/datalad/pull/7974))
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- DataLad's pytest plugin no longer forces collection into every directory, so a
+  bare `pytest` in a DataLad (or extension) checkout stops descending into
+  `.venv/`, `.tox/` and `build/`.
+  [PR #7943](https://github.com/datalad/datalad/pull/7943)
+  (by [@just-meng](https://github.com/just-meng))
+
 <a id='changelog-1.7.1'></a>
 # 1.7.1 (2026-10-06)
 
