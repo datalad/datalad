@@ -973,7 +973,7 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
     # special remote with new URL (or origin in case of HTTP), once its
     # configuration, created by this test, is verified (git-annex >=
     # 10.20261026 does not use it before).
-    riaclone.repo.verify_remote('store-storage')
+    riaclone.repo.verify_remote('store-storage', mode='mark-safe')
     res = riaclone.get('test.txt')
     assert_result_count(res, 1,
                         status='ok',
@@ -1007,7 +1007,7 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
                               "auto-enabled",
                           level="INFO",
                           regex=False)
-    riaclonesub.repo.verify_remote('store-storage')
+    riaclonesub.repo.verify_remote('store-storage', mode='mark-safe')
     res = riaclonesub.get('testsub.txt')
     assert_result_count(res, 1,
                         status='ok',
@@ -1066,7 +1066,7 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
 
     subds = Dataset(ds.pathobj / 'sub')
     # special remote is fine:
-    subds.repo.verify_remote('store-storage')
+    subds.repo.verify_remote('store-storage', mode='mark-safe')
     res = subds.get('test.txt')
     assert_result_count(res, 1,
                         status='ok',

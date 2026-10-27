@@ -16,6 +16,7 @@ import logging
 import os
 import re
 import sys
+import time
 import unittest.mock
 from functools import partial
 from glob import glob
@@ -71,6 +72,7 @@ from datalad.support.exceptions import (
     OutdatedExternalDependency,
     OutOfSpaceError,
     RemoteNotAvailableError,
+    RemoteNotVerifiedError,
 )
 from datalad.support.external_versions import external_versions
 from datalad.support.gitrepo import GitRepo
@@ -126,6 +128,7 @@ from datalad.tests.utils_pytest import (
     with_parametric_batch,
     with_sameas_remote,
     with_tempfile,
+    with_testsui,
     with_tree,
 )
 from datalad.utils import (
@@ -2154,6 +2157,128 @@ def test_is_special(path=None):
     with swallow_logs(new_level=logging.WARNING) as cml:
         assert_false(ar.is_special_annex_remote(DEFAULT_REMOTE))
         cml.assert_logged(msg=".*no URL.*", level="WARNING", regex=True)
+
+
+needs_verifyremote = pytest.mark.skipif(
+    external_versions['cmd:annex'] < '10.20261026',
+    reason="git-annex does not verify special remotes")
+
+
+def _clone_with_unverified_remote(path):
+    """Clone a repository with an enabled, but unverified special remote
+
+    Returns the original repository, the clone, and a function telling
+    whether the clone can get a file from the special remote.
+    """
+    rem = AnnexRepo(op.join(path, "remote"), create=True)
+    dir_arg = "directory={}".format(op.join(path, "special"))
+    rem.init_remote("imspecial",
+                    ["type=directory", "encryption=none", dir_arg])
+    (rem.pathobj / 'f').write_text("content")
+    rem.save('f')
+    rem.call_annex(['copy', '--to', 'imspecial', 'f'])
+    ar = AnnexRepo.clone(rem.path, op.join(path, "main"))
+    ar.enable_remote("imspecial", options=[dir_arg])
+
+    def can_get():
+        try:
+            ar.call_annex(['get', '--from', 'imspecial', 'f'])
+        except CommandError:
+            return False
+        ar.call_annex(['drop', '--force', 'f'])
+        return True
+
+    return rem, ar, can_get
+
+
+def _update_remote_config(path, rem, ar):
+    """Update the configuration of the special remote for the clone"""
+    rem.enable_remote(
+        "imspecial",
+        options=["directory={}".format(op.join(path, "special")),
+                 "chunk=1MiB"],
+        # make sure the update is newer than the original
+        env=dict(os.environ,
+                 GIT_ANNEX_VECTOR_CLOCK=str(int(time.time()) + 10)))
+    ar.call_git(['fetch', DEFAULT_REMOTE])
+    ar.call_annex(['merge'])
+
+
+@needs_verifyremote
+@with_tree(tree={"remote": {}, "main": {}, "special": {}})
+def test_verify_remote(path=None):
+    rem, ar, can_get = _clone_with_unverified_remote(path)
+    assert_raises(ValueError, ar.verify_remote, "imspecial", mode="bogus")
+    # git-annex does not use it, and without an interactive session to
+    # confirm its configuration, it remains so, but git-annex's instructions
+    # are given
+    with assert_raises(RemoteNotVerifiedError) as cme:
+        ar.verify_remote("imspecial")
+    assert_in("git-annex verifyremote imspecial --safe ", str(cme.value))
+    assert_false(can_get())
+    # marked unsafe, it remains unused, and git-annex warns
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        assert_false(ar.verify_remote("imspecial", mode="mark-unsafe"))
+        cml.assert_logged(msg=".*You may be under attack", level="WARNING",
+                          flags=re.DOTALL)
+    assert_false(can_get())
+    # marked safe, it is used
+    ok_(ar.verify_remote("imspecial", mode="mark-safe"))
+    ok_(can_get())
+    # and there is nothing left to verify, no question to ask
+    ok_(ar.verify_remote("imspecial"))
+    ok_(ar.verify_remote("imspecial", mode="mark-safe"))
+    # marked unsafe again, it is still used, as git-annex does not revoke a
+    # verification, but warns
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        ok_(ar.verify_remote("imspecial", mode="mark-unsafe"))
+        cml.assert_logged(msg=".*information may have leaked",
+                          level="WARNING", flags=re.DOTALL)
+    ok_(can_get())
+
+    # an updated configuration, until it is verified, does not keep git-annex
+    # from using the previously verified one
+    _update_remote_config(path, rem, ar)
+    with swallow_logs(new_level=logging.INFO) as cml:
+        ok_(ar.verify_remote("imspecial"))
+        cml.assert_logged(msg=".*updated configuration .*chunk=1MiB",
+                          level="INFO", flags=re.DOTALL)
+    ok_(can_get())
+    ok_(ar.verify_remote("imspecial", mode="mark-safe"))
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        ok_(ar.verify_remote("imspecial"))
+        cml.assert_logged(msg="Nothing to verify", level="DEBUG",
+                          match=False)
+
+
+@needs_verifyremote
+@with_tree(tree={"remote": {}, "main": {}, "special": {}})
+@with_testsui(responses=["no", "yes", "no", "yes"])
+def test_verify_remote_interactive(path=None):
+    rem, ar, can_get = _clone_with_unverified_remote(path)
+    # "no" marks it unsafe
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        assert_false(ar.verify_remote("imspecial"))
+        cml.assert_logged(msg=".*You may be under attack", level="WARNING",
+                          flags=re.DOTALL)
+    assert_false(can_get())
+    # "yes" safe
+    ok_(ar.verify_remote("imspecial"))
+    ok_(can_get())
+    # no question is left to ask
+    ok_(ar.verify_remote("imspecial"))
+    # "no" to an updated configuration keeps the previously verified one
+    _update_remote_config(path, rem, ar)
+    with swallow_logs(new_level=logging.INFO) as cml:
+        ok_(ar.verify_remote("imspecial"))
+        cml.assert_logged(msg=".*keeps using the previously verified",
+                          level="INFO", flags=re.DOTALL)
+        assert_not_in("[WARNING]", cml.out)
+    ok_(can_get())
+    # which "yes" replaces
+    ok_(ar.verify_remote("imspecial"))
+    ok_(can_get())
+    ok_(ar.verify_remote("imspecial"))
 
 
 @with_tempfile(mkdir=True)
