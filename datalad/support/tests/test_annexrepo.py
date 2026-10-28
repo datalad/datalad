@@ -2200,8 +2200,9 @@ def _update_remote_config(path, rem, ar):
         # make sure the update is newer than the original
         env=dict(os.environ,
                  GIT_ANNEX_VECTOR_CLOCK=str(int(time.time()) + 10)))
+    # leaving it to git-annex to merge it, and report on that, when asked to
+    # verify
     ar.call_git(['fetch', DEFAULT_REMOTE])
-    ar.call_annex(['merge'])
 
 
 @needs_verifyremote
@@ -2249,6 +2250,15 @@ def test_verify_remote(path=None):
         ok_(ar.verify_remote("imspecial"))
         cml.assert_logged(msg="Nothing to verify", level="DEBUG",
                           match=False)
+
+    # whatever else git-annex might say counts as the remote having no
+    # verified configuration
+    with patch.object(ar, 'call_annex', return_value="Something else\n"), \
+            swallow_logs(new_level=logging.WARNING) as cml:
+        for mode in ("interactive", "mark-safe"):
+            assert_false(ar.verify_remote("imspecial", mode=mode))
+            cml.assert_logged(msg="Cannot verify special remote imspecial",
+                              level="WARNING", match=False)
 
 
 @needs_verifyremote

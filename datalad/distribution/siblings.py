@@ -99,10 +99,10 @@ class Siblings(Interface):
     re-configuring a (different) sibling under a known name will not
     be considered an error. 'enable' can be used to complete access
     configuration for non-Git sibling (aka git-annex special remotes).
-    Since git-annex 10.20261026 does not use such a sibling before its
-    configuration is verified, 'enable' displays the configuration and asks
-    whether it is a location you expected, or, without an interactive
-    session to ask, reports how to verify it with git-annex.
+    As git-annex (since 10.20261026) does not use a sibling enabled this
+    way, not even to get files from, before its configuration is verified,
+    'enable' asks you to confirm the configuration, or, without an
+    interactive session to ask, reports how to verify it with git-annex.
     Lastly, the 'remove' action allows for the
     removal (or de-configuration) of a registered sibling.
 
