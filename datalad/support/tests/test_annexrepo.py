@@ -2200,8 +2200,6 @@ def _update_remote_config(path, rem, ar):
         # make sure the update is newer than the original
         env=dict(os.environ,
                  GIT_ANNEX_VECTOR_CLOCK=str(int(time.time()) + 10)))
-    # leaving it to git-annex to merge it, and report on that, when asked to
-    # verify
     ar.call_git(['fetch', DEFAULT_REMOTE])
 
 
@@ -2217,6 +2215,13 @@ def test_verify_remote(path=None):
         ar.verify_remote("imspecial")
     assert_in("git-annex verifyremote imspecial --safe ", str(cme.value))
     assert_false(can_get())
+    # nor does it get verified if git-annex offers no configuration to confirm
+    with patch.object(ar, 'call_annex', return_value="Something else\n"), \
+            swallow_logs(new_level=logging.WARNING) as cml:
+        for mode in ("interactive", "mark-safe"):
+            assert_false(ar.verify_remote("imspecial", mode=mode))
+            cml.assert_logged(msg="Cannot verify special remote imspecial",
+                              level="WARNING", match=False)
     # marked unsafe, it remains unused, and git-annex warns
     with swallow_logs(new_level=logging.WARNING) as cml:
         assert_false(ar.verify_remote("imspecial", mode="mark-unsafe"))
@@ -2225,47 +2230,30 @@ def test_verify_remote(path=None):
     assert_false(can_get())
     # marked safe, it is used
     ok_(ar.verify_remote("imspecial", mode="mark-safe"))
+    eq_(ar.config.get("remote.imspecial.annex-verified"), "verified")
     ok_(can_get())
-    # and there is nothing left to verify, no question to ask
-    ok_(ar.verify_remote("imspecial"))
-    ok_(ar.verify_remote("imspecial", mode="mark-safe"))
-    # marked unsafe again, it is still used, as git-annex does not revoke a
-    # verification, but warns
-    with swallow_logs(new_level=logging.WARNING) as cml:
-        ok_(ar.verify_remote("imspecial", mode="mark-unsafe"))
-        cml.assert_logged(msg=".*information may have leaked",
-                          level="WARNING", flags=re.DOTALL)
-    ok_(can_get())
-
-    # an updated configuration, until it is verified, does not keep git-annex
-    # from using the previously verified one
-    _update_remote_config(path, rem, ar)
-    with swallow_logs(new_level=logging.INFO) as cml:
-        ok_(ar.verify_remote("imspecial"))
-        cml.assert_logged(msg=".*updated configuration .*chunk=1MiB",
-                          level="INFO", flags=re.DOTALL)
-    ok_(can_get())
-    ok_(ar.verify_remote("imspecial", mode="mark-safe"))
-    with swallow_logs(new_level=logging.DEBUG) as cml:
-        ok_(ar.verify_remote("imspecial"))
-        cml.assert_logged(msg="Nothing to verify", level="DEBUG",
-                          match=False)
-
-    # whatever else git-annex might say counts as the remote having no
-    # verified configuration
-    with patch.object(ar, 'call_annex', return_value="Something else\n"), \
+    # and then git-annex is not asked anymore, not even to mark it unsafe,
+    # which would not revoke the verification
+    with patch.object(ar, 'call_annex') as call_annex, \
             swallow_logs(new_level=logging.WARNING) as cml:
-        for mode in ("interactive", "mark-safe"):
-            assert_false(ar.verify_remote("imspecial", mode=mode))
-            cml.assert_logged(msg="Cannot verify special remote imspecial",
-                              level="WARNING", match=False)
+        for mode in ("interactive", "mark-safe", "mark-unsafe"):
+            ok_(ar.verify_remote("imspecial", mode=mode))
+        cml.assert_logged(msg="Not marking special remote imspecial unsafe",
+                          level="WARNING", match=False)
+        call_annex.assert_not_called()
+    ok_(can_get())
+    # nor for an updated configuration, while git-annex keeps using the
+    # verified one
+    _update_remote_config(path, rem, ar)
+    ok_(ar.verify_remote("imspecial"))
+    ok_(can_get())
 
 
 @needs_verifyremote
 @with_tree(tree={"remote": {}, "main": {}, "special": {}})
-@with_testsui(responses=["no", "yes", "no", "yes"])
+@with_testsui(responses=["no", "yes"])
 def test_verify_remote_interactive(path=None):
-    rem, ar, can_get = _clone_with_unverified_remote(path)
+    _, ar, can_get = _clone_with_unverified_remote(path)
     # "no" marks it unsafe
     with swallow_logs(new_level=logging.WARNING) as cml:
         assert_false(ar.verify_remote("imspecial"))
@@ -2276,18 +2264,6 @@ def test_verify_remote_interactive(path=None):
     ok_(ar.verify_remote("imspecial"))
     ok_(can_get())
     # no question is left to ask
-    ok_(ar.verify_remote("imspecial"))
-    # "no" to an updated configuration keeps the previously verified one
-    _update_remote_config(path, rem, ar)
-    with swallow_logs(new_level=logging.INFO) as cml:
-        ok_(ar.verify_remote("imspecial"))
-        cml.assert_logged(msg=".*keeps using the previously verified",
-                          level="INFO", flags=re.DOTALL)
-        assert_not_in("[WARNING]", cml.out)
-    ok_(can_get())
-    # which "yes" replaces
-    ok_(ar.verify_remote("imspecial"))
-    ok_(can_get())
     ok_(ar.verify_remote("imspecial"))
 
 
