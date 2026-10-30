@@ -39,6 +39,10 @@ def _get_unicode_robust_version(f):
     @wraps(f)
     def wrapped(*args, **kwargs):
         try:
+            if not kwargs:
+                if len(args) == 1:
+                    return f(args[0])
+                return f(*args)
             return f(*args, **kwargs)
         except UnicodeEncodeError:
             return f(ensure_bytes(*args, **kwargs))
@@ -274,6 +278,11 @@ def get_filtered_paths_(paths: Iterable[str|Path], filter_paths: Iterable[str | 
 
 def _get_parent_paths_check(path: str, sep: str, asep: str) -> None:
     """A little helper for get_parent_paths"""
+    if (type(path) is str and path
+            and path[0] not in {'/', '.'} and '//' not in path
+            and type(sep) is str and sep == '/' and os.name == 'posix'
+            and asep not in path):
+        return
     if isabs(path) or path.startswith(pardir + sep) or path.startswith(curdir + sep):
         raise ValueError("Expected relative within directory paths, got %r" % path)
     if sep+sep in path:
