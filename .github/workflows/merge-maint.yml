@@ -1,0 +1,69 @@
+name: Merge maint into master
+
+on:
+  push:
+    branches:
+      - maint
+  # The release workflow's commits to maint carry "[skip ci]", which
+  # suppresses their push event; the release it then publishes does not.
+  release:
+    types: [published]
+  workflow_dispatch:
+
+# Each run redoes everything from the current branches, so queue runs instead
+# of interrupting one between its pushes.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    if: github.repository == 'datalad/datalad'
+    env:
+      # Owned by this workflow: force-pushed on every run
+      MERGE_BRANCH: bot/merge-maint
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+        with:
+          ref: maint
+          # Pushes and PRs made with the default GITHUB_TOKEN would not
+          # trigger the tests
+          token: ${{ secrets.GITMATE_GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Fast-forward master to maint, or propose merging maint into it
+        env:
+          GH_TOKEN: ${{ secrets.GITMATE_GITHUB_TOKEN }}
+        run: |
+          set -eu
+          git fetch origin maint master
+          if git merge-base --is-ancestor origin/master origin/maint; then
+            # master has no commits of its own.  Without --force the push is
+            # refused unless it is a fast-forward.
+            git push origin origin/maint:refs/heads/master
+            exit 0
+          fi
+          if git merge-base --is-ancestor origin/maint origin/master; then
+            echo "'master' already contains 'maint'"
+            exit 0
+          fi
+          git config user.name "DataLad Bot"
+          git config user.email bot@datalad.org
+          git checkout -B "$MERGE_BRANCH" origin/master
+          if ! git merge --no-ff --log -m "Merge branch 'maint'" origin/maint; then
+            echo "::error::Merging 'maint' into 'master' conflicts in: $(git diff --name-only --diff-filter=U | xargs).  Merge it manually."
+            exit 1
+          fi
+          git push --force origin "HEAD:refs/heads/$MERGE_BRANCH"
+          if [ -z "$(gh pr list --head "$MERGE_BRANCH" --base master --state open --json number --jq '.[].number')" ]; then
+            gh pr create --head "$MERGE_BRANCH" --base master --label semver-internal \
+              --title "Merge maint into master" \
+              --body "Opened by the [\"Merge maint into master\" workflow](https://github.com/datalad/datalad/blob/maint/.github/workflows/merge-maint.yml): \`master\` has commits of its own, so it cannot be fast-forwarded to \`maint\`.
+
+          Every push to \`maint\` force-pushes a fresh merge of \`maint\` into \`master\` to \`$MERGE_BRANCH\`, updating this PR.  Merge it with a merge commit (not squash or rebase) once the tests pass.  Do not push to \`$MERGE_BRANCH\` yourself; if the merge needs conflicts resolved, the workflow fails and \`maint\` has to be merged on a branch of your own."
+          fi
