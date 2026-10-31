@@ -530,6 +530,25 @@ class RemoteNotAvailableError(CommandError):
                "".format(self.remote, linesep, super_str)
 
 
+class RemoteNotVerifiedError(RuntimeError):
+    """To be raised whenever git-annex cannot use a special remote, since
+    its configuration needs to be verified, but nobody can be asked to
+    confirm it
+    """
+
+    def __init__(self, remote, msg):
+        """
+
+        Parameters
+        ----------
+        remote: str
+          name of the special remote
+        msg: str
+        """
+        super().__init__(msg)
+        self.remote = remote
+
+
 class InvalidInstanceRequestError(RuntimeError):
     """Thrown if a request to create a (flyweight) instance is invalid"""
 

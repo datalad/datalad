@@ -96,6 +96,7 @@ from .exceptions import (
     OutdatedExternalDependency,
     OutOfSpaceError,
     RemoteNotAvailableError,
+    RemoteNotVerifiedError,
 )
 from .external_versions import external_versions
 from .gitrepo import (
@@ -2113,48 +2114,87 @@ class AnnexRepo(GitRepo, RepoInterface):
                 raise e
         self.config.reload()
 
-    def verify_remote(self, name):
-        """Mark the current configuration of a special remote as verified
+    def verify_remote(self, name, mode='interactive'):
+        """Verify the configuration of a special remote
 
-        Since 10.20261026 (CVE-2026-112818) git-annex does not use a special
-        remote enabled with `enable_remote()` until its configuration is
-        verified, and while an autoenabled special remote is unverified, it
-        does not push to, or copy annexed files to, any remote.  This method
-        confirms whatever configuration git-annex presents, so use it only
-        for a special remote whose configuration you created yourself or have
-        reviewed.  To review and verify it directly with git-annex, run
-        ``git annex verifyremote NAME``, which displays the configuration,
-        and then, if it is a location you expected, the
-        ``git annex verifyremote NAME --safe ID`` command it suggests.
-
-        Does nothing with an older git-annex, or when the configuration has
-        not changed since it was last verified.
+        git-annex (since 10.20261026, CVE-2026-112818) requires a special
+        remote's configuration to be verified -- confirmed to be of an
+        expected location -- before it fully uses the remote.  Does nothing
+        with an older git-annex, or for a remote verified already
+        (``remote.NAME.annex-verified=verified``).
 
         Parameters
         ----------
         name: str
           name of the special remote
+        mode: {'interactive', 'mark-safe', 'mark-unsafe'}, optional
+          'interactive' displays the configuration, as
+          ``git annex verifyremote NAME`` does, and asks the user to confirm
+          it.  Without an interactive UI, RemoteNotVerifiedError, carrying
+          git-annex's instructions, is raised instead.
+          'mark-safe' confirms it without anyone looking at it, so use it
+          only for a special remote whose configuration you created yourself
+          or have reviewed.
+          'mark-unsafe' rejects it.
+
+        Returns
+        -------
+        bool
+          True if it has a verified configuration (or git-annex
+          does not verify special remotes), False if not.
         """
+        if mode not in ('interactive', 'mark-safe', 'mark-unsafe'):
+            raise ValueError(
+                "mode must be 'interactive', 'mark-safe' or 'mark-unsafe', "
+                "not {!r}".format(mode))
         annex_version = external_versions['cmd:annex']
         if annex_version < '10.20261026':
             lgr.debug("Not verifying special remote %s: git-annex %s does not "
                       "verify special remotes", name, annex_version)
-            return
-        # git-annex displays the configuration along with the command to
-        # confirm it, whose ID makes sure that it is that very configuration
-        # which gets verified.
-        # TODO: let the user confirm interactively, see gh-7975
-        out = self.call_annex(['verifyremote', name])
-        safe_id = re.search(
-            r'verifyremote {} --safe (\d+)'.format(re.escape(name)), out)
-        if not safe_id:
-            lgr.debug("Nothing to verify for special remote %s: %s",
-                      name, out.strip())
-            return
-        lgr.debug("Verifying configuration of special remote %s: %s",
-                  name, out.strip())
-        self.call_annex(['verifyremote', name, '--safe', safe_id.group(1)])
+            return True
+        verified_var = 'remote.{}.annex-verified'.format(name)
         self.config.reload()
+        if self.config.get(verified_var) == 'verified':
+            if mode == 'mark-unsafe':
+                lgr.warning("Not marking special remote %s unsafe: it is "
+                            "verified already", name)
+            return True
+        if mode == 'interactive' or mode == 'mark-safe':
+            out = self.call_annex(['verifyremote', name])
+            # the ID makes sure that it is that very configuration which
+            # gets verified
+            safe_id = re.search(
+                r'verifyremote {} --safe (\d+)'.format(re.escape(name)), out)
+            if not safe_id:
+                lgr.warning("Cannot verify special remote %s: %s",
+                            name, out.strip())
+                return False
+            if mode == 'interactive':
+                if not ui.is_interactive:
+                    raise RemoteNotVerifiedError(
+                        name,
+                        "git-annex does not use special remote {} until its "
+                        "configuration is verified, and there is no "
+                        "interactive session to confirm it:\n{}".format(
+                            name, out.strip()))
+                # display the configuration and git-annex's question, but not
+                # the commands to answer it, which are run here
+                if ui.yesno(out.split('\nIf so, run:', 1)[0].strip(),
+                            title="Verifying special remote {}".format(name)):
+                    mode = 'mark-safe'
+        if mode == 'mark-safe':
+            self.call_annex(
+                ['verifyremote', name, '--safe', safe_id.group(1)])
+            self.config.reload()
+            return self.config.get(verified_var) == 'verified'
+        # 'mark-unsafe', or the user said no
+        try:
+            self.call_annex(['verifyremote', name, '--unsafe'])
+        except CommandError as e:
+            # git-annex fails it, explaining what it means
+            lgr.warning("Told git-annex that special remote %s is unsafe:\n%s",
+                        name, (e.stderr or '').strip())
+        return False
 
     def merge_annex(self, remote=None):  # do not use anymore, use localsync()
         self.localsync(remote)
