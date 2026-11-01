@@ -1,0 +1,45 @@
+name: Fast-forward master to maint
+
+on:
+  push:
+    branches:
+      - maint
+  # The release workflow's commits to maint carry "[skip ci]", which
+  # suppresses their push event; the release it then publishes does not.
+  release:
+    types: [published]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  fast-forward:
+    runs-on: ubuntu-latest
+    if: github.repository == 'datalad/datalad'
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+        with:
+          ref: maint
+          # A push made with the default GITHUB_TOKEN would not trigger the
+          # workflows on master
+          token: ${{ secrets.GITMATE_GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Fast-forward master to maint
+        run: |
+          set -eu
+          git fetch origin maint master
+          if git merge-base --is-ancestor origin/maint origin/master; then
+            echo "'master' already contains 'maint'"
+          elif git merge-base --is-ancestor origin/master origin/maint; then
+            # Without --force the push is refused unless it is a fast-forward
+            git push origin origin/maint:refs/heads/master
+          else
+            echo "::notice::'master' has commits of its own, so it cannot be fast-forwarded to 'maint'; merge 'maint' into 'master' instead."
+          fi
