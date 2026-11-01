@@ -2773,9 +2773,12 @@ class GitRepo(CoreGitRepo):
           Each item is a 2-tuple, where the first element is a path pattern,
           and the second element is a dictionary with attribute key/value
           pairs. The attribute dictionary must use the same semantics as those
-          returned by `get_gitattributes()`. Path patterns can use absolute paths,
-          in which case they will be normalized relative to the directory
-          that contains the target .gitattributes file (see `attrfile`).
+          returned by `get_gitattributes()`. Path patterns are written as
+          given (with '/' as the directory separator), hence they are relative
+          to the directory that contains the target .gitattributes file (see
+          `attrfile`), and a leading '/' anchors them to it, as in
+          gitattributes(5): '/*.tsv' matches only the TSV files directly in
+          it, whereas '*.tsv' matches them at any depth.
         attrfile: path
           Path relative to the repository root of the .gitattributes file the
           attributes shall be set in.
@@ -2796,11 +2799,9 @@ class GitRepo(CoreGitRepo):
                     f.write('\n')
 
             for pattern, attr in sorted(attrs, key=lambda x: x[0]):
-                # normalize the pattern relative to the target .gitattributes file
-                npath = _normalize_path(
-                    op.join(self.path, op.dirname(attrfile)), pattern)
-                # paths in gitattributes always have to be POSIX
-                npath = Path(npath).as_posix()
+                # a pattern, not a path: a leading '/' anchors it to attrdir
+                # (gh-7972).  Patterns in gitattributes always have to be POSIX
+                npath = Path(pattern).as_posix()
                 attrline = u''
                 if npath.count(' '):
                     # quote patterns with spaces
