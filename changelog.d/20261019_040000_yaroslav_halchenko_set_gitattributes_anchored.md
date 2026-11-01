@@ -1,9 +1,10 @@
 ### 💥 Breaking Changes
 
-- `GitRepo.set_gitattributes()` writes patterns as given: absolute paths, and
-  paths starting with `./` or `../`, are no longer converted into patterns
-  relative to the directory of the `.gitattributes` file.  Pass such patterns
-  instead.
+- `GitRepo.set_gitattributes()` writes string patterns as given: absolute
+  paths, and paths starting with `./` or `../`, are no longer converted into
+  patterns relative to the directory of the `.gitattributes` file.  Pass such
+  patterns instead, or a path as a `Path`, which is converted (relative to the
+  repository root, if not absolute).
   (by [@yarikoptic](https://github.com/yarikoptic))
 
 ### 🐛 Bug Fixes

@@ -1331,9 +1331,22 @@ def test_gitattributes(path=None):
         {'relative/top.tsv': True,
          'relative/sub/deep.tsv': None,
          'top.tsv': None})
-    # patterns are written as given
+    # whereas a Path is a path, absolute or relative to the repository root,
+    # turned into the pattern anchored to that directory which matches it
+    gr.set_gitattributes([(gr.pathobj / 'relative' / 'abs.json', {'p': True}),
+                          (Path('relative', 'sub', 'rel.json'), {'p': True})],
+                         attrfile=op.join('relative', '.gitattributes'))
+    # str patterns are written as given, Paths as the patterns matching them
+    attrlines = ['ikethemike/** bang', '/*.tsv top',
+                 '/abs.json p', '/sub/rel.json p']
     eq_((gr.pathobj / 'relative' / '.gitattributes').read_text().splitlines(),
-        ['ikethemike/** bang', '/*.tsv top'])
+        attrlines)
+    # a Path must point into that directory, or nothing is written
+    assert_raises(FileNotInRepositoryError, gr.set_gitattributes,
+                  [('fine', {'p': True}), (Path('top.json'), {'p': True})],
+                  attrfile=op.join('relative', '.gitattributes'))
+    eq_((gr.pathobj / 'relative' / '.gitattributes').read_text().splitlines(),
+        attrlines)
     if get_encoding_info()['default'] != 'ascii' and not on_windows:
         # do not perform this on obscure systems without anything like UTF
         # it is not relevant whether a path actually exists, and paths

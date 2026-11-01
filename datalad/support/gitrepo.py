@@ -2759,7 +2759,7 @@ class GitRepo(CoreGitRepo):
         return {relpath(k, self.path) if isabs(k) else k: v
                 for k, v in attributes.items()}
 
-    def set_gitattributes(self, attrs: list[tuple[str, dict[str, str | bool]]], attrfile: str = '.gitattributes', mode: str = 'a') -> None:
+    def set_gitattributes(self, attrs: list[tuple[str | PathLike[str], dict[str, str | bool]]], attrfile: str = '.gitattributes', mode: str = 'a') -> None:
         """Set gitattributes
 
         By default appends additional lines to `attrfile`. Note, that later
@@ -2778,7 +2778,11 @@ class GitRepo(CoreGitRepo):
           to the directory that contains the target .gitattributes file (see
           `attrfile`), and a leading '/' anchors them to it, as in
           gitattributes(5): '/*.tsv' matches only the TSV files directly in
-          it, whereas '*.tsv' matches them at any depth.
+          it, whereas '*.tsv' matches them at any depth. To give a path
+          instead, pass it as a Path, absolute or relative to the repository
+          root: it must lie within that directory, and is turned into the
+          pattern anchored to it which matches the path (glob characters in
+          it remain in effect).
         attrfile: path
           Path relative to the repository root of the .gitattributes file the
           attributes shall be set in.
@@ -2788,6 +2792,40 @@ class GitRepo(CoreGitRepo):
 
         git_attributes_file = op.join(self.path, attrfile)
         attrdir = op.dirname(git_attributes_file)
+        attrdir_path = Path(attrdir).resolve()
+
+        # compose all lines first, to write none if a path is outside attrdir
+        attrlines = []
+        for pattern, attr in sorted(attrs, key=lambda x: os.fspath(x[0])):
+            if isinstance(pattern, PathLike):
+                # a path, absolute or relative to the repository root
+                path = self.pathobj / pattern
+                # realpath only the directory, as _normalize_path() does
+                path = path.parent.resolve() / path.name
+                if attrdir_path not in path.parents:
+                    raise FileNotInRepositoryError(
+                        msg="Path not within %s" % attrdir,
+                        filename=os.fspath(pattern))
+                pattern = '/' + path.relative_to(attrdir_path).as_posix()
+            # a pattern: a leading '/' anchors it to attrdir (gh-7972).
+            # Patterns in gitattributes always have to be POSIX
+            npath = Path(pattern).as_posix()
+            attrline = u''
+            if npath.count(' '):
+                # quote patterns with spaces
+                attrline += u'"{}"'.format(npath.replace('"', '\\"'))
+            else:
+                attrline += npath
+            for a in sorted(attr):
+                val = attr[a]
+                if val is True:
+                    attrline += ' {}'.format(a)
+                elif val is False:
+                    attrline += ' -{}'.format(a)
+                else:
+                    attrline += ' {}={}'.format(a, val)
+            attrlines.append(attrline)
+
         if not op.exists(attrdir):
             os.makedirs(attrdir)
 
@@ -2798,24 +2836,7 @@ class GitRepo(CoreGitRepo):
                 if not f.read().endswith('\n'):
                     f.write('\n')
 
-            for pattern, attr in sorted(attrs, key=lambda x: x[0]):
-                # a pattern, not a path: a leading '/' anchors it to attrdir
-                # (gh-7972).  Patterns in gitattributes always have to be POSIX
-                npath = Path(pattern).as_posix()
-                attrline = u''
-                if npath.count(' '):
-                    # quote patterns with spaces
-                    attrline += u'"{}"'.format(npath.replace('"', '\\"'))
-                else:
-                    attrline += npath
-                for a in sorted(attr):
-                    val = attr[a]
-                    if val is True:
-                        attrline += ' {}'.format(a)
-                    elif val is False:
-                        attrline += ' -{}'.format(a)
-                    else:
-                        attrline += ' {}={}'.format(a, val)
+            for attrline in attrlines:
                 f.write('{}\n'.format(attrline))
 
     def get_content_info(self, paths: Optional[Sequence[str | PathLike[str]]] = None, ref: Optional[str] = None, untracked: str = 'all') -> dict[Path, dict[str, str | int | None]]:
