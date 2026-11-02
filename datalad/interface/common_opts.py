@@ -207,10 +207,15 @@ jobs_opt = Parameter(
     args=("-J", "--jobs"),
     metavar="NJOBS",
     default='auto',
-    constraints=EnsureInt() | EnsureNone() | EnsureChoice('auto'),
+    constraints=EnsureInt() | EnsureNone() | EnsureChoice('auto', 'cpus'),
     doc="""how many parallel jobs (where possible) to use. "auto" corresponds
     to the number defined by 'datalad.runtime.max-annex-jobs' configuration
-    item""")
+    item. "cpus" sets the number of jobs to the number of CPUs available to
+    the process. Note that, unlike "auto", "cpus" is NOT bounded by
+    'datalad.runtime.max-annex-jobs' (nor by 'datalad.runtime.max-jobs' for
+    operations across datasets) and can therefore be resource-intensive on
+    machines with many cores. CPU quotas (e.g. a container's CPU limit) are
+    not taken into account""")
 
 verbose = Parameter(
     args=("-v", "--verbose",),

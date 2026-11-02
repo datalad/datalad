@@ -390,7 +390,8 @@ class ForEachDataset(Interface):
                     warning += \
                         "Execution of Python commands in parallel while capturing output is not possible."
                 if warning:
-                    lgr.warning("Got jobs=%d. %s We will execute without parallelization", jobs, warning)
+                    lgr.warning("Got jobs=%d. %s We will execute without parallelization",
+                                effective_jobs, warning)
                     jobs = 0  # no threading even between producer/consumer
 
         yield from pc_class(
