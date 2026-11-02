@@ -37,6 +37,7 @@ from datalad.tests.utils_pytest import (
     assert_in_results,
     assert_is_instance,
     assert_not_in,
+    assert_not_in_results,
     assert_raises,
     assert_repo_status,
     assert_result_count,
@@ -1002,7 +1003,6 @@ def test_update_how_subds_different(path=None, *, follow, action):
 
 
 @slow  # ~15s
-@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_update_reset_dirty(path=None):
     path = Path(path)
@@ -1017,26 +1017,41 @@ def test_update_reset_dirty(path=None):
     (ds_src_s1.pathobj / "foo").write_text("foo")
     (ds_src_s2.pathobj / "bar").write_text("bar")
     ds_src.save(recursive=True)
+    # s2's sibling moves past the state recorded in the top-level sibling
+    (ds_src_s2.pathobj / "baz").write_text("baz")
+    ds_src_s2.save()
 
     ds_clone_s1 = Dataset(ds_clone.pathobj / "s1")
     ds_clone_s2 = Dataset(ds_clone.pathobj / "s2")
     (ds_clone_s1.pathobj / "dirt").write_text("")
+    # a commit in s2 which is not saved in the top-level dataset (gh-7949)
+    (ds_clone_s2.pathobj / "local").write_text("")
+    ds_clone_s2.save()
+    # a reset of the top-level dataset must leave subdatasets alone regardless
+    ds_clone.config.set("submodule.recurse", "true", scope="local")
 
     res = ds_clone.update(follow="sibling", how="reset", recursive=True,
                           on_failure="ignore")
 
+    # Neither the dirt nor the new commit in a subdataset are in the way of
+    # resetting the top-level dataset, which does not touch subdatasets.
     assert_result_count(res, 1, path=ds_clone.path,
-                        action=f"update.reset", status="error")
+                        action=f"update.reset", status="ok")
     assert_result_count(res, 1, path=ds_clone_s1.path,
                         action=f"update.reset", status="error")
     assert_result_count(res, 1, path=ds_clone_s2.path,
                         action=f"update.reset", status="ok")
 
-    # s2 was reset...
-    eq_(ds_src_s2.repo.get_hexsha(), ds_clone_s2.repo.get_hexsha())
-    # ... but s1 and the top-level dataset stayed behind due to the dirty tree.
-    eq_(ds_src.repo.get_hexsha("HEAD~"), ds_clone.repo.get_hexsha())
-    eq_(ds_src_s1.repo.get_hexsha("HEAD~"), ds_clone_s1.repo.get_hexsha())
+    # The top-level dataset and s2 were reset, and the top-level dataset was
+    # not saved to a commit past its target...
+    assert_not_in_results(res, action="save")
+    eq_(corresponding_hexsha(ds_src.repo),
+        corresponding_hexsha(ds_clone.repo))
+    eq_(corresponding_hexsha(ds_src_s2.repo),
+        corresponding_hexsha(ds_clone_s2.repo))
+    # ... but s1 stayed behind due to the dirty tree.
+    eq_(corresponding_hexsha(ds_src_s1.repo, "HEAD~"),
+        corresponding_hexsha(ds_clone_s1.repo))
 
     assert_repo_status(ds_clone.path,
                        modified=[ds_clone_s1.repo.path,
