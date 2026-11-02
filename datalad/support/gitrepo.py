@@ -2775,9 +2775,10 @@ class GitRepo(CoreGitRepo):
           pairs. The attribute dictionary must use the same semantics as those
           returned by `get_gitattributes()`. A str pattern is written as
           given, i.e. relative to the directory of `attrfile`, where a leading
-          '/' anchors it. A Path (absolute, or relative to the repository
-          root) must lie within that directory, and is written as the
-          anchored pattern matching it. Items are written in the given order.
+          '/' anchors it. A Path (absolute, or relative to that directory) and
+          a str starting with './' are paths, which must lie within that
+          directory, and are written as the anchored patterns matching them.
+          Items are written in the given order.
         attrfile: path
           Path relative to the repository root of the .gitattributes file the
           attributes shall be set in.
@@ -2792,10 +2793,13 @@ class GitRepo(CoreGitRepo):
         # compose all lines first, to write none if a path is outside attrdir
         attrlines = []
         for pattern, attr in attrs:
-            if isinstance(pattern, PathLike):
-                # a path, absolute or relative to the repository root:
-                # joining an absolute one to pathobj yields it as is
-                path = self.pathobj / pattern
+            # a leading './' has no meaning to git, which matches no path
+            # against such a pattern
+            if isinstance(pattern, PathLike) \
+                    or pattern.startswith(('./', '.' + os.sep)):
+                # a path, absolute or relative to attrdir:
+                # joining an absolute one to attrdir_path yields it as is
+                path = attrdir_path / pattern
                 # realpath only the directory, as _normalize_path() does
                 path = path.parent.resolve() / path.name
                 if attrdir_path not in path.parents:

@@ -1331,21 +1331,23 @@ def test_gitattributes(path=None):
         {'relative/top.tsv': True,
          'relative/sub/deep.tsv': None,
          'top.tsv': None})
-    # whereas a Path is a path, absolute or relative to the repository root,
-    # turned into the pattern anchored to that directory which matches it
-    gr.set_gitattributes([(Path('relative', 'sub', 'rel.json'), {'p': True}),
+    # whereas a Path, absolute or relative to that directory, and a str
+    # starting with './' are paths, turned into the anchored patterns
+    # matching them
+    gr.set_gitattributes([(Path('sub', 'rel.json'), {'p': True}),
+                          ('./dot.json', {'p': True}),
                           (gr.pathobj / 'relative' / 'abs.json',
                            {'p': True, 'a': False})],
                          attrfile=op.join('relative', '.gitattributes'))
-    # str patterns are written as given, Paths as the patterns matching them,
+    # str patterns are written as given, paths as the patterns matching them,
     # and all in the given order, since later lines overrule earlier ones
     attrlines = ['ikethemike/** bang', '/*.tsv top',
-                 '/sub/rel.json p', '/abs.json p -a']
+                 '/sub/rel.json p', '/dot.json p', '/abs.json p -a']
     eq_((gr.pathobj / 'relative' / '.gitattributes').read_text().splitlines(),
         attrlines)
-    # a Path must point into that directory, or nothing is written
+    # a path must point into that directory, or nothing is written
     assert_raises(FileNotInRepositoryError, gr.set_gitattributes,
-                  [('fine', {'p': True}), (Path('top.json'), {'p': True})],
+                  [('fine', {'p': True}), (Path('..', 'top.json'), {'p': True})],
                   attrfile=op.join('relative', '.gitattributes'))
     eq_((gr.pathobj / 'relative' / '.gitattributes').read_text().splitlines(),
         attrlines)
