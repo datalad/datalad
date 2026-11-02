@@ -420,8 +420,9 @@ class Update(Interface):
                 save_paths.append(ds.path)
             yield res
         # we need to save updated states only if merge was requested -- otherwise
-        # it was a pure fetch
-        if how_curr and recursive:
+        # it was a pure fetch.  Not after a reset either, which must leave the
+        # dataset at its target and not at a new commit on top of it (gh-7949)
+        if how_curr and how != "reset" and recursive:
             yield from _save_after_update(
                 refds, save_paths, update_failures, path, saw_subds, message)
 
@@ -618,6 +619,19 @@ def _get_adjust_mode(branch_name):
     return mode_to_option.get(mode, '--unlock')
 
 
+def _dirty_ignoring_subdatasets(repo):
+    """Like `repo.dirty`, but any change within subdatasets is disregarded.
+
+    A reset with --no-recurse-submodules leaves subdatasets as they are, so
+    neither their modifications nor their commits not (yet) saved in `repo`
+    are at risk.
+    """
+    return bool(repo.call_git(
+        ["status", "--porcelain", "--untracked-files=normal",
+         "--ignore-submodules=all"],
+        read_only=True).strip())
+
+
 def _annex_reset_target(repo, _remote, target, opts=None):
     """Reset an adjusted branch to a specific target revision.
 
@@ -625,7 +639,7 @@ def _annex_reset_target(repo, _remote, target, opts=None):
     the branch to maintain the adjusted state. This is useful for
     `how_subds='reset'` on adjusted branches.
     """
-    if repo.dirty:
+    if _dirty_ignoring_subdatasets(repo):
         yield {"action": "update.reset",
                "status": "error",
                "message": "Refusing to reset dirty working tree"}
@@ -637,10 +651,11 @@ def _annex_reset_target(repo, _remote, target, opts=None):
 
     def do_reset():
         # Checkout the corresponding branch
-        repo.call_git(['checkout', corr_branch])
+        repo.call_git(['checkout', '--no-recurse-submodules', corr_branch])
         try:
             # Reset to target
-            repo.call_git(['reset', '--hard', target])
+            repo.call_git(
+                ['reset', '--hard', '--no-recurse-submodules', target])
             # Re-adjust with --force to overwrite existing adjusted branch
             repo.call_annex(['adjust', adjust_mode, '--force'])
         except Exception:
@@ -660,7 +675,7 @@ def _annex_reset_target(repo, _remote, target, opts=None):
 
 
 def _reset_hard(repo, _, target, opts=None):
-    if repo.dirty:
+    if _dirty_ignoring_subdatasets(repo):
         yield {"action": "update.reset",
                "status": "error",
                "message": "Refusing to reset dirty working tree"}
@@ -668,7 +683,7 @@ def _reset_hard(repo, _, target, opts=None):
         yield _try_command(
             {"action": "update.reset", "message": ("Reset to %s", target)},
             repo.call_git,
-            ["reset", "--hard", target])
+            ["reset", "--hard", "--no-recurse-submodules", target])
 
 
 def _checkout(repo, _, target, opts=None):
