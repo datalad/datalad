@@ -206,7 +206,12 @@ class ReadThread(TransportThread):
             # try to close it and indicate EOF.
             _try_close(self.source)
             return None
-        return data or None
+        if not data:
+            # EOF: release the pipe now rather than when the consumer of the
+            # results gets around to it, which it might never do (gh-7932)
+            _try_close(self.source)
+            return None
+        return data
 
     def write(self,
               data: bytes
