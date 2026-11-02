@@ -118,11 +118,12 @@ def test_call_annex_resolves_cpus(path=None):
 
 
 @pytest.mark.ai_generated
-def test_available_cpu_count_warns_when_undetermined():
+@pytest.mark.parametrize("exc", [AttributeError, NotImplementedError, OSError])
+def test_available_cpu_count_warns_when_undetermined(exc):
     """available_cpu_count warns and returns 1 when the OS cannot report a count"""
     import datalad.utils as du
     with patch.object(du, '_n_available_cpus', None), \
-         patch('os.sched_getaffinity', side_effect=AttributeError, create=True), \
+         patch('os.sched_getaffinity', side_effect=exc, create=True), \
          patch('os.cpu_count', return_value=None), \
          swallow_logs(new_level=logging.WARNING) as cml:
         n = available_cpu_count()

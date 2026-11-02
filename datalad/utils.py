@@ -2880,9 +2880,12 @@ def available_cpu_count():
     if _n_available_cpus is None:
         try:
             _n_available_cpus = len(os.sched_getaffinity(0))
-        except (AttributeError, NotImplementedError):
-            # no sched_getaffinity (macOS/Windows or exotic platforms):
-            # fall back to the total CPU count, or 1 if undeterminable
+        except (AttributeError, NotImplementedError, OSError) as exc:
+            # no sched_getaffinity (macOS/Windows or exotic platforms), or the
+            # call failed (e.g. denied in a sandbox): fall back to the total
+            # CPU count, or 1 if undeterminable
+            lgr.debug("Could not get CPU affinity (%r), using os.cpu_count()",
+                      exc)
             if not (cpu_count := os.cpu_count()):
                 lgr.warning(
                     "Could not determine the number of CPUs available to "
