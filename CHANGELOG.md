@@ -1,4 +1,20 @@
 
+<a id='changelog-1.7.4'></a>
+# 1.7.4 (2026-11-02)
+
+## 🐛 Bug Fixes
+
+- Replaces `mktemp` with `mkdtemp` in file `datalad/support/archives.py` via
+  [PR #7534](https://github.com/datalad/datalad/pull/7534)
+  (by [@fazledyn-or](https://github.com/fazledyn-or))
+
+## 🏠 Internal
+
+- Pushes to `maint` now fast-forward `master` to it, as long as `master` has
+  no commits of its own.
+  ([PR #7978](https://github.com/datalad/datalad/pull/7978))
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.7.3'></a>
 # 1.7.3 (2026-10-31)
 
