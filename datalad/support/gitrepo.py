@@ -2773,16 +2773,11 @@ class GitRepo(CoreGitRepo):
           Each item is a 2-tuple, where the first element is a path pattern,
           and the second element is a dictionary with attribute key/value
           pairs. The attribute dictionary must use the same semantics as those
-          returned by `get_gitattributes()`. Path patterns are written as
-          given (with '/' as the directory separator), hence they are relative
-          to the directory that contains the target .gitattributes file (see
-          `attrfile`), and a leading '/' anchors them to it, as in
-          gitattributes(5): '/*.tsv' matches only the TSV files directly in
-          it, whereas '*.tsv' matches them at any depth. To give a path
-          instead, pass it as a Path, absolute or relative to the repository
-          root: it must lie within that directory, and is turned into the
-          pattern anchored to it which matches the path (glob characters in
-          it remain in effect).
+          returned by `get_gitattributes()`. A str pattern is written as
+          given, i.e. relative to the directory of `attrfile`, where a leading
+          '/' anchors it. A Path (absolute, or relative to the repository
+          root) must lie within that directory, and is written as the
+          anchored pattern matching it. Items are written in the given order.
         attrfile: path
           Path relative to the repository root of the .gitattributes file the
           attributes shall be set in.
@@ -2796,9 +2791,10 @@ class GitRepo(CoreGitRepo):
 
         # compose all lines first, to write none if a path is outside attrdir
         attrlines = []
-        for pattern, attr in sorted(attrs, key=lambda x: os.fspath(x[0])):
+        for pattern, attr in attrs:
             if isinstance(pattern, PathLike):
-                # a path, absolute or relative to the repository root
+                # a path, absolute or relative to the repository root:
+                # joining an absolute one to pathobj yields it as is
                 path = self.pathobj / pattern
                 # realpath only the directory, as _normalize_path() does
                 path = path.parent.resolve() / path.name
@@ -2816,7 +2812,7 @@ class GitRepo(CoreGitRepo):
                 attrline += u'"{}"'.format(npath.replace('"', '\\"'))
             else:
                 attrline += npath
-            for a in sorted(attr):
+            for a in attr:
                 val = attr[a]
                 if val is True:
                     attrline += ' {}'.format(a)
