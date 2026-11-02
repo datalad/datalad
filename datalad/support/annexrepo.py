@@ -890,10 +890,11 @@ class AnnexRepo(GitRepo, RepoInterface):
           If command passes list of files. If list is too long
           (by number of files or overall size) it will be split, and multiple
           command invocations will follow
-        jobs : int or 'auto', optional
+        jobs : int or 'auto' or 'cpus', optional
           If 'auto', the number of jobs will be determined automatically,
           informed by the configuration setting
-          'datalad.runtime.max-annex-jobs'.
+          'datalad.runtime.max-annex-jobs'.  If 'cpus', the number of CPUs
+          available to the process is used, not bounded by that setting.
         protocol : WitlessProtocol, optional
           Protocol class to pass to GitWitlessRunner.run(). By default this is
           StdOutErrCapture, which will provide default logging behavior and

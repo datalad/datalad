@@ -140,9 +140,10 @@ class ProducerConsumer:
         consumer: callable
           Is provided with items produced by producer.  Multiple consumers might
           operate in parallel threads if jobs > 1
-        jobs: int, optional
+        jobs: int or "auto" or "cpus", optional
           If None or "auto", 'datalad.runtime.max-jobs' configuration variable is
-          consulted.  With jobs=0 there is no threaded execution whatsoever.  With
+          consulted.  If "cpus", the number of CPUs available to the process is
+          used, not bounded by 'datalad.runtime.max-jobs'.  With jobs=0 there is no threaded execution whatsoever.  With
           jobs=1 there is a separate thread for the producer, so in effect with jobs=1
           some parallelization between producer (if it is a generator) and consumer
           could be achieved, while there is only a single thread available for consumers.
