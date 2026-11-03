@@ -1,4 +1,42 @@
 
+<a id='changelog-1.8.0'></a>
+# 1.8.0 (2026-11-03)
+
+## 💥 Breaking Changes
+
+- `GitRepo.set_gitattributes()` writes string patterns as given, so it no
+  longer converts absolute paths into patterns relative to the directory of
+  the `.gitattributes` file: pass such paths as `Path`s.  Strings starting
+  with `./` are paths relative to that directory, not the current one, and
+  `../` is not supported.
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+## 🚀 Enhancements and New Features
+
+- Add `cpus` as a new value for the `-J`/`--jobs` option, resolving to the
+  number of CPUs available to the process (via `os.sched_getaffinity` on
+  Linux, so CPU-affinity and cpuset limits are respected).  Unlike `auto`,
+  `cpus`
+  is not bounded by `datalad.runtime.max-annex-jobs`, providing an explicit
+  opt-in to CPU-count-based parallelism.  The `auto` path is now also
+  affinity-aware (no change in behavior under the default
+  `max-annex-jobs=1`).
+  [PR #7871](https://github.com/datalad/datalad/pull/7871)
+  (by [@just-meng](https://github.com/just-meng))
+
+## 🐛 Bug Fixes
+
+- `GitRepo.set_gitattributes()` accepts patterns anchored with a leading `/`,
+  e.g. `/*.tsv` for top-level TSV files only, instead of rejecting them as
+  outside the repository.
+  Fixes [#7972](https://github.com/datalad/datalad/issues/7972)
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
+- `GitRepo.set_gitattributes()` writes entries, and the attributes within
+  each, in the given order instead of sorting them, so that later ones
+  overrule earlier ones as the caller intends.
+  (by [@yarikoptic](https://github.com/yarikoptic))
+
 <a id='changelog-1.7.4'></a>
 # 1.7.4 (2026-11-02)
 
