@@ -39,10 +39,6 @@ def _get_unicode_robust_version(f):
     @wraps(f)
     def wrapped(*args, **kwargs):
         try:
-            if not kwargs:
-                if len(args) == 1:
-                    return f(args[0])
-                return f(*args)
             return f(*args, **kwargs)
         except UnicodeEncodeError:
             return f(ensure_bytes(*args, **kwargs))
@@ -276,11 +272,25 @@ def get_filtered_paths_(paths: Iterable[str|Path], filter_paths: Iterable[str | 
             yield '/'.join(path_parts)
 
 
+# os.name does not change while the process runs, so decide it only once.
+# The fast path below is for POSIX only: on Windows, isabs() also accepts
+# paths such as 'C:/x', which do not start with a separator.
+_ON_POSIX = os.name == 'posix'
+
+
 def _get_parent_paths_check(path: str, sep: str, asep: str) -> None:
-    """A little helper for get_parent_paths"""
-    if (type(path) is str and path
-            and path[0] not in {'/', '.'} and '//' not in path
-            and type(sep) is str and sep == '/' and os.name == 'posix'
+    """Make sure that a path given to get_parent_paths is valid
+
+    A valid path is relative and stays within its directory (it does not
+    start with the root, './' or '../'), is normalized (it has no '//'), and
+    uses only `sep` as separator (it has no `asep`).  Raise ValueError if the
+    path is not valid.
+    """
+    # Fast path: get_parent_paths calls this for every path and parent, and
+    # most of them are plain POSIX relative paths.  These simple str tests
+    # accept only paths that also pass all the full checks below.
+    if (_ON_POSIX and sep == '/' and type(path) is str and path
+            and path[0] not in '/.' and '//' not in path
             and asep not in path):
         return
     if isabs(path) or path.startswith(pardir + sep) or path.startswith(curdir + sep):
