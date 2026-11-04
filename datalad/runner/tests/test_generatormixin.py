@@ -154,12 +154,14 @@ def test_abandoned_generator_releases_pipes() -> None:
     assert isinstance(result_generator, _ResultGenerator)
     runner = result_generator.runner
     process = runner.process
+    assert process is not None
     next(result_generator)
     # ... and is abandoned here
     process.wait()
     for thread in (runner.stdout_enqueueing_thread,
                    runner.stderr_enqueueing_thread):
+        assert thread is not None
         thread.join(timeout=10)
-    assert process.stdout.closed
-    assert process.stderr.closed
+    assert process.stdout is not None and process.stdout.closed
+    assert process.stderr is not None and process.stderr.closed
 
