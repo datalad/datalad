@@ -118,6 +118,7 @@ platform_system = platform.system().lower()
 on_windows = platform_system == 'windows'
 on_osx = platform_system == 'darwin'
 on_linux = platform_system == 'linux'
+on_posix = os.name == 'posix'
 
 # COPY_BUFSIZE sort of belongs into datalad.consts, but that would lead to
 # circular import due to `on_windows`
