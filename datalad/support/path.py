@@ -31,6 +31,7 @@ from pathlib import (
 from ..utils import (
     ensure_bytes,
     getpwd,
+    on_posix,
 )
 
 
@@ -273,7 +274,20 @@ def get_filtered_paths_(paths: Iterable[str|Path], filter_paths: Iterable[str | 
 
 
 def _get_parent_paths_check(path: str, sep: str, asep: str) -> None:
-    """A little helper for get_parent_paths"""
+    """Make sure that a path given to get_parent_paths is valid
+
+    A valid path is relative and stays within its directory (it does not
+    start with the root, './' or '../'), is normalized (it has no '//'), and
+    uses only `sep` as separator (it has no `asep`).  Raise ValueError if the
+    path is not valid.
+    """
+    # Fast path: get_parent_paths calls this for every path and parent, and
+    # most of them are plain POSIX relative paths.  These simple str tests
+    # accept only paths that also pass all the full checks below.
+    if (on_posix and sep == '/' and type(path) is str and path
+            and path[0] not in '/.' and '//' not in path
+            and asep not in path):
+        return
     if isabs(path) or path.startswith(pardir + sep) or path.startswith(curdir + sep):
         raise ValueError("Expected relative within directory paths, got %r" % path)
     if sep+sep in path:
