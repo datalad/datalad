@@ -214,8 +214,9 @@
 
 # Run with our reported minimum Git version.  Pinned to ubuntu-24.04: Git
 # 2.31.0 no longer compiles against ubuntu-latest's libcurl.  See PR #7983.
+# TEMP -- DROP THIS COMMIT BEFORE MERGE: `cron-only` removed so the pinned
+# minimum-Git build is exercised on this PR instead of on the next cron.
 - python-version: '3.10'
-  cron-only: true
   minimum-git: true
   os: ubuntu-24.04
   extra-envs:
