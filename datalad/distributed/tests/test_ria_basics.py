@@ -49,7 +49,6 @@ from datalad.tests.utils_pytest import (
     known_failure_windows,
     serve_path_via_http,
     skip_if_adjusted_branch,
-    skip_if_no_network,
     skip_if_root,
     skip_ssh,
     skip_wo_symlink_capability,
@@ -566,10 +565,13 @@ def _test_binary_data(host, store, dspath):
     dspath = Path(dspath)
     store = Path(store)
 
-    url = "https://github.com/datalad/example-dicom-functional/blob/master/dicoms/MR.1.3.46.670589.11.38317.5.0.4476.2014042516042547586"
-    file = "dicomfile"
+    # every byte value: not valid UTF-8 and with a NUL byte in it, so an
+    # accidental decode/encode would either blow up or corrupt the content
+    file = "binaryfile"
+    content = bytes(range(256)) * 4
     ds = Dataset(dspath).create()
-    ds.download_url(url, path=file, message="Add DICOM file from github")
+    (dspath / file).write_bytes(content)
+    ds.save(file, message="Add binary file")
     assert_repo_status(ds.path)
 
     # set up store:
@@ -607,12 +609,17 @@ def _test_binary_data(host, store, dspath):
     known_sources = ds.repo.whereis(str(file))
     assert_in(here_uuid, known_sources)
     assert_in(store_uuid, known_sources)
+    assert_equal((dspath / file).read_bytes(), content)
 
 
-def test_binary_data():
-    # TODO: Skipped due to gh-4436
-    known_failure_windows(skip_ssh(_test_binary_data))('datalad-test')
-    skip_if_no_network(_test_binary_data)(None)
+@known_failure_windows  # TODO: Skipped due to gh-4436
+@skip_ssh
+def test_binary_data_ssh():
+    _test_binary_data('datalad-test')
+
+
+def test_binary_data_local():
+    _test_binary_data(None)
 
 
 @known_failure_windows
