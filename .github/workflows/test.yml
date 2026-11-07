@@ -270,6 +270,9 @@ jobs:
           python -m pip freeze
 
       - name: Run tests
+        # ~2x the slowest job observed; a deadlock would otherwise run into
+        # the 6h job default.  See PR #7983.
+        timeout-minutes: 90
         run: |
           PYTEST_OPTS=( -v --durations=0 --durations-min=5
                         --fail-slow "$PYTEST_FAIL_SLOW" )
