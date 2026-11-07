@@ -1311,11 +1311,9 @@ def test_gitattributes(path=None):
     # attributes
     eq_(gr.get_gitattributes('.', index_only=True)['.'], {})
 
-    # we can send absolute path patterns and write to any file, and
-    # the patterns will be translated relative to the target file
-    gr.set_gitattributes([
-        (op.join(gr.path, 'relative', 'ikethemike/**'), {'bang': True})],
-        attrfile=op.join('relative', '.gitattributes'))
+    # we can write to any file, and patterns are relative to its directory
+    gr.set_gitattributes([('ikethemike/**', {'bang': True})],
+                         attrfile=op.join('relative', '.gitattributes'))
     # directory and file get created
     ok_(op.exists(op.join(gr.path, 'relative', '.gitattributes')))
     eq_(gr.get_gitattributes(
@@ -1323,6 +1321,36 @@ def test_gitattributes(path=None):
         # always comes out relative to the repo root, even if abs goes in
         {op.join('relative', 'ikethemike', 'probe'):
             {'tag': False, 'sec.key': 'val', 'bang': True}})
+    # a leading '/' anchors a pattern to that directory, as in
+    # gitattributes(5) (gh-7972)
+    gr.set_gitattributes([('/*.tsv', {'top': True})],
+                         attrfile=op.join('relative', '.gitattributes'))
+    attrs = gr.get_gitattributes(
+        ['relative/top.tsv', 'relative/sub/deep.tsv', 'top.tsv'])
+    eq_({p: a.get('top') for p, a in attrs.items()},
+        {'relative/top.tsv': True,
+         'relative/sub/deep.tsv': None,
+         'top.tsv': None})
+    # whereas a Path, absolute or relative to that directory, and a str
+    # starting with './' are paths, turned into the anchored patterns
+    # matching them
+    gr.set_gitattributes([(Path('sub', 'rel.json'), {'p': True}),
+                          ('./dot.json', {'p': True}),
+                          (gr.pathobj / 'relative' / 'abs.json',
+                           {'p': True, 'a': False})],
+                         attrfile=op.join('relative', '.gitattributes'))
+    # str patterns are written as given, paths as the patterns matching them,
+    # and all in the given order, since later lines overrule earlier ones
+    attrlines = ['ikethemike/** bang', '/*.tsv top',
+                 '/sub/rel.json p', '/dot.json p', '/abs.json p -a']
+    eq_((gr.pathobj / 'relative' / '.gitattributes').read_text().splitlines(),
+        attrlines)
+    # a path must point into that directory, or nothing is written
+    assert_raises(FileNotInRepositoryError, gr.set_gitattributes,
+                  [('fine', {'p': True}), (Path('..', 'top.json'), {'p': True})],
+                  attrfile=op.join('relative', '.gitattributes'))
+    eq_((gr.pathobj / 'relative' / '.gitattributes').read_text().splitlines(),
+        attrlines)
     if get_encoding_info()['default'] != 'ascii' and not on_windows:
         # do not perform this on obscure systems without anything like UTF
         # it is not relevant whether a path actually exists, and paths

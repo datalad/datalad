@@ -19,7 +19,6 @@ import re
 import time
 import warnings
 from itertools import chain
-from multiprocessing import cpu_count
 from os import linesep
 from os.path import (
     curdir,
@@ -71,6 +70,7 @@ from datalad.utils import (
     Path,
     PurePosixPath,
     auto_repr,
+    available_cpu_count,
     bytes2human,
     ensure_list,
     on_windows,
@@ -96,6 +96,7 @@ from .exceptions import (
     OutdatedExternalDependency,
     OutOfSpaceError,
     RemoteNotAvailableError,
+    RemoteNotVerifiedError,
 )
 from .external_versions import external_versions
 from .gitrepo import (
@@ -560,6 +561,10 @@ class AnnexRepo(GitRepo, RepoInterface):
             "yes" if ver >= '10.20230408' else \
             "maybe" if ver > '10.20230407' else \
             "no"
+        # --json/--json-error-messages were extended to a batch of commands,
+        # unannex among them, in the 10.20230626 release.  Our announced
+        # minimum (GIT_ANNEX_MIN_VERSION) is older than that.
+        kludges["unannex-json"] = ver >= '10.20230626'
         cls._version_kludges = kludges
         return kludges[key]
 
@@ -892,10 +897,11 @@ class AnnexRepo(GitRepo, RepoInterface):
           If command passes list of files. If list is too long
           (by number of files or overall size) it will be split, and multiple
           command invocations will follow
-        jobs : int or 'auto', optional
+        jobs : int or 'auto' or 'cpus', optional
           If 'auto', the number of jobs will be determined automatically,
           informed by the configuration setting
-          'datalad.runtime.max-annex-jobs'.
+          'datalad.runtime.max-annex-jobs'.  If 'cpus', the number of CPUs
+          available to the process is used, not bounded by that setting.
         protocol : WitlessProtocol, optional
           Protocol class to pass to GitWitlessRunner.run(). By default this is
           StdOutErrCapture, which will provide default logging behavior and
@@ -959,13 +965,15 @@ class AnnexRepo(GitRepo, RepoInterface):
         if self._annex_common_options:
             cmd += self._annex_common_options
 
-        if jobs == 'auto':
+        if jobs == 'cpus':
+            jobs = available_cpu_count()
+        elif jobs == 'auto':
             # Limit to # of CPUs (but at least 3 to start with)
             # and also an additional config constraint (by default 1
             # due to https://github.com/datalad/datalad/issues/4404)
             jobs = self._n_auto_jobs or min(
                 self.config.obtain('datalad.runtime.max-annex-jobs'),
-                max(3, cpu_count()))
+                max(3, available_cpu_count()))
             # cache result to avoid repeated calls to cpu_count()
             self._n_auto_jobs = jobs
         if jobs and jobs != 1:
@@ -1930,12 +1938,24 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
 
         options = options[:] if options else []
-        # --json, since the human-readable output C-quotes paths (e.g., with
-        # a tab or a backslash)
+        if self._check_version_kludges('unannex-json'):
+            # --json, since the human-readable output C-quotes paths (e.g.,
+            # with a tab or a backslash)
+            return [
+                r['file']
+                for r in self.call_annex_records(['unannex'] + options, files=files)
+                if r.get('success')
+            ]
+        # No --json for unannex on this git-annex, so fall back to parsing the
+        # human-readable output.  Paths needing more than `"` quoting come back
+        # mangled -- that is what --json above avoids.
+        prefix = 'unannex'
+        suffix = 'ok'
         return [
-            r['file']
-            for r in self.call_annex_records(['unannex'] + options, files=files)
-            if r.get('success')
+            # we cannot .split here since filename could have spaces
+            self._unquote_annex_path(line[len(prefix) + 1 : -(len(suffix) + 1)])
+            for line in self.call_annex_items_(['unannex'] + options, files=files)
+            if line.split()[0] == prefix and line.split()[-1] == suffix
         ]
 
     @normalize_paths(map_filenames_back=True)
@@ -2096,6 +2116,88 @@ class AnnexRepo(GitRepo, RepoInterface):
             else:
                 raise e
         self.config.reload()
+
+    def verify_remote(self, name, mode='interactive'):
+        """Verify the configuration of a special remote
+
+        git-annex (since 10.20261026, CVE-2026-112818) requires a special
+        remote's configuration to be verified -- confirmed to be of an
+        expected location -- before it fully uses the remote.  Does nothing
+        with an older git-annex, or for a remote verified already
+        (``remote.NAME.annex-verified=verified``).
+
+        Parameters
+        ----------
+        name: str
+          name of the special remote
+        mode: {'interactive', 'mark-safe', 'mark-unsafe'}, optional
+          'interactive' displays the configuration, as
+          ``git annex verifyremote NAME`` does, and asks the user to confirm
+          it.  Without an interactive UI, RemoteNotVerifiedError, carrying
+          git-annex's instructions, is raised instead.
+          'mark-safe' confirms it without anyone looking at it, so use it
+          only for a special remote whose configuration you created yourself
+          or have reviewed.
+          'mark-unsafe' rejects it.
+
+        Returns
+        -------
+        bool
+          True if it has a verified configuration (or git-annex
+          does not verify special remotes), False if not.
+        """
+        if mode not in ('interactive', 'mark-safe', 'mark-unsafe'):
+            raise ValueError(
+                "mode must be 'interactive', 'mark-safe' or 'mark-unsafe', "
+                "not {!r}".format(mode))
+        annex_version = external_versions['cmd:annex']
+        if annex_version < '10.20261026':
+            lgr.debug("Not verifying special remote %s: git-annex %s does not "
+                      "verify special remotes", name, annex_version)
+            return True
+        verified_var = 'remote.{}.annex-verified'.format(name)
+        self.config.reload()
+        if self.config.get(verified_var) == 'verified':
+            if mode == 'mark-unsafe':
+                lgr.warning("Not marking special remote %s unsafe: it is "
+                            "verified already", name)
+            return True
+        if mode == 'interactive' or mode == 'mark-safe':
+            out = self.call_annex(['verifyremote', name])
+            # the ID makes sure that it is that very configuration which
+            # gets verified
+            safe_id = re.search(
+                r'verifyremote {} --safe (\d+)'.format(re.escape(name)), out)
+            if not safe_id:
+                lgr.warning("Cannot verify special remote %s: %s",
+                            name, out.strip())
+                return False
+            if mode == 'interactive':
+                if not ui.is_interactive:
+                    raise RemoteNotVerifiedError(
+                        name,
+                        "git-annex does not use special remote {} until its "
+                        "configuration is verified, and there is no "
+                        "interactive session to confirm it:\n{}".format(
+                            name, out.strip()))
+                # display the configuration and git-annex's question, but not
+                # the commands to answer it, which are run here
+                if ui.yesno(out.split('\nIf so, run:', 1)[0].strip(),
+                            title="Verifying special remote {}".format(name)):
+                    mode = 'mark-safe'
+        if mode == 'mark-safe':
+            self.call_annex(
+                ['verifyremote', name, '--safe', safe_id.group(1)])
+            self.config.reload()
+            return self.config.get(verified_var) == 'verified'
+        # 'mark-unsafe', or the user said no
+        try:
+            self.call_annex(['verifyremote', name, '--unsafe'])
+        except CommandError as e:
+            # git-annex fails it, explaining what it means
+            lgr.warning("Told git-annex that special remote %s is unsafe:\n%s",
+                        name, (e.stderr or '').strip())
+        return False
 
     def merge_annex(self, remote=None):  # do not use anymore, use localsync()
         self.localsync(remote)

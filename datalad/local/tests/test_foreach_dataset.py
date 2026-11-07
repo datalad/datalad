@@ -7,9 +7,11 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test foreach-dataset command"""
 
+import logging
 import os.path as op
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -24,6 +26,7 @@ from datalad.tests.utils_pytest import (
     eq_,
     get_deeply_nested_structure,
     ok_clean_git,
+    swallow_logs,
     swallow_outputs,
     with_tempfile,
 )
@@ -154,3 +157,15 @@ def test_python():
         return kwargs
 
     check_python_eval(dummy_dir)  # direct function invocation
+
+
+@pytest.mark.ai_generated
+@with_tempfile(mkdir=True)
+def test_python_parallel_warning_with_str_jobs(path=None):
+    """A str jobs value ('cpus'/'auto') resolving to >1 still gets a readable warning"""
+    ds = Dataset(path).create()
+    with patch('datalad.support.parallel.available_cpu_count', return_value=2), \
+            swallow_logs(new_level=logging.WARNING) as cml:
+        res = ds.foreach_dataset("ds.path", cmd_type='eval', jobs='cpus')
+    assert_status('ok', res)
+    cml.assert_logged("Got jobs=2. ", level='WARNING', regex=False)

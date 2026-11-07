@@ -79,6 +79,7 @@ from datalad.tests.utils_pytest import (
     swallow_logs,
     with_sameas_remote,
     with_tempfile,
+    with_testsui,
     with_tree,
     xfail_annex_ignore_not_respected_for_local,
 )
@@ -130,7 +131,7 @@ def test_invalid_args(path=None, otherpath=None, alienpath=None):
 
 
 @integration
-@skip_if_no_network
+@skip_if_no_network(url=consts.DATASETS_TOPURL)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_clone_crcns(tdir=None, ds_path=None):
@@ -148,7 +149,7 @@ def test_clone_crcns(tdir=None, ds_path=None):
 
 
 @integration
-@skip_if_no_network
+@skip_if_no_network(url=consts.DATASETS_TOPURL)
 @pytest.mark.xfail(on_osx and on_github, reason="spurious https://github.com/datalad/datalad/issues/7485")
 @with_tree(tree={'sub': {}})
 def test_clone_datasets_root(tdir=None):
@@ -564,7 +565,7 @@ def test_clone_report_permission_issue(tdir=None):
         )
 
 
-@skip_if_no_network
+@skip_if_no_network(url=consts.DATASETS_TOPURL)
 @with_tempfile
 def test_autoenabled_remote_msg(path=None):
     # Verify that no message about a remote not been enabled is displayed
@@ -968,9 +969,20 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
                               "auto-enabled",
                           level="INFO",
                           regex=False)
+        if external_versions['cmd:annex'] >= '10.20261026':
+            # there is no interactive session to verify the special remote,
+            # but the user is told
+            cml.assert_logged(msg="git-annex does not use special remote "
+                                  "store-storage until its configuration is "
+                                  "verified",
+                              level="WARNING",
+                              regex=False)
 
     # However, we now can retrieve content since clone should have enabled the
-    # special remote with new URL (or origin in case of HTTP).
+    # special remote with new URL (or origin in case of HTTP), once its
+    # configuration, created by this test, is verified (git-annex >=
+    # 10.20261026 does not use it before).
+    riaclone.repo.verify_remote('store-storage', mode='mark-safe')
     res = riaclone.get('test.txt')
     assert_result_count(res, 1,
                         status='ok',
@@ -1004,6 +1016,7 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
                               "auto-enabled",
                           level="INFO",
                           regex=False)
+    riaclonesub.repo.verify_remote('store-storage', mode='mark-safe')
     res = riaclonesub.get('testsub.txt')
     assert_result_count(res, 1,
                         status='ok',
@@ -1052,9 +1065,13 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
     # get it again:
 
     # Autoenabling should fail initially by git-annex-init and we would report
-    # on INFO level. Only postclone routine would deal with it.
+    # on INFO level. Only postclone routine would deal with it, this time
+    # asking to verify the special remote, if git-annex needs it to.
     with swallow_logs(new_level=logging.INFO) as cml:
-        ds.get('sub', get_data=False)
+        with_testsui(
+            responses=['yes']
+            if external_versions['cmd:annex'] >= '10.20261026' else None,
+        )(ds.get)('sub', get_data=False)
         cml.assert_logged(msg="access to 1 dataset sibling store-storage not "
                               "auto-enabled",
                           level="INFO",

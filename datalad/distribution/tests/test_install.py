@@ -29,6 +29,7 @@ from datalad.api import (
     install,
 )
 from datalad.cmd import WitlessRunner as Runner
+from datalad.consts import DATASETS_TOPURL
 from datalad.interface.results import YieldDatasets
 from datalad.support import path as op
 from datalad.support.annexrepo import AnnexRepo
@@ -182,7 +183,7 @@ def test_invalid_args(path=None):
 #    assert_in(crcns.path, ds.get_subdatasets(absolute=True))
 
 
-@skip_if_no_network
+@skip_if_no_network(url=DATASETS_TOPURL)
 @with_tree(tree={'sub': {}})
 def test_install_datasets_root(tdir=None):
     with chpwd(tdir):
@@ -503,7 +504,7 @@ def test_install_into_dataset(source=None, top_path=None):
 
 @slow   # 15sec on Yarik's laptop
 @usecase  # 39.3074s
-@skip_if_no_network
+@skip_if_no_network(url=DATASETS_TOPURL)
 @with_tempfile
 def test_failed_install_multiple(top_path=None):
     ds = create(top_path)
@@ -959,7 +960,7 @@ def test_install_subds_from_another_remote(topdir=None):
 # Takes > 2 sec
 # Do not use cassette
 @pytest.mark.parametrize("suffix", ["", "/.git"])
-@skip_if_no_network
+@skip_if_no_network(url=DATASETS_TOPURL)
 @with_tempfile
 def test_datasets_datalad_org(tdir=None, *, suffix):
     # Test that git annex / datalad install, get work correctly on our datasets.datalad.org

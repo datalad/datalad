@@ -33,6 +33,7 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
     CapturedException,
     DownloadError,
+    RemoteNotVerifiedError,
 )
 from datalad.support.gitrepo import GitRepo
 from datalad.support.network import (
@@ -233,6 +234,13 @@ def postclonecfg_ria(ds, props, remote="origin"):
                     lgr.debug("Failed to reconfigure ORA special remote: %s", ce)
                     repo.config.unset(f"remote.{srs[org_uuid]['name']}.ora-url",
                                       scope='local')
+                else:
+                    # git-annex (>= 10.20261026) does not use it before its
+                    # configuration, from the cloned dataset, is verified
+                    try:
+                        repo.verify_remote(srs[org_uuid]['name'])
+                    except RemoteNotVerifiedError as e:
+                        lgr.warning("%s", e)
             else:
                 lgr.debug("Unknown ORA special remote uuid at '%s': %s",
                           remote, org_uuid)
