@@ -8,7 +8,6 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import logging
-import sys
 from functools import partial
 from time import (
     sleep,
@@ -38,7 +37,6 @@ from datalad.tests.utils_pytest import (
     slow,
     with_tempfile,
 )
-from datalad.utils import on_windows
 
 info_log_level = lgr.getEffectiveLevel() >= logging.INFO
 
@@ -94,11 +92,6 @@ def test_producing_consumer(jobs):
 
 
 def test_producer_future_key(jobs):
-    if sys.version_info >= (3, 13) and jobs == 10:
-        pytest.xfail("Known issue with Python 3.13 and jobs=10")
-    if on_windows and jobs == 10:
-        pytest.xfail("Known issue on Windows with jobs=10")
-
     def producer():
         for i in range(3):
             yield i, {"k": i**2}  # dict is mutable, will need a key
@@ -108,7 +101,16 @@ def test_producer_future_key(jobs):
         yield i
 
     pc = ProducerConsumer(producer(), consumer, producer_future_key=lambda r: r[0], jobs=jobs)
-    assert_equal(list(pc), [0, 1, 2])
+    # Only a serial run may be expected to preserve the producer's order --
+    # see the "order might not match the one provided by producer" note in
+    # ProducerConsumer's docstring, and d8eed5001 which made the same
+    # correction to test_producing_consumer above.  `producer_future_key`
+    # keys the futures dict for `safe_to_consume`; it is not an ordering
+    # mechanism.
+    if ProducerConsumer.get_effective_jobs(jobs) <= 1:
+        assert_equal(list(pc), [0, 1, 2])
+    else:
+        assert_equal(set(pc), {0, 1, 2})
 
 
 @slow  # 12sec on Yarik's laptop

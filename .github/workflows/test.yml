@@ -270,9 +270,15 @@ jobs:
           python -m pip freeze
 
       - name: Run tests
+        # ~2x the slowest job observed; a deadlock would otherwise run into
+        # the 6h job default.  See PR #7983.
+        timeout-minutes: 90
         run: |
+          # faulthandler_timeout dumps all thread stacks (2x the --fail-slow
+          # per-test budget), which --fail-slow cannot do for a hung test.
           PYTEST_OPTS=( -v --durations=0 --durations-min=5
-                        --fail-slow "$PYTEST_FAIL_SLOW" )
+                        --fail-slow "$PYTEST_FAIL_SLOW"
+                        -o faulthandler_timeout=600 )
 
           # Coverage costs ~39% of test runtime, so collect it where somebody
           # reads it and skip it where nobody does: the upload below never
