@@ -240,10 +240,10 @@ def get_filtered_paths_(paths: Iterable[str|Path], filter_paths: Iterable[str | 
             if type(p) is str and not p.startswith('/'):
                 # split plain relative str paths directly, the same way
                 # PurePosixPath does, which is much cheaper than parsing
-                parts = p.split('/')
-                if '' in parts or '.' in parts:
-                    parts = [part for part in parts if part and part != '.']
-                parts = tuple(parts)
+                split = p.split('/')
+                if '' in split or '.' in split:
+                    split = [part for part in split if part and part != '.']
+                parts = tuple(split)
             else:
                 pp = PurePosixPath(p)
                 if pp.is_absolute():
