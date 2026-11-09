@@ -114,6 +114,26 @@ def test_line_splitter_corner_cases() -> None:
     assert_equal(lines, ["  a   ", " "])
 
 
+def test_line_splitter_crlf_across_chunks() -> None:
+    # A "\r\n" that is split between two chunks is one line ending, and
+    # must not produce an extra empty line.
+    line_splitter = LineSplitter()
+    assert_equal(line_splitter.process("a\r"), ["a"])
+    assert_equal(line_splitter.process("\nb\r\n"), ["b"])
+    assert_equal(line_splitter.finish_processing(), None)
+
+    line_splitter = LineSplitter(keep_ends=True)
+    assert_equal(line_splitter.process("a\r"), ["a\r"])
+    assert_equal(line_splitter.process("\nb\n"), ["b\n"])
+
+    # A "\n" after a chunk that ended with "\r" alone is the end of an
+    # empty line only if it is not the first character of the next chunk.
+    line_splitter = LineSplitter()
+    assert_equal(line_splitter.process("a\r"), ["a"])
+    assert_equal(line_splitter.process("\n"), [])
+    assert_equal(line_splitter.process("\n"), [""])
+
+
 def test_assembling_decoder_mix_in_basic() -> None:
 
     encoding = "utf-8"
