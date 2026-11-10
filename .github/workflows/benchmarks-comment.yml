@@ -1,0 +1,101 @@
+name: Benchmarks comment
+
+# Post the report of the Benchmarks workflow to its PR.
+#
+# The Benchmarks workflow cannot do it itself, since it gets a read-only
+# token for PRs from forks.  This workflow runs in the context of the base
+# repository instead, with a token which can comment.  It must therefore never
+# check out or run code from the PR: the report is produced by the PR's code,
+# so it is untrusted and only used as the text of the comment.
+#
+# A PR gets a new comment only if benchmarks got significantly slower or
+# faster, or fail, or the report has notes.  An existing comment is updated
+# by every later report, so it does not keep reporting changes which are
+# gone.
+
+on:
+  workflow_run:
+    workflows: [Benchmarks]
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
+
+jobs:
+  comment:
+    runs-on: ubuntu-latest
+    # The Benchmarks workflow fails if benchmarks got slower, which is the
+    # main reason to comment
+    if: >-
+      github.event.workflow_run.event == 'pull_request'
+      && (github.event.workflow_run.conclusion == 'success'
+          || github.event.workflow_run.conclusion == 'failure')
+    permissions:
+      actions: read         # to download the report of the Benchmarks run
+      pull-requests: write  # to comment on the PR
+    steps:
+    - name: Download report
+      id: download
+      # There is no report if the benchmarks could not be run at all
+      continue-on-error: true
+      uses: actions/download-artifact@v8
+      with:
+        name: benchmarks-report
+        path: ${{ runner.temp }}/benchmarks-report
+        run-id: ${{ github.event.workflow_run.id }}
+        github-token: ${{ github.token }}
+    - name: Comment on PR
+      if: steps.download.outcome == 'success'
+      # bash with pipefail, so failing API calls are not hidden
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+        HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        RUN_URL: ${{ github.event.workflow_run.html_url }}
+        REPORT_DIR: ${{ runner.temp }}/benchmarks-report
+      run: |
+        marker='<!-- benchmarks-report -->'
+        pr=$(cat "$REPORT_DIR/pr-number")
+        notable=$(cat "$REPORT_DIR/notable")
+        if ! [[ "$pr" =~ ^[0-9]+$ ]]; then
+          echo "::error::Report contains no valid PR number"
+          exit 1
+        fi
+        # Comment only on the open PR whose head is the benchmarked commit.
+        # If the PR got updated since, its newer run will report instead.
+        pr_info=$(gh api "repos/$GH_REPO/pulls/$pr" --jq '"\(.head.sha) \(.state) \(.locked)"')
+        read -r pr_head pr_state pr_locked <<< "$pr_info"
+        if [ "$pr_head" != "$HEAD_SHA" ] || [ "$pr_state" != open ] || [ "$pr_locked" != false ]; then
+          echo "PR #$pr is $pr_state (locked: $pr_locked) with head $pr_head, benchmarked was $HEAD_SHA: not commenting"
+          exit 0
+        fi
+
+        body="$RUNNER_TEMP/comment.md"
+        {
+          echo "$marker"
+          # A zero-width space after "@" (also if given as HTML entity)
+          # prevents mentions
+          sed -E 's/&(#0*64|#[xX]0*40|commat);?/@/g; s/@/@\xe2\x80\x8b/g' "$REPORT_DIR/report.md"
+          echo
+          echo "<sub>PR head ${HEAD_SHA:0:8} merged into its target branch, [workflow run]($RUN_URL)</sub>"
+        } > "$body"
+
+        comment_id=$(
+          gh api --paginate "repos/$GH_REPO/issues/$pr/comments" \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" \
+          | tail -n 1
+        )
+        if [ -n "$comment_id" ]; then
+          gh api --method PATCH "repos/$GH_REPO/issues/comments/$comment_id" \
+            -F "body=@$body" --silent
+          echo "Updated comment $comment_id on PR #$pr"
+        elif [ "$notable" = true ]; then
+          gh api --method POST "repos/$GH_REPO/issues/$pr/comments" \
+            -F "body=@$body" --silent
+          echo "Commented on PR #$pr"
+        else
+          echo "No significant changes and no earlier report on PR #$pr: not commenting"
+        fi

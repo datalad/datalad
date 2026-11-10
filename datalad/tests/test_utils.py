@@ -1358,6 +1358,7 @@ def test_get_open_files(p=None):
     eq_(get_open_files(p)[str(subd.resolve())].pid, proc.pid)
     eq_(get_open_files(subd)[str(subd.resolve())].pid, proc.pid)
     proc.terminate()
+    proc.wait()
     assert_equal(get_open_files(str(subd)), {})
 
 

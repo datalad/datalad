@@ -155,9 +155,11 @@ we outline the workflow used by the developers:
    fill in the checklist and delete the instructions.
 
    PRs should be labeled with a `semver-*` label (e.g. `semver-patch`,
-   `semver-minor`) to indicate the type of version bump. Adding the
-   `CHANGELOG-missing` label triggers automatic generation of a changelog
-   snippet under `changelog.d/`.  See [CHANGELOG entries](#changelog-entries-and-labelling-pull-requests)
+   `semver-minor`) to indicate the type of version bump. Every PR needs a
+   changelog fragment `changelog.d/pr-NUMBER.md`: commit it to the PR's
+   branch once you know the PR number, or ask for the `CHANGELOG-missing`
+   label, which generates one from the PR title.
+   See [CHANGELOG entries](#changelog-entries-and-labelling-pull-requests)
    for details.  Keep that snippet short and scaled to the change; see
    [Writing the entry](#writing-the-entry).
 
@@ -410,7 +412,18 @@ We use [asv] to benchmark core DataLad functionality.  Benchmarks live in
 [benchmarks/](./benchmarks).  Historical results were published at
 https://datalad.github.io/datalad/ (not actively maintained).  The
 [benchmarks workflow](.github/workflows/benchmarks.yml) still runs on PRs to
-gate against performance regressions.
+gate against performance regressions.  It runs the benchmarks of the PR,
+including any it adds or modifies, for the PR and for its merge target, and
+summarizes the comparison in the job summary.  The job fails if a benchmark
+fails for the PR, or got significantly slower by more than a factor of 1.2.
+If any benchmark got significantly slower or faster, or fails for the PR (or
+the benchmarks of the PR could not be run for the merge target), the
+[benchmarks-comment workflow](.github/workflows/benchmarks-comment.yml)
+posts the summary to the PR, and updates that comment on later runs.  When
+benchmarking new functionality, import it within the benchmark (or its
+`setup`), not at module level: otherwise the benchmarks of the PR cannot be
+imported for the merge target, and none of the added or modified ones get
+compared.
 
 Setup:
 
@@ -585,6 +598,10 @@ A release from `master` fails unless `maint` is merged into `master`, and on suc
 DataLad uses [scriv](https://github.com/nedbat/scriv/) to maintain [CHANGELOG.md](./CHANGELOG.md).
 Adding label `CHANGELOG-missing` to a PR triggers workflow to add a new `scriv` changelog fragment under `changelog.d/` using PR title as the content.
 That produced changelog snippet could subsequently tuned to improve perspective CHANGELOG entry.
+Only maintainers can add labels, so contributors -- and AI assistants in
+particular -- are expected to write the fragment themselves: open the PR, then
+commit `changelog.d/pr-NUMBER.md` (see [Writing the entry](#writing-the-entry)
+and the fragments already under `changelog.d/` for the format) to its branch.
 The section that workflow adds to the changelog depends on the `semver-` label added to the PR:
 
 - `semver-minor` — for changes corresponding to an increase in the minor version
