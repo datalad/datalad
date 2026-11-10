@@ -24,7 +24,7 @@ not the assistant — set `user.name`/`user.email` accordingly (e.g.
 identity says otherwise. Credit the harness and the model in the
 `Co-Authored-By:` trailer instead, e.g.
 
-   Co-Authored-By: Claude Code 2.1.319 / Claude Opus 5.5 <noreply@anthropic.com>
+    Co-Authored-By: Claude Code 2.1.319 / Claude Opus 5.5 <noreply@anthropic.com>
 
 GitHub counts commit authors, not trailers, towards the repository's
 contributor list; see `CONTRIBUTING.md`, section "Recognizing contributions".
