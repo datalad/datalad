@@ -89,7 +89,7 @@ def decompress_file(archive, dir_):
             and tarfile.is_tarfile(archive)
         ):
             raise
-        lgr.info(
+        lgr.warning(
             "7z could not create the links in %s on this filesystem, "
             "extracting copies of their targets instead", archive)
         try:
