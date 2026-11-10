@@ -237,40 +237,48 @@ def get_filtered_paths_(paths: Iterable[str|Path], filter_paths: Iterable[str | 
     def _harmonize_paths(l: Iterable[str | Path]) -> list[tuple[str, ...]]:
         ps = []
         for p in l:
-            pp = PurePosixPath(p)
-            if pp.is_absolute():
-                raise ValueError(f"Got absolute path {p}, expected relative")
-            if pp.parts and pp.parts[0] == '..':
+            if type(p) is str and not p.startswith('/'):
+                # split plain relative str paths directly, the same way
+                # PurePosixPath does, which is much cheaper than parsing
+                split = p.split('/')
+                if '' in split or '.' in split:
+                    split = [part for part in split if part and part != '.']
+                parts = tuple(split)
+            else:
+                pp = PurePosixPath(p)
+                if pp.is_absolute():
+                    raise ValueError(f"Got absolute path {p}, expected relative")
+                parts = pp.parts
+            if parts and parts[0] == '..':
                 raise ValueError(f"Path {p} leads outside")
-            ps.append(pp.parts)  # store parts
+            ps.append(parts)  # store parts
         return sorted(ps)  # O(N * log(N))
 
     paths_parts = _harmonize_paths(paths)
     filter_paths_parts = _harmonize_paths(filter_paths)
+    n_filter_paths = len(filter_paths_parts)
+    i = 0  # index of the current filter path
 
     # we will pretty much "scroll" through sorted paths and filter_paths at the same time
     for path_parts in paths_parts:
-        while filter_paths_parts:
-            filter_path_parts = filter_paths_parts[0]
-            l = min(len(path_parts), len(filter_path_parts))
-            # if common part is "greater" in the path -- we can go to the next "filter"
-            if filter_path_parts[:l] < path_parts[:l]:
-                # get to the next one
-                filter_paths_parts = filter_paths_parts[1:]
-            else:
-                break  # otherwise -- consider this one!
+        while i < n_filter_paths:
+            filter_path_parts = filter_paths_parts[i]
+            # path is under the filter path -- select it
+            if path_parts[:len(filter_path_parts)] == filter_path_parts:
+                yield '/'.join(path_parts)
+                break
+            # filter path sorts after the path -- consider this one, and
+            # (if include_within_path) select the path if the filter path is under it
+            if filter_path_parts > path_parts:
+                if (include_within_path
+                        and filter_path_parts[:len(path_parts)] == path_parts):
+                    yield '/'.join(path_parts)
+                break
+            # common part is "greater" in the path -- get to the next "filter"
+            i += 1
         else:
             # no filter path left - the other paths cannot be the selected ones
             break
-        if include_within_path:
-            # if one identical or subpath of another one -- their parts match in the beginning
-            # and we will just reuse that 'l'
-            pass
-        else:
-            # if all components of the filter match, for that we also add len(path_parts) check below
-            l = len(filter_path_parts)
-        if len(path_parts) >= l and (path_parts[:l] == filter_path_parts[:l]):
-            yield '/'.join(path_parts)
 
 
 def _get_parent_paths_check(path: str, sep: str, asep: str) -> None:
