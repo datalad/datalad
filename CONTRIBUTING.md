@@ -412,7 +412,18 @@ We use [asv] to benchmark core DataLad functionality.  Benchmarks live in
 [benchmarks/](./benchmarks).  Historical results were published at
 https://datalad.github.io/datalad/ (not actively maintained).  The
 [benchmarks workflow](.github/workflows/benchmarks.yml) still runs on PRs to
-gate against performance regressions.
+gate against performance regressions.  It runs the benchmarks of the PR,
+including any it adds or modifies, for the PR and for its merge target, and
+summarizes the comparison in the job summary.  The job fails if a benchmark
+fails for the PR, or got significantly slower by more than a factor of 1.2.
+If any benchmark got significantly slower or faster, or fails for the PR (or
+the benchmarks of the PR could not be run for the merge target), the
+[benchmarks-comment workflow](.github/workflows/benchmarks-comment.yml)
+posts the summary to the PR, and updates that comment on later runs.  When
+benchmarking new functionality, import it within the benchmark (or its
+`setup`), not at module level: otherwise the benchmarks of the PR cannot be
+imported for the merge target, and none of the added or modified ones get
+compared.
 
 Setup:
 
