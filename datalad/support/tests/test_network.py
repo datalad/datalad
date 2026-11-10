@@ -323,7 +323,8 @@ def test_url_samples():
     _check_ri("file:///%7E/path/sp1", URL, localpath='/~/path/sp1', scheme='file', path='/~/path/sp1', exact_str=False)
     # not sure but let's check
     if on_windows:
-        _check_ri("file:///C:/path/sp1", URL, localpath='C:/path/sp1', scheme='file', path='/C:/path/sp1', exact_str=False)
+        # renders back exactly, with the drive colon unescaped
+        _check_ri("file:///C:/path/sp1", URL, localpath='C:/path/sp1', scheme='file', path='/C:/path/sp1')
         _check_ri("file:/C:/path/sp1", URL, localpath='C:/path/sp1', scheme='file', path='/C:/path/sp1', exact_str=False)
         # git-annex style drive-letter encoding
         _check_ri("file://C:/path/sp1", URL, netloc="C:", hostname="c", localpath='C:/path/sp1', scheme='file', path='/path/sp1', exact_str=False)
@@ -637,7 +638,10 @@ def test_quote_path(monkeypatch):
         ctx.setattr(datalad.support.network, 'on_windows', True)
         assert quote_path("/c:/win:xxx") == "/c:/win%3Axxx"
         assert quote_path("/C:/win:xxx") == "/C:/win%3Axxx"
+        # URL renders its path the same way, e.g. for RIA clone URLs
+        assert str(URL(scheme="file", path="/C:/win:xxx")) == "file:///C:/win%3Axxx"
 
         ctx.setattr(datalad.support.network, 'on_windows', False)
         assert quote_path("/c:/win:xxx") == "/c%3A/win%3Axxx"
         assert quote_path("/C:/win:xxx") == "/C%3A/win%3Axxx"
+        assert str(URL(scheme="file", path="/C:/win:xxx")) == "file:///C%3A/win%3Axxx"

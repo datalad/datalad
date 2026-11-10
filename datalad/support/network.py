@@ -684,8 +684,9 @@ class URL(RI):
         }
         pr_fields['netloc'] = netloc
         pr_fields['params'] = ''
-        # We need to quote the path
-        pr_fields['path'] = urlquote(pr_fields['path'])
+        # We need to quote the path, but keep the colon of a Windows drive
+        # (/C:/...): git-annex does not recognize an escaped one (C%3A)
+        pr_fields['path'] = quote_path(pr_fields['path'])
         # TODO: figure out what to do with query/fragment... one step at a time
         return ParseResult(**pr_fields)
 
