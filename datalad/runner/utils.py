@@ -47,6 +47,9 @@ class LineSplitter:
         self.separator = separator
         self.keep_ends = keep_ends
         self.remaining_data: str | None = None
+        # Whether the last returned line ended with a bare "\r", in which
+        # case a "\n" at the start of the next chunk belongs to it.
+        self._ended_with_cr = False
 
     def process(self,
                 data: str
@@ -59,6 +62,15 @@ class LineSplitter:
         # it has already been parsed.
         if data == "":
             return []
+
+        if self.separator is None and self._ended_with_cr:
+            self._ended_with_cr = False
+            if data.startswith("\n"):
+                # The second half of a "\r\n" that was split between
+                # chunks, the line it ends was already returned.
+                data = data[1:]
+                if data == "":
+                    return []
 
         # Update remaining data before attempting to split lines.
         if self.remaining_data is None:
@@ -81,6 +93,7 @@ class LineSplitter:
                 del detected_lines[-1]
             else:
                 self.remaining_data = None
+                self._ended_with_cr = lines_with_ends[-1].endswith("\r")
 
             if self.keep_ends:
                 return lines_with_ends
