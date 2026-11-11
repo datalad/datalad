@@ -616,6 +616,9 @@ def test_assure_list_copy():
         ([], None),
         ('somestring', ['somestring']),
         ('some\nmultiline\nstring', ['some', 'multiline', 'string']),
+        # empty lines, e.g. from a multi-line config value, are dropped
+        ('\nsome\n\nstring\n', ['some', 'string']),
+        ('\n', None),
         (['something'], ['something']),
         (['a', 'listof', 'stuff'], ['a', 'listof', 'stuff']),
     ]
@@ -637,6 +640,7 @@ def test_assure_dict_from_str():
     assert_equal(ensure_dict_from_str(
         target_dict),
         target_dict)
+    assert_equal(ensure_dict_from_str('\na=1\n\nb=2\n'), {'a': '1', 'b': '2'})
 
 
 def test_assure_bool():
