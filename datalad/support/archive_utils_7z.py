@@ -18,6 +18,7 @@ external_versions.check(
         "alternative implementation that may not need 7z.")
 
 import logging
+import tarfile
 
 from datalad.utils import (
     Path,
@@ -27,8 +28,12 @@ from datalad.utils import (
 
 lgr = logging.getLogger('datalad.support.archive_utils_7z')
 
-from datalad.cmd import KillOutput
+from datalad.cmd import (
+    KillOutput,
+    StdOutErrCapture,
+)
 from datalad.cmd import WitlessRunner as Runner
+from datalad.support.exceptions import CommandError
 
 
 def _normalize_fname_suffixes(suffixes):
@@ -59,7 +64,39 @@ def decompress_file(archive, dir_):
     else:
         # fire and forget
         cmd = ['7z', 'x', archive]
-    runner.run(cmd, protocol=KillOutput)
+    try:
+        runner.run(cmd, protocol=StdOutErrCapture)
+    except CommandError as e:
+        # 7-Zip (unlike p7zip) recreates the symlinks and hard links of a
+        # tarball, and fails where the filesystem has none (e.g. VFAT).
+        # Only if that is all that failed, re-extract with tarfile, which
+        # extracts copies of the link targets instead -- and only with its
+        # 'data' filter (Python >= 3.10.12, 3.11.4), which keeps the
+        # extraction inside `dir_`
+        link_errors = ('ERROR: Cannot create symbolic link',
+                       'ERROR: Cannot create hard link')
+        # 7-Zip 21-24 then also fail to set the attributes of a hard link
+        # they did not create
+        accepted = link_errors + (
+            'ERROR: Cannot set file attribute : errno=2 :',)
+        errors = [
+            line for line in (e.stderr or '').splitlines() if line.strip()
+        ]
+        if not (
+            any(line.startswith(link_errors) for line in errors)
+            and all(line.startswith(accepted) for line in errors)
+            and hasattr(tarfile, 'data_filter')
+            and tarfile.is_tarfile(archive)
+        ):
+            raise
+        lgr.warning(
+            "7z could not create the links in %s on this filesystem, "
+            "extracting copies of their targets instead", archive)
+        try:
+            with tarfile.open(archive) as tar:
+                tar.extractall(dir_, filter='data')
+        except Exception as tar_exc:
+            raise e from tar_exc
 
 
 def compress_files(files, archive, path=None, overwrite=True):
