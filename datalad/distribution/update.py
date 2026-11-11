@@ -28,7 +28,7 @@ from datalad.interface.common_opts import (
     recursion_flag,
     recursion_limit,
     save_message_opt,
-    sibling_name_kwargs,
+    sibling_parameter,
 )
 from datalad.interface.results import (
     YieldDatasets,
@@ -134,15 +134,14 @@ class Update(Interface):
             operation.""",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
-        sibling=Parameter(
+        sibling=sibling_parameter(
             args=("-s", "--sibling",),
             doc="""name of the sibling to update from. When unspecified,
             updates from all siblings are fetched. If there is more than one
             sibling and changes will be brought into the working tree (as
             requested via [CMD: --merge, --how, or --how-subds CMD][PY:
             `merge`, `how`, or `how_subds` PY]), a sibling will be chosen based
-            on the configured remote for the current branch.""",
-            **sibling_name_kwargs),
+            on the configured remote for the current branch."""),
         dataset=Parameter(
             args=("-d", "--dataset"),
             doc="""specify the dataset to update.  If

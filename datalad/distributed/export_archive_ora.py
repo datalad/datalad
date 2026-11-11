@@ -29,7 +29,7 @@ from datalad.interface.base import (
     build_doc,
     eval_results,
 )
-from datalad.interface.common_opts import sibling_name_kwargs
+from datalad.interface.common_opts import sibling_parameter
 from datalad.interface.results import get_status_dict
 from datalad.log import log_progress
 from datalad.support.constraints import (
@@ -76,12 +76,11 @@ class ExportArchiveORA(Interface):
             doc="""if an existing directory, an 'archive.7z' is placed into
             it, otherwise this is the path to the target archive""",
             constraints=EnsureStr() | EnsureNone()),
-        remote=Parameter(
+        remote=sibling_parameter(
             args=("--for",),
             dest="remote",
             doc="""name of the target sibling, wanted/preferred settings
-            will be used to filter the files added to the archives""",
-            **sibling_name_kwargs),
+            will be used to filter the files added to the archives"""),
         annex_wanted=Parameter(
             args=("--annex-wanted",),
             metavar="FILTERS",

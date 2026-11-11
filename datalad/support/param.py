@@ -53,11 +53,13 @@ class Parameter(object):
           Any additional positional args for argparser.add_argument. This is
           most useful for assigned multiple alternative argument names or
           create positional arguments.
-        completer : str or callable, optional
+        completer : str or callable or list, optional
           Source of candidate values for shell completion of this parameter
           on the command line. Either the name of a completer known to
-          :mod:`datalad.cli.completers` (e.g. 'siblings'), or a callable
-          following the argcomplete completer protocol.
+          :mod:`datalad.cli.completers` (e.g. 'siblings'), or a list of
+          values to choose from, or a callable following the argcomplete
+          completer protocol. If not specified, one could still be derived
+          from `constraints` (e.g. for `EnsureChoice`, `EnsureDataset`).
         **kwargs :
           Any additional keyword args for argparser.add_argument.
 

@@ -464,14 +464,33 @@ def test_completion(path=None, out_fn=None):
     # but for incomplete one we do get all create* commands
     get_completions('creat', [c for c in all_commands if c.startswith('create')])
 
-    # names of the siblings of the dataset at hand
+    # values of the parameters, according to their completers
     ds = create(path, annex=False)
     for name in ('github', 'origin'):
         ds.repo.add_remote(name, f'https://example.com/{name}')
-    assert_equal(get_completions('push --to ', [], cwd=path),
-                 ['github', 'origin'])
-    assert_equal(get_completions('push --to=o', [], cwd=path),
-                 ['--to=origin '])
+    ds.repo.tag('v1')
+    (ds.pathobj / 'subdir').mkdir()
+    branch = ds.repo.get_active_branch()
+    for s, expected in (
+            # names of the siblings of the dataset at hand
+            ('push --to ', ['github', 'origin']),
+            ('push --to=o', ['--to=origin ']),
+            (f'-C {path} siblings -s g', ['github ']),
+            # ... or of the one pointed to
+            ('-C subdir push -d .. --to o', ['origin ']),
+            ('diff --from ', sorted([branch, 'v1'])),
+            ('-f json', ['json', 'json_pp']),
+            ('create -c yo', ['yoda ']),
+            # directories for datasets, but files for paths
+            ('status -d s', ['subdir/']),
+            ('-C s', ['subdir/']),
+            ('status s', ['subdir/']),
+            ('status .datalad/c', ['.datalad/config ']),
+    ):
+        assert_equal(get_completions(s, [], cwd=path), expected)
+    # choices of a constraint which allows for other values too
+    get_completions('clone --reckless ', ['auto', 'ephemeral'], cwd=path)
+    get_completions('run-procedure cfg_', ['cfg_yoda'], cwd=path)
     # without a dataset there are none, but completion does not fail
     assert_not_in('origin',
                   get_completions('push -d nonexistent --to ', [], cwd=path))

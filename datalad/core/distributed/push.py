@@ -33,7 +33,7 @@ from datalad.interface.common_opts import (
     jobs_opt,
     recursion_flag,
     recursion_limit,
-    sibling_name_kwargs,
+    sibling_parameter,
 )
 from datalad.interface.results import annexjson2result
 from datalad.interface.utils import render_action_summary
@@ -90,15 +90,15 @@ class Push(Interface):
             args=("-d", "--dataset"),
             doc="""specify the dataset to push""",
             constraints=EnsureDataset() | EnsureNone()),
-        to=Parameter(
+        to=sibling_parameter(
             args=("--to",),
             doc="""name of the target sibling. If no name is given an attempt is
             made to identify the target based on the dataset's configuration
             (i.e. a configured tracking branch, or a single sibling that is
-            configured for push)""",
-            **sibling_name_kwargs),
+            configured for push)"""),
         since=Parameter(
             args=("--since",),
+            completer='revisions',
             constraints=EnsureStr() | EnsureNone(),
             doc="""specifies commit-ish (tag, shasum, etc.) from which to look for
             changes to decide whether pushing is necessary.

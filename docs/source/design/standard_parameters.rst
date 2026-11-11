@@ -44,7 +44,7 @@ The parameters are listed in their command-line form, but similar names and desc
   The identifier for a dataset sibling (remote).
   Option names still differ between commands (e.g., ``push --to``,
   ``update -s/--sibling``, ``get -s/--source``), but all such parameters
-  are defined with ``**sibling_name_kwargs`` from
+  are defined with ``sibling_parameter()`` from
   ``datalad.interface.common_opts`` for a uniform ``SIBLING`` metavar and
   shell completion of the dataset's sibling names.
 

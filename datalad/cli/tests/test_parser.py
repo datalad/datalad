@@ -7,13 +7,17 @@ from unittest.mock import patch
 
 from datalad.tests.utils_pytest import (
     assert_equal,
-    assert_false,
     assert_in,
-    assert_is,
+    assert_is_none,
     assert_raises,
 )
 
-from ..completers import complete_siblings
+from ..completers import (
+    ChoicesCompleter,
+    complete_directories,
+    complete_revisions,
+    complete_siblings,
+)
 from ..parser import (
     fail_with_short_help,
     setup_parser,
@@ -86,12 +90,34 @@ def test_setup():
 
 
 def test_setup_completer():
-    def get_to_action(completing):
-        parser = setup_parser(['datalad', 'push'], completing=completing)
+    def get_completers(completing):
+        parser = setup_parser(
+            ['datalad', 'push', '--to'], completing=completing)
         subparser = parser._positionals._group_actions[0].choices['push']
-        return [a for a in subparser._actions if '--to' in a.option_strings][0]
+        actions = {a.dest: a for a in parser._actions + subparser._actions}
+        assert_equal(actions['to'].metavar, 'SIBLING')
+        return {
+            dest: getattr(actions[dest], 'completer', None)
+            for dest in ('change_path', 'common_result_renderer',
+                         'dataset', 'to', 'since', 'jobs', 'path')
+        }
 
     # completers are only attached when completing
-    assert_false(hasattr(get_to_action(False), 'completer'))
-    assert_is(get_to_action(True).completer, complete_siblings)
-    assert_equal(get_to_action(True).metavar, 'SIBLING')
+    assert_equal(set(get_completers(False).values()), {None})
+    found = get_completers(True)
+    assert_is_none(found.pop('path'))
+    # derived from EnsureChoice among alternative constraints
+    assert_in('auto', found.pop('jobs').completer.choices)
+    assert_equal(
+        {dest: completer.completer for dest, completer in found.items()},
+        dict(
+            # common arguments
+            change_path=complete_directories,
+            common_result_renderer=ChoicesCompleter(
+                'generic', 'json', 'json_pp', 'tailored', 'disabled'),
+            # explicit
+            to=complete_siblings,
+            since=complete_revisions,
+            # derived from the EnsureDataset constraint
+            dataset=complete_directories,
+        ))
