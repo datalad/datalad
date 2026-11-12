@@ -475,17 +475,24 @@ def test_completion(path=None, out_fn=None):
             # names of the siblings of the dataset at hand
             ('push --to ', ['github', 'origin']),
             ('push --to=o', ['--to=origin ']),
-            (f'-C {path} siblings -s g', ['github ']),
+            ('siblings -s g', ['github ']),
             # ... or of the one pointed to
             ('-C subdir push -d .. --to o', ['origin ']),
             ('diff --from ', sorted([branch, 'v1'])),
             ('-f json', ['json', 'json_pp']),
             ('create -c yo', ['yoda ']),
+    ) + (
+        # A command line is split following the POSIX shell rules, so there
+        # is no point in testing the completion of paths with backslashes.
+        # complete_directories() itself is tested in test_completers.
+        () if on_windows else (
+            (f'-C {path} siblings -s g', ['github ']),
             # directories for datasets, but files for paths
             ('status -d s', ['subdir/']),
             ('-C s', ['subdir/']),
             ('status s', ['subdir/']),
             ('status .datalad/c', ['.datalad/config ']),
+        )
     ):
         assert_equal(get_completions(s, [], cwd=path), expected)
     # choices of a constraint which allows for other values too
