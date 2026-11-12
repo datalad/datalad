@@ -20,6 +20,10 @@ from giturlparse import parse as parse_git_url
 
 from datalad.log import log_progress
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import (
+    CapturedException,
+    CommandError,
+)
 from datalad.support.network import (
     RI,
     URL,
@@ -174,3 +178,35 @@ def _yield_ds_w_matching_siblings(
         lgr.info, pbar_id,
         'Finished checking pre-existing sibling configuration %s', ds,
     )
+
+
+def _try_command(record, fn, *args, **kwargs):
+    """Call `fn`, catching a `CommandError`.
+
+    Parameters
+    ----------
+    record : dict
+        A partial result record. It should at least have 'action' and 'message'
+        fields. A 'status' value of 'ok' or 'error' will be added based on
+        whether calling `fn` raises a `CommandError`.
+
+    Returns
+    -------
+    A new record with a 'status' field.
+    """
+    try:
+        fn(*args, **kwargs)
+    except CommandError as exc:
+        ce = CapturedException(exc)
+        return dict(record, status="error", message=str(ce))
+    else:
+        return dict(record, status="ok")
+
+
+def corresponding_hexsha(repo, ref="HEAD"):
+    """Hexsha of ``ref``, with HEAD-relative refs read from the corresponding
+    branch when adjusted (the adjusted HEAD is a git-annex view commit)."""
+    if (corr := repo.get_corresponding_branch()) and (
+            ref == "HEAD" or ref.startswith(("HEAD~", "HEAD^", "HEAD@"))):
+        ref = corr + ref[len("HEAD"):]
+    return repo.get_hexsha(ref)
