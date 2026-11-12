@@ -63,9 +63,15 @@ def test_bool():
     assert_equal(c('no'), False)
     assert_equal(c('off'), False)
     assert_equal(c('disable'), False)
+    # bytes are accepted the same way as str
+    assert_equal(c(b'True'), True)
+    assert_equal(c(b'1'), True)
+    assert_equal(c(b'off'), False)
+    assert_equal(c(b'No'), False)
     # this should always fail
     assert_raises(ValueError, c, 0)
     assert_raises(ValueError, c, 1)
+    assert_raises(ValueError, c, b'maybe')
 
 
 def test_str():
