@@ -120,7 +120,8 @@ def split_ext(filename: str) -> tuple[str, str]:
 
     file_parts = parts[:1] + tail[::-1]
     ext_parts = parts[1+len(tail):]
-    return ".".join(file_parts), "." + ".".join(ext_parts)
+    # no short extension at all (e.g. "data.parquet") means an empty extension
+    return ".".join(file_parts), "." + ".".join(ext_parts) if ext_parts else ""
 
 
 def get_parent_paths(paths: list[str], parents: list[str], only_with_parents: bool = False, *, sep: str = '/') -> list[str]:
