@@ -14,7 +14,6 @@ from datalad.api import (
     create_test_dataset,
     drop,
     install,
-    ls,
 )
 
 #
@@ -29,6 +28,12 @@ try:
     from datalad.api import status
 except ImportError:
     status = None
+
+# ls moved to the datalad-deprecated extension
+try:
+    from datalad.api import ls
+except ImportError:
+    ls = None
 
 
 # Some tracking example -- may be we should track # of datasets.datalad.org
@@ -76,14 +81,15 @@ class supers(SampleSuperDatasetBenchmarks):
         subds = create(opj(self.ds.path, 'newsubds'))
         self.ds.save(subds.path)
 
-    def time_ls(self):
-        ls(self.ds.path)
+    if ls is not None:
+        def time_ls(self):
+            ls(self.ds.path)
 
-    def time_ls_recursive(self):
-        ls(self.ds.path, recursive=True)
+        def time_ls_recursive(self):
+            ls(self.ds.path, recursive=True)
 
-    def time_ls_recursive_long_all(self):
-        ls(self.ds.path, recursive=True, long_=True, all_=True)
+        def time_ls_recursive_long_all(self):
+            ls(self.ds.path, recursive=True, long_=True, all_=True)
 
     def time_subdatasets(self):
         self.ds.subdatasets()
