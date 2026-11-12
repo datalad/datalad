@@ -51,6 +51,7 @@ from ..completers import (
 )
 
 
+@pytest.mark.ai_generated
 @with_tempfile(mkdir=True)
 def test_complete_in_dataset(path=None):
     ds = Dataset(path).create(annex=False)
@@ -87,6 +88,7 @@ def test_complete_in_dataset(path=None):
         assert not complete(change_path=[path], dataset='nonexistent')
 
 
+@pytest.mark.ai_generated
 def test_complete_procedures():
     assert_in('cfg_yoda', complete_procedures(''))
     assert_equal(complete_procedures('cfg_yo'), ['cfg_yoda'])
@@ -99,6 +101,7 @@ def test_complete_procedures():
     assert_equal(complete_cfg_procedures('cfg_'), [])
 
 
+@pytest.mark.ai_generated
 @with_tree(tree={
     'dir1': {'sub': {}},
     'dir2': {},
@@ -127,6 +130,7 @@ def test_complete_directories(path=None):
     assert_equal(complete('', os.path.join(path, 'nonexistent')), [])
 
 
+@pytest.mark.ai_generated
 def test_get_completer():
     assert_is(get_completer('siblings').completer, complete_siblings)
 
@@ -154,6 +158,7 @@ def test_get_completer():
         assert_in("some problem", cml.out)
 
 
+@pytest.mark.ai_generated
 @pytest.mark.parametrize('param,target', [
     (Parameter(), None),
     (Parameter(constraints=EnsureStr() | EnsureNone()), None),
@@ -181,6 +186,7 @@ def test_get_param_completer(param, target):
         assert_equal(completer.completer, target)
 
 
+@pytest.mark.ai_generated
 def test_sibling_parameter():
     param = sibling_parameter()
     assert_equal(param.cmd_kwargs['metavar'], 'SIBLING')
@@ -195,6 +201,7 @@ def test_sibling_parameter():
     assert_equal(param.completer, 'siblings')
 
 
+@pytest.mark.ai_generated
 def test_known_completers():
     # all named completers of the core commands' parameters and of the common
     # arguments are known

@@ -5,6 +5,8 @@ __docformat__ = 'restructuredtext'
 from io import StringIO
 from unittest.mock import patch
 
+import pytest
+
 from datalad.tests.utils_pytest import (
     assert_equal,
     assert_in,
@@ -89,6 +91,7 @@ def test_setup():
     )
 
 
+@pytest.mark.ai_generated
 def test_setup_completer():
     def get_completers(completing):
         parser = setup_parser(
