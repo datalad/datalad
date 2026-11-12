@@ -58,7 +58,8 @@ def dump(obj, fname, compressed=False):
     _open = LZMAFile if compressed else io.open
 
     indir = dirname(fname)
-    if not exists(indir):
+    # a bare file name has no directory to create
+    if indir and not exists(indir):
         makedirs(indir)
     if lexists(fname):
         os.unlink(fname)

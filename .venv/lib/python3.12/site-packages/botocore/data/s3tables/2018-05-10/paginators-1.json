@@ -1,0 +1,28 @@
+{
+  "pagination": {
+    "ListNamespaces": {
+      "input_token": "continuationToken",
+      "output_token": "continuationToken",
+      "limit_key": "maxNamespaces",
+      "result_key": "namespaces"
+    },
+    "ListTableBuckets": {
+      "input_token": "continuationToken",
+      "output_token": "continuationToken",
+      "limit_key": "maxBuckets",
+      "result_key": "tableBuckets"
+    },
+    "ListTables": {
+      "input_token": "continuationToken",
+      "output_token": "continuationToken",
+      "limit_key": "maxTables",
+      "result_key": "tables"
+    },
+    "ListTableMigrations": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults",
+      "result_key": "migrations"
+    }
+  }
+}
