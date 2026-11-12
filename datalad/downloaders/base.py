@@ -61,12 +61,23 @@ from ..support.locking import (
 from ..ui import ui
 from ..utils import (
     auto_repr,
+    ensure_list_from_str,
     ensure_unicode,
     unlink,
 )
 from .credentials import CompositeCredential
 
 lgr = getLogger('datalad.downloaders')
+
+
+def ensure_regex_list(s):
+    """Like ensure_list_from_str, but without empty patterns
+
+    A multi-line config value written on the lines after ``key =`` starts with
+    an empty line, and an empty pattern would match anything.
+    """
+    regexes = [r for r in ensure_list_from_str(s) or [] if r]
+    return regexes or None
 
 
 def _errnos(*names):

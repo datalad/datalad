@@ -49,6 +49,7 @@ from .base import (
     Authenticator,
     BaseDownloader,
     DownloaderSession,
+    ensure_regex_list,
 )
 
 # at some point was trying to be too specific about which exceptions to
@@ -174,8 +175,8 @@ class HTTPBaseAuthenticator(Authenticator):
         """
         super(HTTPBaseAuthenticator, self).__init__(**kwargs)
         self.url = url
-        self.failure_re = ensure_list_from_str(failure_re)
-        self.success_re = ensure_list_from_str(success_re)
+        self.failure_re = ensure_regex_list(failure_re)
+        self.success_re = ensure_regex_list(success_re)
         self.session_cookies = ensure_list_from_str(session_cookies)
 
     def authenticate(self, url, credential, session, update=False):

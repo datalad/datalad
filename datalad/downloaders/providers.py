@@ -26,13 +26,13 @@ from datalad.support.network import RI
 from datalad.utils import (
     Path,
     auto_repr,
-    ensure_list_from_str,
     get_dataset_root,
 )
 
 from ..interface.common_cfg import dirs
 from .base import (
     NoneAuthenticator,
+    ensure_regex_list,
     NotImplementedAuthenticator,
 )
 from .http import (
@@ -102,7 +102,7 @@ class Provider(object):
 
         """
         self.name = name
-        self.url_res = ensure_list_from_str(url_res)
+        self.url_res = ensure_regex_list(url_res)
         self.credential = credential
         self.authenticator = authenticator
         self._downloader = downloader
@@ -336,7 +336,7 @@ type = {credential_type}
             authenticator = None
 
         # bringing url_re to "standard" format of a list and populating _providers_ordered
-        url_res = ensure_list_from_str(items.pop('url_re', []))
+        url_res = ensure_regex_list(items.pop('url_re', []))
         assert url_res, "current implementation relies on having url_re defined"
 
         credential = items.pop('credential', None)

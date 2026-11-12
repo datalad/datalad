@@ -847,9 +847,6 @@ def ensure_list_from_str(s: list[T], sep: str='\n') -> Optional[list[T]]:
 def ensure_list_from_str(s: str | list[T], sep: str='\n') -> Optional[list[str]] | Optional[list[T]]:
     """Given a multiline string convert it to a list of return None if empty
 
-    Empty items, e.g. from the leading newline of a multi-line config
-    value, are dropped.
-
     Parameters
     ----------
     s: str or list
@@ -860,7 +857,7 @@ def ensure_list_from_str(s: str | list[T], sep: str='\n') -> Optional[list[str]]
 
     if isinstance(s, list):
         return s
-    return [item for item in s.split(sep) if item] or None
+    return s.split(sep)
 
 @overload
 def ensure_dict_from_str(s: str, sep: str = '\n') -> Optional[dict[str, str]]:
