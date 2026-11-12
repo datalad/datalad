@@ -1,0 +1,7 @@
+[keyring.backends]
+Gnome = keyrings.alt.Gnome
+Google = keyrings.alt.Google
+Windows (alt) = keyrings.alt.Windows
+file = keyrings.alt.file
+keyczar = keyrings.alt.keyczar
+multi = keyrings.alt.multi

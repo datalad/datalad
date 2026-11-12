@@ -1,0 +1,2 @@
+[console_scripts]
+patool = patoolib.cli:main_cli

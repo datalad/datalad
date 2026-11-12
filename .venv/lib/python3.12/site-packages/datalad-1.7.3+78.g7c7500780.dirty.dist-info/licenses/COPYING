@@ -1,0 +1,47 @@
+# Main Copyright/License
+
+DataLad, including all examples, code snippets and attached
+documentation is covered by the MIT license.
+
+  The MIT License
+
+  Copyright (c) 2013-     Yaroslav Halchenko
+                2015-     DataLad Team
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+  THE SOFTWARE.
+
+See CONTRIBUTORS file for a full list of contributors.
+
+
+# 3rd Party Code
+
+Some code distributed within DataLad was not developed by the DataLad
+team, hence you should adhere to the copyright and license terms of
+respective authors if you are to use corresponding parts. PyMVPA
+authors (where mentioned) are DataLad developers, so no explicit
+mentioning in the list below:
+
+## `_datalad_build_support/{setup,formatters}.py`
+   - (parts) Python license - Copyright (c) 2014 Oz Nahum Tiram  <nahumoz@gmail.com>
+## `datalad/support/due.py`
+   - BSD-2 - 2015-2019  DueCredit developers
+## `datalad/support/{,tests/test_}gitrepo.py`
+   - (parts) BSD-3 - Copyright (C) 2008, 2009 Michael Trier and contributors
+## `datalad/utils.py:optional_args`
+   - BSD-3 - 2011-2014, Lambda Foundry, Inc. and PyData Development Team

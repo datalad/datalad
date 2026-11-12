@@ -1,0 +1,341 @@
+"""Generic mechanism for marking and selecting python functions."""
+
+from __future__ import annotations
+
+import collections
+from collections.abc import Collection
+from collections.abc import Iterable
+from collections.abc import Set as AbstractSet
+import dataclasses
+from typing import TYPE_CHECKING
+
+from .expression import Expression
+from .structures import _EmptyParameterSetMark
+from .structures import _HiddenParam
+from .structures import EMPTY_PARAMETERSET_OPTION
+from .structures import get_empty_parameterset_mark
+from .structures import HIDDEN_PARAM
+from .structures import Mark
+from .structures import MARK_GEN
+from .structures import MarkDecorator
+from .structures import MarkGenerator
+from .structures import ParameterSet
+from _pytest.compat import NOTSET
+from _pytest.config import Config
+from _pytest.config import ExitCode
+from _pytest.config import hookimpl
+from _pytest.config import UsageError
+from _pytest.config.argparsing import Parser
+from _pytest.stash import StashKey
+
+
+if TYPE_CHECKING:
+    from _pytest.nodes import Item
+
+
+__all__ = [
+    "HIDDEN_PARAM",
+    "MARK_GEN",
+    "Mark",
+    "MarkDecorator",
+    "MarkGenerator",
+    "ParameterSet",
+    "get_empty_parameterset_mark",
+]
+
+
+old_mark_config_key = StashKey[Config | None]()
+
+
+def param(
+    *values: object,
+    marks: MarkDecorator | Collection[MarkDecorator | Mark] = (),
+    id: str | _HiddenParam | None = None,
+) -> ParameterSet:
+    """Specify a parameter in `pytest.mark.parametrize`_ calls or
+    :ref:`parametrized fixtures <fixture-parametrize-marks>`.
+
+    .. code-block:: python
+
+        @pytest.mark.parametrize(
+            "test_input,expected",
+            [
+                ("3+5", 8),
+                pytest.param("6*9", 42, marks=pytest.mark.xfail),
+            ],
+        )
+        def test_eval(test_input, expected):
+            assert eval(test_input) == expected
+
+    :param values: Variable args of the values of the parameter set, in order.
+
+    :param marks:
+        A single mark or a list of marks to be applied to this parameter set.
+
+        :ref:`pytest.mark.usefixtures <pytest.mark.usefixtures ref>` cannot be added via this parameter.
+
+    :type id: str | Literal[pytest.HIDDEN_PARAM] | None
+    :param id:
+        The id to attribute to this parameter set.
+
+        .. versionadded:: 8.4
+            :ref:`hidden-param` means to hide the parameter set
+            from the test name. Can only be used at most 1 time, as
+            test names need to be unique.
+    """
+    return ParameterSet.param(*values, marks=marks, id=id)
+
+
+def pytest_addoption(parser: Parser) -> None:
+    group = parser.getgroup("general")
+    group._addoption(  # private to use reserved lower-case short option
+        "-k",
+        action="store",
+        dest="keyword",
+        default="",
+        metavar="EXPRESSION",
+        help="Only run tests matching the given keyword expression, "
+        "e.g. -k 'test_method or test_other', -k 'not (slow or network)'.\n"
+        "Names in the expression are matched case-insensitively as substrings "
+        "of the test's keywords, which are:\n"
+        "- its own name, including any parametrization id\n"
+        "- the names of its class, module and directories\n"
+        "- the names of the markers applied to it or to its parents\n"
+        "- attributes assigned directly to the test function\n"
+        "- any names in its 'extra_keyword_matches' set\n"
+        "Use -m to match marker names exactly, including their arguments.",
+    )
+
+    group._addoption(  # private to use reserved lower-case short option
+        "-m",
+        action="store",
+        dest="markexpr",
+        default="",
+        metavar="MARKEXPR",
+        help="Only run tests matching given mark expression. "
+        "For example: -m 'mark1 and not mark2'.",
+    )
+
+    group.addoption(
+        "--markers",
+        action="store_true",
+        help="show markers (builtin, plugin and per-project ones).",
+    )
+
+    parser.addini("markers", "Register new markers for test functions", "linelist")
+    parser.addini(
+        EMPTY_PARAMETERSET_OPTION,
+        "Default marker for empty parametersets",
+        type=_EmptyParameterSetMark,
+        default="skip",
+    )
+
+
+@hookimpl(tryfirst=True)
+def pytest_cmdline_main(config: Config) -> int | ExitCode | None:
+    import _pytest.config
+
+    if config.option.markers:
+        config._do_configure()
+        tw = _pytest.config.create_terminal_writer(config)
+        for marker in config._iter_registered_markers():
+            tw.write(f"@pytest.mark.{marker.signature}:", bold=True)
+            tw.line(f" {marker.description}" if marker.description else "")
+            tw.line()
+        config._ensure_unconfigure()
+        return 0
+
+    return None
+
+
+#: Attributes which are never meaningful as keywords, but do end up in the
+#: ``__dict__`` of a test function: pytest's own mark storage, and the
+#: bookkeeping decorators leave behind (``functools.wraps`` copies ``__wrapped__``
+#: and friends, ``functools.lru_cache`` adds ``cache_parameters``, ...).
+IGNORED_FUNCTION_ATTRIBUTES = frozenset({"pytestmark", "cache_parameters"})
+
+
+def _is_matchable_function_attribute(name: str) -> bool:
+    """Whether a test function attribute may be matched by ``-k``."""
+    return not name.startswith("_") and name not in IGNORED_FUNCTION_ATTRIBUTES
+
+
+@dataclasses.dataclass
+class KeywordMatcher:
+    """A matcher for keywords, as used by ``-k``.
+
+    Given a set of names, matches any substring of one of these names. The
+    string inclusion check is case-insensitive.
+
+    The names are collected in :meth:`from_item` from the item and its
+    parents: their node names, the names of the markers in scope, the
+    attributes assigned to the test function, and the
+    :attr:`~_pytest.nodes.Node.extra_keyword_matches` sets.
+
+    Note that these names are collected independently of
+    :attr:`Node.keywords <_pytest.nodes.Node.keywords>`; writing into that
+    mapping does not affect ``-k``.
+    """
+
+    __slots__ = ("_names",)
+
+    _names: AbstractSet[str]
+
+    @classmethod
+    def from_item(cls, item: Item) -> KeywordMatcher:
+        mapped_names = set()
+
+        # Add the names of the current item and any parent items,
+        # except the Session and root Directory's which are not
+        # interesting for matching.
+        import pytest
+
+        for node in item.listchain():
+            if isinstance(node, pytest.Session):
+                continue
+            if isinstance(node, pytest.Directory) and isinstance(
+                node.parent, pytest.Session
+            ):
+                continue
+            mapped_names.add(node.name)
+
+        # Add the names added as extra keywords to current or parent items.
+        mapped_names.update(item.listextrakeywords())
+
+        # Add the names attached to the current function through direct
+        # assignment, ignoring the attributes that merely happen to live in the
+        # function's __dict__ without anyone meaning them as keywords.
+        function_obj = getattr(item, "function", None)
+        if function_obj:
+            mapped_names.update(
+                name
+                for name in function_obj.__dict__
+                if _is_matchable_function_attribute(name)
+            )
+
+        # Add the markers to the keywords as we no longer handle them correctly.
+        mapped_names.update(mark.name for mark in item.iter_markers())
+
+        return cls(mapped_names)
+
+    def __call__(self, subname: str, /, **kwargs: str | int | bool | None) -> bool:
+        if kwargs:
+            raise UsageError("Keyword expressions do not support call parameters.")
+        subname = subname.lower()
+        return any(subname in name.lower() for name in self._names)
+
+
+def deselect_by_keyword(items: list[Item], config: Config) -> None:
+    keywordexpr = config.option.keyword.lstrip()
+    if not keywordexpr:
+        return
+
+    expr = _parse_expression(keywordexpr, "Wrong expression passed to '-k'")
+
+    remaining = []
+    deselected = []
+    for colitem in items:
+        if not expr.evaluate(KeywordMatcher.from_item(colitem)):
+            deselected.append(colitem)
+        else:
+            remaining.append(colitem)
+
+    if deselected:
+        config.hook.pytest_deselected(items=deselected)
+        items[:] = remaining
+
+
+@dataclasses.dataclass
+class MarkMatcher:
+    """A matcher for markers which are present.
+
+    Tries to match on any marker names, attached to the given colitem.
+    """
+
+    __slots__ = ("own_mark_name_mapping",)
+
+    own_mark_name_mapping: dict[str, list[Mark]]
+
+    @classmethod
+    def from_markers(cls, markers: Iterable[Mark]) -> MarkMatcher:
+        mark_name_mapping = collections.defaultdict(list)
+        for mark in markers:
+            mark_name_mapping[mark.name].append(mark)
+        return cls(mark_name_mapping)
+
+    def __call__(self, name: str, /, **kwargs: str | int | bool | None) -> bool:
+        if not (matches := self.own_mark_name_mapping.get(name, [])):
+            return False
+
+        for mark in matches:  # pylint: disable=consider-using-any-or-all
+            if all(mark.kwargs.get(k, NOTSET) == v for k, v in kwargs.items()):
+                return True
+        return False
+
+
+def deselect_by_mark(items: list[Item], config: Config) -> None:
+    matchexpr = config.option.markexpr
+    if not matchexpr:
+        return
+
+    expr = _parse_expression(matchexpr, "Wrong expression passed to '-m'")
+    _validate_marker_names(expr, config)
+
+    remaining: list[Item] = []
+    deselected: list[Item] = []
+    for item in items:
+        if expr.evaluate(MarkMatcher.from_markers(item.iter_markers())):
+            remaining.append(item)
+        else:
+            deselected.append(item)
+    if deselected:
+        config.hook.pytest_deselected(items=deselected)
+        items[:] = remaining
+
+
+def _validate_marker_names(expr: Expression, config: Config) -> None:
+    """Validate that all marker names in the expression are registered.
+
+    Only validates when strict_markers is enabled.
+    """
+    strict_markers = config.getini("strict_markers")
+    if strict_markers is None:
+        strict_markers = config.getini("strict")
+    if not strict_markers:
+        return
+
+    registered_markers = {m.name for m in config._iter_registered_markers()}
+
+    unknown_markers = expr.idents() - registered_markers
+    if unknown_markers:
+        unknown_str = ", ".join(sorted(unknown_markers))
+        raise UsageError(
+            f"Unknown marker(s) in '-m' expression: {unknown_str}. "
+            "Use 'pytest --markers' to see available markers."
+        )
+
+
+def _parse_expression(expr: str, exc_message: str) -> Expression:
+    try:
+        return Expression.compile(expr)
+    except SyntaxError as e:
+        raise UsageError(
+            f"{exc_message}: {e.text}: at column {e.offset}: {e.msg}"
+        ) from None
+
+
+def pytest_collection_modifyitems(items: list[Item], config: Config) -> None:
+    deselect_by_keyword(items, config)
+    deselect_by_mark(items, config)
+
+
+def pytest_configure(config: Config) -> None:
+    config.stash[old_mark_config_key] = MARK_GEN._config
+    MARK_GEN._config = config
+
+    # Eagerly validate the value; it is only read lazily during collection.
+    config.getini(EMPTY_PARAMETERSET_OPTION)
+
+
+def pytest_unconfigure(config: Config) -> None:
+    MARK_GEN._config = config.stash.get(old_mark_config_key, None)
