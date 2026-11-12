@@ -27,6 +27,17 @@ from datalad.tests.utils_pytest import (
 )
 
 
+@with_tempfile
+def test_load_screwy_unicode_compressed(fname=None):
+    # the fixup re-read must honor an explicit `compressed` flag, also for a
+    # file name without an .xz extension
+    from lzma import LZMAFile
+    with LZMAFile(fname, 'wb') as f:
+        f.write(b'{"Authors": ["A1"\xc2\xa0, "A2"]}')
+    with swallow_logs(new_level=logging.WARNING):
+        eq_(load(fname, compressed=True), {'Authors': ['A1', 'A2']})
+
+
 @with_tempfile(content=b'{"Authors": ["A1"\xc2\xa0, "A2"]}')
 def test_load_screwy_unicode(fname=None):
     # test that we can tollerate some screwy unicode embeddings within json
