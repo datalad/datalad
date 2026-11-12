@@ -234,6 +234,23 @@ def test_providers_multiple_matches(path=None):
     assert_equal(the_chosen_one.name, "foo1")
 
 @with_tree(tree={'providers.cfg': """\
+[provider:foo]
+url_re =
+    https?://foo\\.org/.*
+    https?://bar\\.org/.*
+authentication_type = none
+"""})
+def test_providers_multiline_url_re(path=None):
+    # The usual multi-line form starts with an empty line, which must not
+    # turn into an empty url_re that matches any URL.
+    providers = Providers.from_config_files(
+        files=[op.join(path, "providers.cfg")], reload=True)
+    assert_equal(providers.get_provider('https://bar.org/data').name, "foo")
+    assert_equal(
+        providers.get_provider('https://other.org/data').name, "")
+
+
+@with_tree(tree={'providers.cfg': """\
 [provider:foo0]
 url_re = https?://[foo-a\\.org]/.*
 authentication_type = none

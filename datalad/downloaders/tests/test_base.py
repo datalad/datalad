@@ -22,6 +22,7 @@ from urllib3.exceptions import ProtocolError
 from datalad.downloaders.base import (
     _get_transfer_error,
     _warn_if_not_enough_space,
+    ensure_regex_list,
     is_transient_download_error,
 )
 from datalad.support.exceptions import IncompleteDownloadError
@@ -95,3 +96,16 @@ def test_get_transfer_error(path=None):
     assert_in("Ran out of space", str(err))
     assert_in("free on the file system holding %s" % op.dirname(path),
               str(err))
+
+
+@pytest.mark.parametrize("value, expected", [
+    (None, None),
+    ('', None),
+    ('\n', None),
+    ('a.*', ['a.*']),
+    # a multi-line config value starts with an empty line
+    ('\na.*\n\nb.*', ['a.*', 'b.*']),
+    (['a.*', ''], ['a.*']),
+])
+def test_ensure_regex_list(value, expected):
+    assert_equal(ensure_regex_list(value), expected)
