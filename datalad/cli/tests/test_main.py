@@ -495,6 +495,18 @@ def test_completion(path=None, out_fn=None):
         )
     ):
         assert_equal(get_completions(s, [], cwd=path), expected)
+    # only the values of an option with an optional value if given as
+    # --option=, not also the paths for the positional arguments
+    assert_equal(get_completions('update --how=', [], cwd=path),
+                 [f'--how={c}' for c in
+                  ('fetch', 'merge', 'ff-only', 'reset', 'checkout')])
+    assert_equal(get_completions('update --how=f', [], cwd=path),
+                 ['--how=fetch', '--how=ff-only'])
+    assert_equal(get_completions('clone --reckless=', [], cwd=path),
+                 ['--reckless=auto', '--reckless=ephemeral'])
+    # whenever a separate value could as well be a positional argument
+    get_completions('clone --reckless ', ['auto', 'ephemeral', 'subdir/'],
+                    cwd=path)
     # choices of a constraint which allows for other values too
     get_completions('clone --reckless ', ['auto', 'ephemeral'], cwd=path)
     get_completions('run-procedure cfg_', ['cfg_yoda'], cwd=path)

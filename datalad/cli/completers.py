@@ -269,3 +269,49 @@ def get_param_completer(param):
         for choice in c._allowed if isinstance(choice, str)
     ]
     return get_completer(choices) if choices else None
+
+
+def autocomplete(parser):
+    """Complete the command line, if invoked for completion and can do that
+
+    A replacement for ``argcomplete.autocomplete`` which works around its
+    handling of ``--option=VALUE`` for an option with an optional value
+    (``nargs='?'``, e.g. ``update --how``, ``clone --reckless``).  Such an
+    option does not have to consume the next argument, so argcomplete also
+    completes for the positional arguments, although here the value is
+    certainly of that option.  Moreover it prepends ``--option=`` to the
+    already collected candidates once per each such action, resulting in
+    file names and ``--option=--option=VALUE`` among the candidates.
+    """
+    # argcomplete is an optional dependency
+    try:
+        from argcomplete import CompletionFinder
+    except ImportError as e:
+        lgr.debug("No completion without argcomplete: %s",
+                  CapturedException(e))
+        return
+
+    class _CompletionFinder(CompletionFinder):
+        def _complete_active_option(self, parser, next_positional,
+                                    cword_prefix, *args, **kwargs):
+            def complete():
+                return super(_CompletionFinder, self)._complete_active_option(
+                    parser, next_positional, cword_prefix, *args, **kwargs)
+
+            option, eq, _ = cword_prefix.partition('=')
+            if not (eq and option[:1] in parser.prefix_chars):
+                return complete()
+            # only the action(s) of that option, also if it was abbreviated
+            actions = [
+                a for a in parser.active_actions
+                if any(o.startswith(option) for o in a.option_strings)]
+            if not actions:
+                return complete()
+            active_actions = parser.active_actions
+            parser.active_actions = actions
+            try:
+                return complete()
+            finally:
+                parser.active_actions = active_actions
+
+    _CompletionFinder()(parser)
