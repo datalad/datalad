@@ -4,7 +4,11 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import os
-from argparse import Namespace
+from argparse import (
+    ArgumentParser,
+    Namespace,
+)
+from unittest.mock import patch
 
 import pytest
 
@@ -29,6 +33,7 @@ from datalad.tests.utils_pytest import (
     assert_in,
     assert_is,
     assert_is_none,
+    skip_if_no_module,
     with_tempfile,
     with_tree,
 )
@@ -40,6 +45,7 @@ from datalad.utils import (
 from ..common_args import common_args
 from ..completers import (
     ChoicesCompleter,
+    autocomplete,
     complete_cfg_procedures,
     complete_directories,
     complete_procedures,
@@ -216,3 +222,73 @@ def test_known_completers():
     named = {name: spec for name, spec in specs if isinstance(spec, str)}
     for name, spec in named.items():
         assert_in(spec, completers, msg=name)
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize('line,target', [
+    # an option with an optional value: also the positional could follow
+    ('prog --how ', ['--how', '--to', 'fetch', 'merge', 'file1', 'file2']),
+    # ... but not if the value is "attached" to the option
+    ('prog --how=', ['fetch', 'merge']),
+    ('prog --how=f', ['fetch']),
+    # also if the option is abbreviated
+    ('prog --ho=m', ['merge']),
+    ('prog --to=', ['origin']),
+    ('prog f', ['file1', 'file2']),
+    ('prog --h', ['--how']),
+    # not an option of the parser: default handling
+    ('prog --bogus=', ['file1', 'file2']),
+])
+def test_autocomplete(line, target):
+    skip_if_no_module('argcomplete')
+
+    parser = ArgumentParser(prog='prog', add_help=False)
+    parser.add_argument('--how', nargs='?', choices=['fetch', 'merge'])
+    parser.add_argument('--to').completer = ChoicesCompleter('origin')
+    parser.add_argument('path', nargs='*').completer = \
+        ChoicesCompleter('file1', 'file2')
+
+    class Exit(Exception):
+        pass
+
+    def exit_method(code):
+        raise Exit(code)
+
+    class Out:
+        """argcomplete writes bytes or str, depending on its version"""
+        value = ''
+
+        def write(self, s):
+            self.value += s.decode() if isinstance(s, bytes) else s
+
+        def flush(self):
+            pass
+
+    out = Out()
+    with patch.dict(os.environ, {
+            '_ARGCOMPLETE': '1',
+            '_ARGCOMPLETE_COMP_WORDBREAKS': ' \t\n"\'@><=;|&(:',
+            '_ARGCOMPLETE_SUPPRESS_SPACE': '1',
+            'COMP_LINE': line,
+            'COMP_POINT': str(len(line)),
+    }), patch('os.fdopen', side_effect=OSError("not for the test")):
+        # argcomplete tries to take file descriptor 9 for its debug output,
+        # which here could be the one of something else, and would get
+        # closed.  It falls back on stderr.
+        with pytest.raises(Exit):
+            autocomplete(parser, output_stream=out, exit_method=exit_method)
+    assert_equal(out.value.split('\x0b'), target)
+
+
+@pytest.mark.ai_generated
+def test_autocomplete_noop():
+    # neither without argcomplete
+    with patch.dict('sys.modules', {'argcomplete': None}), \
+            swallow_logs(new_level=logging.DEBUG) as cml:
+        assert_is_none(autocomplete(ArgumentParser()))
+        assert_in("No completion without argcomplete", cml.out)
+    # nor if not invoked for completion
+    skip_if_no_module('argcomplete')
+    with patch.dict(os.environ):
+        os.environ.pop('_ARGCOMPLETE', None)
+        assert_is_none(autocomplete(ArgumentParser()))

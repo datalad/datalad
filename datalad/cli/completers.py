@@ -271,7 +271,7 @@ def get_param_completer(param):
     return get_completer(choices) if choices else None
 
 
-def autocomplete(parser):
+def autocomplete(parser, **kwargs):
     """Complete the command line, if invoked for completion and can do that
 
     A replacement for ``argcomplete.autocomplete`` which works around its
@@ -282,6 +282,14 @@ def autocomplete(parser):
     certainly of that option.  Moreover it prepends ``--option=`` to the
     already collected candidates once per each such action, resulting in
     file names and ``--option=--option=VALUE`` among the candidates.
+
+    Parameters
+    ----------
+    parser: ArgumentParser
+    **kwargs
+      Passed to ``argcomplete.CompletionFinder.__call__``, e.g.
+      ``output_stream`` and ``exit_method`` to not write the candidates to
+      the shell and not exit the process.
     """
     # argcomplete is an optional dependency
     try:
@@ -314,4 +322,4 @@ def autocomplete(parser):
             finally:
                 parser.active_actions = active_actions
 
-    _CompletionFinder()(parser)
+    _CompletionFinder()(parser, **kwargs)
