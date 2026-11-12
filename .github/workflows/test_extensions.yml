@@ -100,6 +100,14 @@ jobs:
       run: tools/ci/install-singularity.sh
       if: env.DL_NEED_SINGULARITY == '1'
 
+    - name: Use Docker's classic image store
+      # TODO: remove (along with the script, if no longer used) whenever
+      # datalad-container's docker adapter supports the containerd image
+      # store, the default of Docker >= 29 (as on ubuntu-latest), i.e. when
+      # datalad-container's own .github/workflows/test.yml no longer does it.
+      if: matrix.extension == 'datalad-container'
+      run: sudo tools/ci/docker-use-classic-image-store.sh
+
     - name: Install additional dependencies and prepare for testing
       run: |
         pip install $DL_PIP_INSTALLS

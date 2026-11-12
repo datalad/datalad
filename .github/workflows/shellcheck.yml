@@ -22,6 +22,7 @@ jobs:
         # I: running only on a subset of scripts which are shellcheck clean ATM
         shellcheck \
           tools/bisect-git-annex.scripts/bisect-git-annex-lock.sh \
+          tools/ci/docker-use-classic-image-store.sh \
           tools/ci/install-annex.sh \
           tools/ci/install-minimum-git.sh \
           tools/ci/prep-travis-devel-annex.sh \
