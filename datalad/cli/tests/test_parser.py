@@ -16,6 +16,7 @@ from datalad.tests.utils_pytest import (
 
 from ..completers import (
     ChoicesCompleter,
+    complete_datasets,
     complete_directories,
     complete_revisions,
     complete_siblings,
@@ -122,5 +123,5 @@ def test_setup_completer():
             to=complete_siblings,
             since=complete_revisions,
             # derived from the EnsureDataset constraint
-            dataset=complete_directories,
+            dataset=complete_datasets,
         ))

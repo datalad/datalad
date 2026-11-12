@@ -33,6 +33,7 @@ from datalad.tests.utils_pytest import (
     assert_in,
     assert_is,
     assert_is_none,
+    assert_not_in,
     skip_if_no_module,
     with_tempfile,
     with_tree,
@@ -47,6 +48,7 @@ from ..completers import (
     ChoicesCompleter,
     autocomplete,
     complete_cfg_procedures,
+    complete_datasets,
     complete_directories,
     complete_procedures,
     complete_revisions,
@@ -137,6 +139,45 @@ def test_complete_directories(path=None):
 
 
 @pytest.mark.ai_generated
+@with_tempfile(mkdir=True)
+def test_complete_datasets(path=None):
+    ds = Dataset(os.path.join(path, 'ds')).create(annex=False)
+    (ds.pathobj / 'sub' / 'deep').mkdir(parents=True)
+    (ds.pathobj / '.hidden').mkdir()
+    up = os.pardir + os.sep
+
+    def complete(prefix, *change_path):
+        return complete_datasets(
+            prefix, parsed_args=Namespace(change_path=list(change_path)))
+
+    def dirs(*names):
+        return [n + os.sep for n in names]
+
+    with chpwd(ds.path):
+        # the parent directory is not in a dataset
+        assert_equal(complete(''), dirs('sub'))
+        assert_equal(complete('..'), [])
+        # relative to -C
+        assert_equal(complete('', 'sub'), dirs('deep', os.pardir))
+    with chpwd(ds.pathobj / 'sub'):
+        # the parent directory is offered since there is a dataset
+        assert_equal(complete(''), dirs('deep', os.pardir))
+        assert_equal(complete('.'), [up])
+        assert_equal(complete('..'), [up])
+        assert_equal(complete('d'), dirs('deep'))
+        # but not the parent of that one
+        assert_equal(complete(up), dirs(os.path.join(os.pardir, 'sub')))
+    with chpwd(ds.pathobj / 'sub' / 'deep'):
+        assert_equal(complete(''), [up])
+        assert_equal(complete(up), dirs(os.path.join(os.pardir, 'deep'),
+                                        os.path.join(os.pardir, os.pardir)))
+    # no parent for the root of the file system
+    root = os.path.abspath(os.sep)
+    assert_not_in(os.path.join(root, os.pardir, ''), complete(root))
+    assert complete(root)
+
+
+@pytest.mark.ai_generated
 def test_get_completer():
     assert_is(get_completer('siblings').completer, complete_siblings)
 
@@ -172,9 +213,9 @@ def test_get_completer():
     (Parameter(constraints=EnsureChoice('a', 'b')), None),
     (Parameter(constraints=EnsureInt() | EnsureChoice('a', None, True, 'b')),
      ChoicesCompleter('a', 'b')),
-    (Parameter(constraints=EnsureDataset()), complete_directories),
+    (Parameter(constraints=EnsureDataset()), complete_datasets),
     (Parameter(constraints=EnsureDataset() | EnsureNone()),
-     complete_directories),
+     complete_datasets),
     # explicit one takes precedence
     (Parameter(constraints=EnsureDataset() | EnsureNone(),
                completer='revisions'),

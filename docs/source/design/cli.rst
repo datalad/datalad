@@ -134,12 +134,15 @@ completed according to, in order of preference,
       ``cfg_`` ones among them, without that prefix
     ``'directories'``
       directories only
+    ``'datasets'``
+      directories, and the parent directory (``..``) if it is within a
+      dataset
 
   - a list of values to choose from, where other values remain acceptable, or
   - a callable following the ``argcomplete`` completer protocol;
 
 - its ``constraints``: the choices of an ``EnsureChoice`` (also if it is only
-  one of the alternatives), or directories for an ``EnsureDataset``.
+  one of the alternatives), or ``'datasets'`` for an ``EnsureDataset``.
 
 Without either, ``argcomplete`` falls back on file name completion.
 

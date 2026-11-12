@@ -44,6 +44,7 @@ from datalad.support.exceptions import (
 )
 from datalad.utils import (
     chpwd,
+    get_dataset_root,
     getpwd,
 )
 
@@ -162,6 +163,25 @@ def complete_directories(prefix, parsed_args=None, **kwargs):
     ]
 
 
+def complete_datasets(prefix, parsed_args=None, **kwargs):
+    """Directories, in which to look for a dataset
+
+    In addition to `complete_directories`, the parent directory (``..``) is
+    offered if it is within a dataset, since otherwise there would be no hint
+    on a dataset being available up the tree.
+    """
+    completions = complete_directories(prefix, parsed_args=parsed_args)
+    dirname, partial = os.path.split(prefix)
+    if partial in ('', '.', '..'):
+        base = os.path.normpath(os.path.join(
+            _get_pwd(parsed_args), os.path.expanduser(dirname)))
+        parent = os.path.dirname(base)
+        # the root of the file system is its own parent
+        if parent != base and get_dataset_root(parent) is not None:
+            completions.append(os.path.join(dirname, os.pardir, ''))
+    return completions
+
+
 class ChoicesCompleter:
     """Complete with any of the given choices
 
@@ -186,6 +206,7 @@ class ChoicesCompleter:
 #: Extensions could add their own.
 completers = {
     'cfg-procedures': complete_cfg_procedures,
+    'datasets': complete_datasets,
     'directories': complete_directories,
     'procedures': complete_procedures,
     'revisions': complete_revisions,
@@ -246,7 +267,7 @@ def get_param_completer(param):
     It is, in order of preference
 
     - the ``completer`` of the parameter, if specified;
-    - directories, if ``constraints`` include `EnsureDataset`;
+    - directories of datasets, if ``constraints`` include `EnsureDataset`;
     - the choices of any `EnsureChoice` among alternative ``constraints``
       (a sole `EnsureChoice` is rather made into ``choices`` of the parser).
 
@@ -259,10 +280,10 @@ def get_param_completer(param):
         return get_completer(param.completer)
     constraints = param.constraints
     if not isinstance(constraints, AltConstraints):
-        return get_completer('directories') \
+        return get_completer('datasets') \
             if isinstance(constraints, EnsureDataset) else None
     if any(isinstance(c, EnsureDataset) for c in constraints.constraints):
-        return get_completer('directories')
+        return get_completer('datasets')
     choices = [
         choice
         for c in constraints.constraints if isinstance(c, EnsureChoice)
