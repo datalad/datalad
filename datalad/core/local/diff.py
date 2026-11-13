@@ -79,12 +79,14 @@ class Diff(Interface):
             args=("-f", "--from",),
             dest='fr',
             metavar="REVISION",
+            completer='revisions',
             doc="""original state to compare to, as given by any identifier
             that Git understands.""",
             constraints=EnsureStr()),
         to=Parameter(
             args=("-t", "--to",),
             metavar="REVISION",
+            completer='revisions',
             doc="""state to compare against the original state, as given by
             any identifier that Git understands. If none is specified,
             the state of the working tree will be compared.""",

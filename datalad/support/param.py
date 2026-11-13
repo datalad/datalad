@@ -35,7 +35,8 @@ class Parameter(object):
         argparse.Action.__init__, include_kwonlyargs=True
     ).args + ['action']
 
-    def __init__(self, constraints=None, doc=None, args=None, **kwargs):
+    def __init__(self, constraints=None, doc=None, args=None, completer=None,
+                 **kwargs):
         """Add constraints (validator) specifications and a docstring for
         a parameter.
 
@@ -52,6 +53,13 @@ class Parameter(object):
           Any additional positional args for argparser.add_argument. This is
           most useful for assigned multiple alternative argument names or
           create positional arguments.
+        completer : str or callable or list, optional
+          Source of candidate values for shell completion of this parameter
+          on the command line. Either the name of a completer known to
+          :mod:`datalad.cli.completers` (e.g. 'siblings'), or a list of
+          values to choose from, or a callable following the argcomplete
+          completer protocol. If not specified, one could still be derived
+          from `constraints` (e.g. for `EnsureChoice`, `EnsureDataset`).
         **kwargs :
           Any additional keyword args for argparser.add_argument.
 
@@ -77,6 +85,7 @@ class Parameter(object):
         self.constraints = expand_constraint_spec(constraints)
         self._doc = doc
         self.cmd_args = args
+        self.completer = completer
 
         # Verify that no mistyped kwargs present
         unknown_args = set(kwargs).difference(self._KNOWN_ARGS)

@@ -282,6 +282,7 @@ class RunProcedure(Interface):
             args=("spec",),
             metavar='NAME [ARGS]',
             nargs=REMAINDER,
+            completer='procedures',
             doc="""Name and possibly additional arguments of the to-be-executed
             procedure. [PY: Can also be a dictionary coming from
             run-procedure(discover=True).][CMD: Note, that all options

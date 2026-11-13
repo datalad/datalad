@@ -102,7 +102,7 @@ def setup_parser(
     )
 
     # common options
-    parser_add_common_options(parser)
+    parser_add_common_options(parser, completing=completing)
 
     # get all interface definitions from datalad-core
     interface_groups = get_interface_groups()
@@ -278,8 +278,15 @@ def setup_parserarg_for_interface(parser, param_name, param, defaults_idx,
             defaults[defaults_idx] if defaults_idx >= 0 else None)
     # create the parameter, using the constraint instance for type
     # conversion
-    parser.add_argument(*parser_args, help=help,
-                        **parser_kwargs)
+    action = parser.add_argument(*parser_args, help=help,
+                                 **parser_kwargs)
+    if completing:
+        # only needed (thus imported) for completion, to not slow down
+        # regular invocations
+        from .completers import get_param_completer
+        completer = get_param_completer(param)
+        if completer is not None:
+            action.completer = completer
 
 
 def _amend_param_parser_kwargs_for_help(parser_kwargs, param, default=None):
@@ -490,23 +497,29 @@ class ArgumentParserDisableAbbrev(argparse.ArgumentParser):
             option_string)
 
 
-def parser_add_common_opt(parser, opt, names=None, **kwargs):
+def parser_add_common_opt(parser, opt, names=None, completing=False,
+                          **kwargs):
     opt_tmpl = common_args[opt]
     opt_kwargs = opt_tmpl[1].copy()
     opt_kwargs.update(kwargs)
-    if names is None:
-        parser.add_argument(*opt_tmpl[0], **opt_kwargs)
-    else:
-        parser.add_argument(*names, **opt_kwargs)
+    # not an argparse thing, see datalad.cli.completers
+    completer = opt_kwargs.pop('completer', None)
+    action = parser.add_argument(
+        *(opt_tmpl[0] if names is None else names), **opt_kwargs)
+    if completing and completer is not None:
+        # only needed (thus imported) for completion, to not slow down
+        # regular invocations
+        from .completers import get_completer
+        action.completer = get_completer(completer)
 
 
-def parser_add_common_options(parser, version=None):
+def parser_add_common_options(parser, version=None, completing=False):
     """Add all options defined in common_args, but excludes 'help'"""
     # populate with standard options
     for arg in common_args:
         if arg == 'help':
             continue
-        parser_add_common_opt(parser, arg)
+        parser_add_common_opt(parser, arg, completing=completing)
     # special case version arg
     if version is not None:
         import warnings

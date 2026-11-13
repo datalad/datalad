@@ -397,14 +397,15 @@ def test_cli_configoverrides(path=None):
         datalad.cfg.reload(force=True)
 
 
+@with_tempfile(mkdir=True)
 @with_tempfile
-def test_completion(out_fn=None):
+def test_completion(path=None, out_fn=None):
     skip_if_no_module('argcomplete')
 
     from datalad.cmd import WitlessRunner
     runner = WitlessRunner()
 
-    def get_completions(s: str, expected) -> list:
+    def get_completions(s: str, expected, cwd=None) -> list:
         """Run 'datalad' external command and collect completions
 
         Parameters
@@ -414,6 +415,8 @@ def test_completion(out_fn=None):
         expected: iterable of str
           What entries to expect - would raise AssertionError if any is
           not present in output
+        cwd: str, optional
+          Directory to run the command in
         exit_code: int, optional
           If incomplete/malformed we seems to get 2, most frequently used
           so default
@@ -428,12 +431,12 @@ def test_completion(out_fn=None):
         comp_line = f'datalad {s}'
         runner.run(
             comp_line.split(' '),
+            cwd=cwd,
             env=dict(os.environ,
                      _ARGCOMPLETE='1',
                      _ARGCOMPLETE_STDOUT_FILENAME=out_fn,
                      COMP_LINE=comp_line,
-                     # without -1 seems to get "finished completion", someone can investigate more
-                     COMP_POINT=str(len(comp_line)-1),  # always at the end ATM
+                     COMP_POINT=str(len(comp_line)),  # always at the end ATM
                      ))
         with open(out_fn, 'rb') as f:
             entries = f.read().split(b'\x0b')
@@ -446,10 +449,63 @@ def test_completion(out_fn=None):
         return entries  # for extra analyzes if so desired
 
     all_commands = get_all_commands()
-    get_completions('i', {'install'})
+    get_completions('i', {'install '})
     get_completions(' ', ['--dbg', '-c'] + all_commands)
     # if command already matches -- we get only that hit ATM, not others which begin with it
     get_completions('create', ['create '])
     get_completions('create -', ['--dataset'])
     # but for incomplete one we do get all create* commands
     get_completions('creat', [c for c in all_commands if c.startswith('create')])
+
+    # values of the parameters, according to their completers
+    ds = create(path, annex=False)
+    for name in ('github', 'origin'):
+        ds.repo.add_remote(name, f'https://example.com/{name}')
+    ds.repo.tag('v1')
+    (ds.pathobj / 'subdir').mkdir()
+    branch = ds.repo.get_active_branch()
+    for s, expected in (
+            # names of the siblings of the dataset at hand
+            ('push --to ', ['github', 'origin']),
+            ('push --to=o', ['--to=origin ']),
+            ('siblings -s g', ['github ']),
+            # ... or of the one pointed to
+            ('-C subdir push -d .. --to o', ['origin ']),
+            ('diff --from ', sorted([branch, 'v1'])),
+            ('-f json', ['json', 'json_pp']),
+            ('create -c yo', ['yoda ']),
+    ) + (
+        # A command line is split following the POSIX shell rules, so there
+        # is no point in testing the completion of paths with backslashes.
+        # complete_directories() itself is tested in test_completers.
+        () if on_windows else (
+            (f'-C {path} siblings -s g', ['github ']),
+            # directories for datasets, but files for paths
+            ('status -d s', ['subdir/']),
+            ('-C s', ['subdir/']),
+            ('status s', ['subdir/']),
+            ('status .datalad/c', ['.datalad/config ']),
+        )
+    ):
+        assert_equal(get_completions(s, [], cwd=path), expected)
+    # only the values of an option with an optional value if given as
+    # --option=, not also the paths for the positional arguments
+    assert_equal(get_completions('update --how=', [], cwd=path),
+                 [f'--how={c}' for c in
+                  ('fetch', 'merge', 'ff-only', 'reset', 'checkout')])
+    assert_equal(get_completions('update --how=f', [], cwd=path),
+                 ['--how=fetch', '--how=ff-only'])
+    assert_equal(get_completions('clone --reckless=', [], cwd=path),
+                 ['--reckless=auto', '--reckless=ephemeral'])
+    # whenever a separate value could as well be a positional argument
+    # (no paths on Windows, see above)
+    get_completions(
+        'clone --reckless ',
+        ['auto', 'ephemeral'] + ([] if on_windows else ['subdir/']),
+        cwd=path)
+    # choices of a constraint which allows for other values too
+    get_completions('clone --reckless ', ['auto', 'ephemeral'], cwd=path)
+    get_completions('run-procedure cfg_', ['cfg_yoda'], cwd=path)
+    # without a dataset there are none, but completion does not fail
+    assert_not_in('origin',
+                  get_completions('push -d nonexistent --to ', [], cwd=path))

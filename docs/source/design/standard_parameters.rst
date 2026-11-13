@@ -41,7 +41,12 @@ The parameters are listed in their command-line form, but similar names and desc
   Limit recursion to a given amount of subdataset levels
 
 ``-s``/``--sibling-name`` [SUGGESTION]
-  The identifier for a dataset sibling (remote)
+  The identifier for a dataset sibling (remote).
+  Option names still differ between commands (e.g., ``push --to``,
+  ``update -s/--sibling``, ``get -s/--source``), but all such parameters
+  are defined with ``sibling_parameter()`` from
+  ``datalad.interface.common_opts`` for a uniform ``SIBLING`` metavar and
+  shell completion of the dataset's sibling names.
 
 
 Certain standard parameters will have their own design document.

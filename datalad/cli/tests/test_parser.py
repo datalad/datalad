@@ -5,12 +5,22 @@ __docformat__ = 'restructuredtext'
 from io import StringIO
 from unittest.mock import patch
 
+import pytest
+
 from datalad.tests.utils_pytest import (
     assert_equal,
     assert_in,
+    assert_is_none,
     assert_raises,
 )
 
+from ..completers import (
+    ChoicesCompleter,
+    complete_datasets,
+    complete_directories,
+    complete_revisions,
+    complete_siblings,
+)
 from ..parser import (
     fail_with_short_help,
     setup_parser,
@@ -80,3 +90,38 @@ def test_setup():
         list(parser._positionals._group_actions[0].choices.keys()),
         ['wtf']
     )
+
+
+@pytest.mark.ai_generated
+def test_setup_completer():
+    def get_completers(completing):
+        parser = setup_parser(
+            ['datalad', 'push', '--to'], completing=completing)
+        subparser = parser._positionals._group_actions[0].choices['push']
+        actions = {a.dest: a for a in parser._actions + subparser._actions}
+        assert_equal(actions['to'].metavar, 'SIBLING')
+        return {
+            dest: getattr(actions[dest], 'completer', None)
+            for dest in ('change_path', 'common_result_renderer',
+                         'dataset', 'to', 'since', 'jobs', 'path')
+        }
+
+    # completers are only attached when completing
+    assert_equal(set(get_completers(False).values()), {None})
+    found = get_completers(True)
+    assert_is_none(found.pop('path'))
+    # derived from EnsureChoice among alternative constraints
+    assert_in('auto', found.pop('jobs').completer.choices)
+    assert_equal(
+        {dest: completer.completer for dest, completer in found.items()},
+        dict(
+            # common arguments
+            change_path=complete_directories,
+            common_result_renderer=ChoicesCompleter(
+                'generic', 'json', 'json_pp', 'tailored', 'disabled'),
+            # explicit
+            to=complete_siblings,
+            since=complete_revisions,
+            # derived from the EnsureDataset constraint
+            dataset=complete_datasets,
+        ))

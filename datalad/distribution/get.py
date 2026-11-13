@@ -37,6 +37,7 @@ from datalad.interface.common_opts import (
     location_description,
     reckless_opt,
     recursion_flag,
+    sibling_parameter,
 )
 from datalad.interface.results import (
     annexjson2result,
@@ -875,13 +876,11 @@ class Get(Interface):
             dataset use the `add` command""",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
-        source=Parameter(
+        source=sibling_parameter(
             args=("-s", "--source",),
-            metavar="LABEL",
             doc="""label of the data source to be used to fulfill requests.
             This can be the name of a dataset :term:`sibling` or another known
-            source""",
-            constraints=EnsureStr() | EnsureNone()),
+            source"""),
         recursive=recursion_flag,
         recursion_limit=Parameter(
             args=("-R", "--recursion-limit",),

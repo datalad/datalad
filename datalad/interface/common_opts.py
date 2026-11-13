@@ -158,6 +158,7 @@ cfg_proc_opt = Parameter(
     args=("-c", "--cfg-proc"),
     metavar="PROC",
     action='append',
+    completer='cfg-procedures',
     doc="""Run cfg_PROC procedure(s) (can be specified multiple times)
     on the dataset. Use
     [PY: `run_procedure(discover=True)` PY][CMD: run-procedure --discover CMD]
@@ -231,17 +232,36 @@ as_common_datasrc = Parameter(
     dataset (technical: git-annex auto-enabled special remote)""")
 
 
-publish_depends = Parameter(
+def sibling_parameter(**kwargs):
+    """Return a `Parameter` for the name of an existing sibling
+
+    To be used for any such parameter, to provide the same metavar, shell
+    completion of the sibling names of the dataset, constraints, and,
+    unless there is more to tell, the doc.  Any of those could be overridden,
+    and anything else (most notably ``args``, since option names differ
+    between commands, e.g. ``push --to`` and ``update --sibling``) added via
+    `kwargs`.
+    """
+    params = dict(
+        doc="""name of the sibling""",
+        metavar='SIBLING',
+        completer='siblings',
+        constraints=EnsureStr() | EnsureNone(),
+    )
+    params.update(kwargs)
+    return Parameter(**params)
+
+
+publish_depends = sibling_parameter(
     args=("--publish-depends",),
-    metavar='SIBLINGNAME',
     doc="""add a dependency such that the given existing sibling is
     always published prior to the new sibling. This equals setting a
-    configuration item 'remote.SIBLINGNAME.datalad-publish-depends'.
+    configuration item 'remote.<name>.datalad-publish-depends' of the new
+    sibling.
     [PY: Multiple dependencies can be given as a list of sibling names
     PY][CMD: This option can be given more than once to configure multiple
     dependencies CMD]""",
-    action='append',
-    constraints=EnsureStr() | EnsureNone())
+    action='append')
 
 publish_by_default = Parameter(
     args=("--publish-by-default",),
