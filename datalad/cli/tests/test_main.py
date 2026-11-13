@@ -505,8 +505,11 @@ def test_completion(path=None, out_fn=None):
     assert_equal(get_completions('clone --reckless=', [], cwd=path),
                  ['--reckless=auto', '--reckless=ephemeral'])
     # whenever a separate value could as well be a positional argument
-    get_completions('clone --reckless ', ['auto', 'ephemeral', 'subdir/'],
-                    cwd=path)
+    # (no paths on Windows, see above)
+    get_completions(
+        'clone --reckless ',
+        ['auto', 'ephemeral'] + ([] if on_windows else ['subdir/']),
+        cwd=path)
     # choices of a constraint which allows for other values too
     get_completions('clone --reckless ', ['auto', 'ephemeral'], cwd=path)
     get_completions('run-procedure cfg_', ['cfg_yoda'], cwd=path)
