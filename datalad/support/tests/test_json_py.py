@@ -11,6 +11,8 @@ import logging
 import os.path as op
 from json import JSONDecodeError
 
+import pytest
+
 from datalad.support.json_py import (
     dump,
     dump2stream,
@@ -27,15 +29,23 @@ from datalad.tests.utils_pytest import (
 )
 
 
+@pytest.mark.parametrize("suffix, compressed", [
+    # compressed content in a file name without an .xz extension
+    ("", True),
+    # plain content in a file name with an .xz extension
+    (".xz", False),
+])
 @with_tempfile
-def test_load_screwy_unicode_compressed(fname=None):
-    # the fixup re-read must honor an explicit `compressed` flag, also for a
-    # file name without an .xz extension
+def test_load_screwy_unicode_explicit_compressed(fname=None, *, suffix, compressed):
+    # the fixup re-read must honor an explicit `compressed` flag, regardless
+    # of what the file name suggests
     from lzma import LZMAFile
-    with LZMAFile(fname, 'wb') as f:
-        f.write(b'{"Authors": ["A1"\xc2\xa0, "A2"]}')
+    fname += suffix
+    content = b'{"Authors": ["A1"\xc2\xa0, "A2"]}'
+    with (LZMAFile if compressed else open)(fname, 'wb') as f:
+        f.write(content)
     with swallow_logs(new_level=logging.WARNING):
-        eq_(load(fname, compressed=True), {'Authors': ['A1', 'A2']})
+        eq_(load(fname, compressed=compressed), {'Authors': ['A1', 'A2']})
 
 
 @with_tempfile(content=b'{"Authors": ["A1"\xc2\xa0, "A2"]}')
