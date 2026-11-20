@@ -177,10 +177,12 @@ class EnsureBool(Constraint):
         if isinstance(value, bool):
             return value
         elif isinstance(value, (bytes, str)):
-            value = value.lower()
-            if value in ('0', 'no', 'off', 'disable', 'false'):
+            label = value.lower()
+            if isinstance(label, bytes):
+                label = label.decode('utf-8', 'replace')
+            if label in ('0', 'no', 'off', 'disable', 'false'):
                 return False
-            elif value in ('1', 'yes', 'on', 'enable', 'true'):
+            elif label in ('1', 'yes', 'on', 'enable', 'true'):
                 return True
         raise ValueError(
             "value '{}' must be convertible to boolean".format(
