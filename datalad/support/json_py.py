@@ -182,7 +182,7 @@ def load(fname, fixup=True, compressed=None, **kw):
             # Load entire content and replace common "abusers" which break JSON
             # comprehension but in general
             # are Ok
-            with _suitable_open(fname)(fname,'rb') as f:
+            with _suitable_open(fname, compressed)(fname, 'rb') as f:
                 s_orig = s = codecs.getreader('utf-8')(f).read()
 
             for o, r in {
