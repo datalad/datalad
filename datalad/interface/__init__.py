@@ -46,6 +46,7 @@ _group_1siblings = (
         ('datalad.distribution.create_sibling', 'CreateSibling'),
         ('datalad.distribution.siblings', 'Siblings', 'siblings'),
         ('datalad.distribution.update', 'Update'),
+        ('datalad.distribution.reset', 'Reset'),
     ])
 
 _group_2dataset = (

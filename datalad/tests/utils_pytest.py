@@ -1999,20 +1999,6 @@ def maybe_unadjust_repo(repo):
         repo.call_git(["branch", "-D", adjusted])
 
 
-def corresponding_hexsha(repo, ref="HEAD"):
-    """Hexsha of ``ref``, read from the corresponding branch when adjusted.
-
-    A plain ``get_hexsha(HEAD)`` on an adjusted repo returns the SHA of the git-annex
-    "adjusting" commit which is just the view. To read the SHA of the real history,
-    HEAD-relative refs need to be resolved against the corresponding branch instead.
-    On a normal branch it is a plain ``get_hexsha(ref)``.
-    """
-    if (corr := repo.get_corresponding_branch()) and (
-            ref == "HEAD" or ref.startswith(("HEAD~", "HEAD^", "HEAD@"))):
-        ref = corr + ref[len("HEAD"):]
-    return repo.get_hexsha(ref)
-
-
 @lru_cache()
 @with_tempfile
 @with_tempfile

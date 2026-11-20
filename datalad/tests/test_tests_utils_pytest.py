@@ -43,6 +43,7 @@ from _pytest.outcomes import (
 
 from datalad import cfg as dl_cfg
 from datalad.distribution.dataset import Dataset
+from datalad.distribution.utils import corresponding_hexsha
 from datalad.support import path as op
 from datalad.support.external_versions import external_versions
 from datalad.support.gitrepo import GitRepo
@@ -59,7 +60,6 @@ from datalad.tests.utils_pytest import (
     assert_re_in,
     assert_str_equal,
     assert_true,
-    corresponding_hexsha,
     eq_,
     fs_supports_filename,
     get_annex_build_flags,
