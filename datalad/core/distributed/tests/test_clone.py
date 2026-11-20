@@ -647,6 +647,15 @@ def test_installationpath_from_url():
     eq_(_get_installationpath_from_url("http://hostname/"), 'hostname')
 
 
+@with_tempfile(mkdir=True)
+def test_get_installationpath_from_url_current_dir(path=None):
+    # https://github.com/datalad/datalad/issues/7889
+    with chpwd(path):
+        for url in ('.', './', '..'):
+            eq_(_get_installationpath_from_url(url),
+                Path(url).resolve().name)
+
+
 # https://github.com/datalad/datalad/issues/3958
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)

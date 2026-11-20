@@ -4,7 +4,10 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import re
-from os.path import expanduser
+from os.path import (
+    abspath,
+    expanduser,
+)
 from pathlib import Path
 from typing import (
     Dict,
@@ -346,7 +349,7 @@ def _get_installationpath_from_url(url):
             else:
                 path = path[-1]
     else:
-        path = Path(url).parts[-1]
+        path = Path(abspath(url)).name or Path(url).parts[-1]
     if path.endswith('.git'):
         path = path[:-4]
     return path
