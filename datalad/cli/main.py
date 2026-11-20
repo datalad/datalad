@@ -87,11 +87,10 @@ def main(args=sys.argv):
     # TODO possibly construct a dedicated parser just for autocompletion
     # rather than lobotomizing the normal one
     parser = setup_parser(args, completing=completing)
-    try:
-        import argcomplete
-        argcomplete.autocomplete(parser)
-    except ImportError:
-        pass
+    if completing:
+        # only needed (thus imported) for completion
+        from .completers import autocomplete
+        autocomplete(parser)
 
     # parse cmd args
     lgr.debug("Parsing known args among %r", args)

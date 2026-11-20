@@ -1316,6 +1316,7 @@ class Addurls(Interface):
             args=("-c", "--cfg-proc"),
             metavar="PROC",
             action='append',
+            completer='cfg-procedures',
             doc="""Pass this [PY: cfg_proc PY][CMD: --cfg_proc CMD] value when
             calling `create` to make datasets."""),
         jobs=jobs_opt,

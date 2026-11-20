@@ -22,12 +22,16 @@ from .helpers import (
 )
 
 _log_level_names = ['critical', 'error', 'warning', 'info', 'debug']
+_result_renderer_names = ['generic', 'json', 'json_pp', 'tailored', 'disabled']
 
 # argument spec template
 #<name>=(
 #    <id_as_positional>, <id_as_option>
 #    {<ArgumentParser.add_arguments_kwargs>}
 #)
+# In addition to the kwargs of add_argument, there could be a `completer`
+# for shell completion of the values, specified as for
+# datalad.support.param.Parameter.
 
 common_args = dict(
     cfg_overrides=(
@@ -46,6 +50,7 @@ common_args = dict(
         dict(action='append',
              dest='change_path',
              metavar='PATH',
+             completer='directories',
              help="""run as if datalad was started in <path> instead
              of the current working directory.  When multiple -C options are given,
              each subsequent non-absolute -C <path> is interpreted relative to the
@@ -128,7 +133,9 @@ common_args = dict(
         dict(dest='common_result_renderer',
              default='tailored',
              type=ensure_unicode,
-             metavar="{generic,json,json_pp,tailored,disabled,'<template>'}",
+             metavar="{%s,'<template>'}" % ','.join(_result_renderer_names),
+             # not `choices` since could also be a template
+             completer=_result_renderer_names,
              help=eval_params['result_renderer']._doc \
              + " [Default: '%(default)s']")),
 )

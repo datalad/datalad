@@ -121,6 +121,7 @@ class Rerun(Interface):
             args=("revision",),
             metavar="REVISION",
             nargs="?",
+            completer='revisions',
             doc="""rerun command(s) in `revision`. By default, the command from
             this commit will be executed, but [CMD: --since CMD][PY: `since`
             PY] can be used to construct a revision range. The default value is
@@ -130,6 +131,7 @@ class Rerun(Interface):
             constraints=EnsureStr() | EnsureNone()),
         since=Parameter(
             args=("--since",),
+            completer='revisions',
             doc="""If `since` is a commit-ish, the commands from all commits
             that are reachable from `revision` but not `since` will be
             re-executed (in other words, the commands in :command:`git log
@@ -146,6 +148,7 @@ class Rerun(Interface):
         onto=Parameter(
             metavar="base",
             args=("--onto",),
+            completer='revisions',
             doc="""start point for rerunning the commands. If not specified,
             commands are executed at HEAD. This option can be used to specify
             an alternative start point, which will be checked out with the

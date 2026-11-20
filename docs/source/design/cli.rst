@@ -109,6 +109,53 @@ are also altered to exclude Python-specific idioms that have no relevance
 on the command line (e.g., the specification of ``None`` as a default).
 
 
+Shell completion of parameter values
+====================================
+
+Shell completion is implemented with ``argcomplete`` (see
+``datalad shell-completion``). When invoked for completion, the parser is
+constructed without any help texts, and the values of a parameter are
+completed according to, in order of preference,
+
+- the ``completer`` of its :class:`~datalad.support.param.Parameter`, which is
+  either
+
+  - the name of a completer in ``datalad.cli.completers.completers``:
+
+    ``'siblings'``
+      names of the siblings of the dataset. Parameters for the name of an
+      existing sibling should be defined using
+      ``datalad.interface.common_opts.sibling_parameter()``, which also
+      provides for a uniform metavar and constraints.
+    ``'revisions'``
+      names of the branches and tags of the dataset
+    ``'procedures'``, ``'cfg-procedures'``
+      names of the procedures known to ``run-procedure``, and of the
+      ``cfg_`` ones among them, without that prefix
+    ``'directories'``
+      directories only
+    ``'datasets'``
+      directories, and the parent directory (``..``) if it is within a
+      dataset
+
+  - a list of values to choose from, where other values remain acceptable, or
+  - a callable following the ``argcomplete`` completer protocol;
+
+- its ``constraints``: the choices of an ``EnsureChoice`` (also if it is only
+  one of the alternatives), or ``'datasets'`` for an ``EnsureDataset``.
+
+Without either, ``argcomplete`` falls back on file name completion.
+
+The dataset is the one given via ``-d/--dataset`` or the one containing the
+working directory, and relative paths are considered relative to any ``-C``.
+Completers run on every press of ``<TAB>``, so they must be fast, and none of
+them is imported unless completing. Any exception raised by a completer is
+only logged at the ``DEBUG`` level, and results in no candidates. The
+common arguments in ``datalad.cli.common_args`` can declare a ``completer``
+the same way, and extensions can add named completers to
+``datalad.cli.completers.completers``.
+
+
 CLI-based execution of ``Interface`` command
 ============================================
 
