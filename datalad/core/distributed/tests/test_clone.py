@@ -647,13 +647,13 @@ def test_installationpath_from_url():
     eq_(_get_installationpath_from_url("http://hostname/"), 'hostname')
 
 
-@with_tempfile(mkdir=True)
-def test_get_installationpath_from_url_current_dir(path=None):
+def test_get_installationpath_from_url_current_dir():
     # https://github.com/datalad/datalad/issues/7889
-    with chpwd(path):
-        for url in ('.', './', '..'):
-            eq_(_get_installationpath_from_url(url),
-                Path(url).resolve().name)
+    # no IndexError; like git, no name is guessed from '.' or '..'
+    eq_(_get_installationpath_from_url('.'), '.')
+    eq_(_get_installationpath_from_url('./'), '.')
+    eq_(_get_installationpath_from_url('..'), '..')
+    eq_(_get_installationpath_from_url('sub/..'), '..')
 
 
 # https://github.com/datalad/datalad/issues/3958
