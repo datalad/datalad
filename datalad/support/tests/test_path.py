@@ -63,6 +63,11 @@ def test_split_ext():
 
     eq_(split_ext("file.a.b..c"), ("file", ".a.b..c"))
 
+    # no short extension: there is no extension, not an empty one after a dot
+    eq_(split_ext("file.toolong"), ("file.toolong", ""))
+    eq_(split_ext("file.a.toolong"), ("file.a.toolong", ""))
+    eq_(split_ext(".hidden"), (".hidden", ""))
+
 
 @pytest.mark.parametrize("sep", [None, '/', '\\'])
 def test_get_parent_paths(sep):
