@@ -105,6 +105,7 @@ devel-docs = [
 ]
 devel-utils = [
     "asv",             # benchmarks
+    "asv-runner>=0.3.1",  # 0.2.2-0.3.0 run class-level setup() before setup_cache (airspeed-velocity/asv_runner#52)
     "coverage>=7.10.6,!=7.13.1",  # 7.10.6: `patch = subprocess` fixes; 7.13.1: ConfigError with '..' in config paths on macOS
     "gprof2dot",       # rendering cProfile output as a graph image
     "psutil",
