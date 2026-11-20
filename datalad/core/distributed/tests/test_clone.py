@@ -647,6 +647,15 @@ def test_installationpath_from_url():
     eq_(_get_installationpath_from_url("http://hostname/"), 'hostname')
 
 
+def test_get_installationpath_from_url_current_dir():
+    # https://github.com/datalad/datalad/issues/7889
+    # no IndexError; like git, no name is guessed from '.' or '..'
+    eq_(_get_installationpath_from_url('.'), '.')
+    eq_(_get_installationpath_from_url('./'), '.')
+    eq_(_get_installationpath_from_url('..'), '..')
+    eq_(_get_installationpath_from_url('sub/..'), '..')
+
+
 # https://github.com/datalad/datalad/issues/3958
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
