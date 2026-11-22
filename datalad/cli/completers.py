@@ -42,6 +42,7 @@ from datalad.support.exceptions import (
     CapturedException,
     NoDatasetFound,
 )
+from datalad.support.external_versions import external_versions
 from datalad.utils import (
     chpwd,
     get_dataset_root,
@@ -292,17 +293,40 @@ def get_param_completer(param):
     return get_completer(choices) if choices else None
 
 
+#: The first version of argcomplete which completes ``--option=VALUE`` only
+#: with the values of that option
+#: (https://github.com/kislyuk/argcomplete/pull/586)
+_ARGCOMPLETE_OPTION_VALUE_FIXED = '3.8.0'
+
+
+def _needs_option_value_workaround():
+    """Whether argcomplete is older than the fix for ``--option=VALUE``
+
+    or is of an unknown version.
+
+    TODO: remove along with the workaround in `autocomplete` whenever such an
+    argcomplete becomes the minimal supported one.
+    """
+    try:
+        return external_versions['argcomplete'] \
+            < _ARGCOMPLETE_OPTION_VALUE_FIXED
+    except TypeError:
+        # version is not known
+        return True
+
+
 def autocomplete(parser, **kwargs):
     """Complete the command line, if invoked for completion and can do that
 
-    A replacement for ``argcomplete.autocomplete`` which works around its
-    handling of ``--option=VALUE`` for an option with an optional value
-    (``nargs='?'``, e.g. ``update --how``, ``clone --reckless``).  Such an
-    option does not have to consume the next argument, so argcomplete also
-    completes for the positional arguments, although here the value is
-    certainly of that option.  Moreover it prepends ``--option=`` to the
-    already collected candidates once per each such action, resulting in
-    file names and ``--option=--option=VALUE`` among the candidates.
+    A replacement for ``argcomplete.autocomplete`` which, for argcomplete
+    older than 3.8.0, works around its handling of ``--option=VALUE`` for an
+    option with an optional value (``nargs='?'``, e.g. ``update --how``,
+    ``clone --reckless``).  Such an option does not have to consume the next
+    argument, so argcomplete also completed for the positional arguments,
+    although here the value is certainly of that option.  Moreover it
+    prepended ``--option=`` to the already collected candidates once per each
+    such action, resulting in file names and ``--option=--option=VALUE`` among
+    the candidates.
 
     Parameters
     ----------
@@ -318,6 +342,10 @@ def autocomplete(parser, **kwargs):
     except ImportError as e:
         lgr.debug("No completion without argcomplete: %s",
                   CapturedException(e))
+        return
+
+    if not _needs_option_value_workaround():
+        CompletionFinder()(parser, **kwargs)
         return
 
     class _CompletionFinder(CompletionFinder):
