@@ -58,6 +58,27 @@ def _on_msys_tainted_paths():
     return True
 
 
+def _split_comp_line(line):
+    """Split the command line to complete into arguments
+
+    The word being completed could have a quote which is not closed yet,
+    e.g. ``datalad push --to "ori``.
+    """
+    import shlex
+
+    # TODO support posix=False too?
+    try:
+        return shlex.split(line)
+    except ValueError as e:
+        # "No closing quotation", so try to close it
+        for quote in '"\'':
+            try:
+                return shlex.split(line + quote)
+            except ValueError:
+                continue
+        raise e
+
+
 def main(args=sys.argv):
     """Main CLI entrypoint"""
     lgr.log(5, "Starting main(%r)", args)
@@ -65,10 +86,7 @@ def main(args=sys.argv):
     datalad.__api = 'cmdline'
     completing = "_ARGCOMPLETE" in os.environ
     if completing and 'COMP_LINE' in os.environ:
-        import shlex
-
-        # TODO support posix=False too?
-        args = shlex.split(os.environ['COMP_LINE']) or args
+        args = _split_comp_line(os.environ['COMP_LINE']) or args
 
     if _on_msys_tainted_paths():
         # Possibly present DataLadRIs were stripped of a leading /
