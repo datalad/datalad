@@ -13,13 +13,24 @@
 __docformat__ = 'restructuredtext'
 
 # Not really worth to be there but it is ATM, so let's use that
-from datalad.api import shell_completion
-from datalad.cmd import WitlessRunner
+import pytest
+
+from datalad.api import (
+    create,
+    shell_completion,
+)
+from datalad.cmd import (
+    StdOutErrCapture,
+    WitlessRunner,
+)
+from datalad.support.external_versions import external_versions
 from datalad.tests.utils_pytest import (
     assert_cwd_unchanged,
     eq_,
+    skip_if_no_module,
     skip_if_on_windows,
     swallow_outputs,
+    with_tempfile,
 )
 
 
@@ -41,3 +52,35 @@ def test_shell_completion_source():
     # yoh sees no easy way ATM, and googled up
     # https://stackoverflow.com/questions/9137245/unit-test-for-bash-completion-script
     # requires too much enthusiasm toward this goal.
+
+
+@pytest.mark.ai_generated
+@skip_if_on_windows
+@with_tempfile(mkdir=True)
+def test_shell_completion_function(path=None):
+    skip_if_no_module('argcomplete')
+    ds = create(path, annex=False)
+    ds.repo.add_remote('origin', 'https://example.com/origin')
+
+    def complete(line):
+        """Return what the completion function replies to bash for `line`"""
+        out = WitlessRunner(cwd=path).run(
+            ['bash', '-c',
+             'source <(datalad shell-completion); '
+             'COMP_LINE=$1; COMP_POINT=${#COMP_LINE}; '
+             '_python_argcomplete datalad; '
+             'printf "%s\\n" "${COMPREPLY[@]}"',
+             '_', line],
+            protocol=StdOutErrCapture)['stdout']
+        return out.splitlines()
+
+    eq_(complete('datalad push --to o'), ['origin '])
+    eq_(complete('datalad push --to=o'), ['origin '])
+    # the quote of the value being completed is not closed yet
+    eq_(complete('datalad push --to "o'), ['origin'])
+    eq_(complete("datalad push --to 'o"), ['origin'])
+    if external_versions['argcomplete'] >= '3.8.0':
+        # Older argcomplete replies with "--to=origin", which bash places
+        # after the quote.  To get it right argcomplete needs to know that it
+        # completes for bash, so the function passes _ARGCOMPLETE_SHELL.
+        eq_(complete('datalad push --to="o'), ['origin'])
