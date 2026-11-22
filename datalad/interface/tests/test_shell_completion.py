@@ -66,7 +66,9 @@ def test_shell_completion_function(path=None):
         """Return what the completion function replies to bash for `line`"""
         out = WitlessRunner(cwd=path).run(
             ['bash', '-c',
-             'source <(datalad shell-completion); '
+             # not "source <(...)": bash 3.2, still the stock one on macOS,
+             # loads nothing from a process substitution
+             'eval "$(datalad shell-completion)"; '
              'COMP_LINE=$1; COMP_POINT=${#COMP_LINE}; '
              '_python_argcomplete datalad; '
              'printf "%s\\n" "${COMPREPLY[@]}"',
