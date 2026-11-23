@@ -70,7 +70,9 @@ def _split_comp_line(line):
     try:
         return shlex.split(line)
     except ValueError as e:
-        # "No closing quotation", so try to close it
+        if 'No closing quotation' not in str(e):
+            raise
+        # try to close it
         for quote in '"\'':
             try:
                 return shlex.split(line + quote)

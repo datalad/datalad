@@ -533,3 +533,11 @@ def test_completion(path=None, out_fn=None):
 ])
 def test_split_comp_line(line, target):
     assert_equal(_split_comp_line(line), target)
+
+
+@pytest.mark.ai_generated
+def test_split_comp_line_other_error():
+    # only a not closed quote is handled
+    with assert_raises(ValueError) as cme:
+        _split_comp_line('datalad status trailing\\')
+    assert_in('No escaped character', str(cme.value))
