@@ -210,7 +210,9 @@ class Run(Interface):
     duplicated in each modified (sub)dataset, although only being fully
     interpretable and re-executable in the actual top-level superdataset. For
     this reason the provenance record contains the dataset ID of that
-    superdataset.
+    superdataset. [CMD: --recursion-limit CMD][PY: `recursion_limit` PY] limits
+    saving to fewer levels of subdatasets, e.g., to leave changes in input
+    subdatasets uncommitted.
 
     *Command format*
 
