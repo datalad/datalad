@@ -1123,3 +1123,25 @@ def test_rerun_merge_runs(path=None):
     assert_repo_status(ds.path)
     ok_((ds.pathobj / "normal_file").exists())
     ok_((ds.pathobj / "inner2").exists())
+
+
+@pytest.mark.ai_generated
+@with_tempfile(mkdir=True)
+def test_rerun_recursion_limit0(path=None):
+    ds = Dataset(path).create()
+    sub = ds.create("sub")
+    sub_head = sub.repo.get_hexsha()
+    newfile = op.join('sub', 'new')
+    ds.run('echo x >> out && echo x >> ' + newfile, recursion_limit=0,
+           result_renderer='disabled')
+    eq_(sub.repo.get_hexsha(), sub_head)
+    # rerun needs a clean dataset
+    remove(op.join(ds.path, newfile))
+    assert_repo_status(ds.path)
+    run_hexsha = ds.repo.get_hexsha()
+
+    ds.rerun(recursion_limit=0, result_renderer='disabled')
+    neq_(ds.repo.get_hexsha(), run_hexsha)
+    eq_(sub.repo.get_hexsha(), sub_head)
+    assert_repo_status(sub.path, untracked=['new'])
+    assert_repo_status(ds.path, modified=['sub'])

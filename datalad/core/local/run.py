@@ -17,7 +17,10 @@ import os
 import os.path as op
 import warnings
 from argparse import REMAINDER
-from pathlib import Path
+from pathlib import (
+    Path,
+    PurePosixPath,
+)
 from tempfile import mkdtemp
 
 import datalad
@@ -48,7 +51,9 @@ from datalad.local.unlock import Unlock
 from datalad.support.constraints import (
     EnsureBool,
     EnsureChoice,
+    EnsureInt,
     EnsureNone,
+    EnsureRange,
 )
 from datalad.support.exceptions import (
     CapturedException,
@@ -100,6 +105,40 @@ def _parse_sub_status(sub_status_output, ds_path):
             sha, relpath = parts[0], parts[1]
             result[op.join(ds_path, relpath)] = sha
     return result
+
+
+def _sub_status_path(line):
+    """Return the path from a ``git submodule status`` line.
+
+    The format is ``<flag><sha> <path>[ (<describe>)]``; the path may
+    contain spaces.
+    """
+    path = line[1:].split(' ', 1)[1]
+    if path.endswith(')') and ' (' in path:
+        path = path.rpartition(' (')[0]
+    return PurePosixPath(path)
+
+
+def _get_sub_status(repo, recursion_limit):
+    """Return ``git submodule status`` output down to `recursion_limit`.
+
+    None means no limit; 0 means no subdatasets, so None is returned.
+    Otherwise only subdatasets at most `recursion_limit` levels below the
+    dataset are kept.
+    """
+    if recursion_limit == 0:
+        return None
+    out = repo.call_git(["submodule", "status", "--recursive"])
+    if recursion_limit is None:
+        return out
+    lines = [line for line in out.splitlines() if line.strip()]
+    paths = [_sub_status_path(line) for line in lines]
+    subs = set(paths)
+    # the level of a subdataset is one more than the number of
+    # subdatasets it is nested in; plain directories do not count
+    return '\n'.join(
+        line for line, path in zip(lines, paths)
+        if 1 + sum(p in subs for p in path.parents) <= recursion_limit)
 
 
 assume_ready_opt = Parameter(
@@ -171,7 +210,9 @@ class Run(Interface):
     duplicated in each modified (sub)dataset, although only being fully
     interpretable and re-executable in the actual top-level superdataset. For
     this reason the provenance record contains the dataset ID of that
-    superdataset.
+    superdataset. [CMD: --recursion-limit CMD][PY: `recursion_limit` PY] limits
+    saving to fewer levels of subdatasets, e.g., to leave changes in input
+    subdatasets uncommitted.
 
     *Command format*
 
@@ -311,6 +352,16 @@ class Run(Interface):
             doc="""Consider the specification of inputs and outputs to be
             explicit. Don't warn if the repository is dirty, and only save
             modifications to the listed outputs."""),
+        recursion_limit=Parameter(
+            args=("-R", "--recursion-limit",),
+            metavar="LEVELS",
+            constraints=EnsureInt() & EnsureRange(min=0) | EnsureNone(),
+            doc="""by default, modifications in subdatasets at any depth are
+            saved too. This limits saving to the given number of subdataset
+            levels below the dataset; 0 saves the dataset only. Subdatasets
+            beyond the limit are treated as by :command:`datalad save
+            --recursion-limit`: their uncommitted changes are left as they
+            are."""),
         message=save_message_opt,
         sidecar=Parameter(
             args=('--sidecar',),
@@ -356,6 +407,7 @@ class Run(Interface):
             expand=None,
             assume_ready=None,
             explicit=False,
+            recursion_limit=None,
             message=None,
             sidecar=None,
             dry_run=None,
@@ -366,6 +418,7 @@ class Run(Interface):
                              expand=expand,
                              assume_ready=assume_ready,
                              explicit=explicit,
+                             recursion_limit=recursion_limit,
                              message=message,
                              sidecar=sidecar,
                              dry_run=dry_run,
@@ -856,8 +909,8 @@ def _create_record(run_info, sidecar_flag, ds):
 
 
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
-                assume_ready=None, explicit=False, message=None, sidecar=None,
-                dry_run=False, jobs=None,
+                assume_ready=None, explicit=False, recursion_limit=None,
+                message=None, sidecar=None, dry_run=False, jobs=None,
                 extra_info=None,
                 rerun_info=None,
                 extra_inputs=None,
@@ -1091,7 +1144,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     # subdataset-only commits later (command may create commits deep
     # in the hierarchy without changing the top-level HEAD).
     pre_cmd_sub_status = (
-        ds.repo.call_git(["submodule", "status", "--recursive"])
+        _get_sub_status(ds.repo, recursion_limit)
         if pre_cmd_hexsha is not None else None)
 
     if not inject:
@@ -1112,8 +1165,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     # Also detect subdataset-only commits by comparing the single-string
     # submodule status snapshot (one git call, not N Dataset objects).
     if (pre_cmd_sub_status is not None and not cmd_made_commits):
-        post_sub_status = ds.repo.call_git(
-            ["submodule", "status", "--recursive"])
+        post_sub_status = _get_sub_status(ds.repo, recursion_limit)
         if pre_cmd_sub_status != post_sub_status:
             cmd_made_commits = True
 
@@ -1275,6 +1327,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                     dataset=ds_path,
                     path=outputs_to_save,
                     recursive=True,
+                    recursion_limit=recursion_limit,
                     message=msg,
                     jobs=jobs,
                     since=pre_cmd_hexsha if cmd_made_commits else None,
