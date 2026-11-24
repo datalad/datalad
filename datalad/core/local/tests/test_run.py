@@ -1389,7 +1389,14 @@ def test_run_on_cmd_failure(path=None):
 
 
 def _gitlink(ds, path):
-    return ds.repo.call_git(['ls-tree', DEFAULT_BRANCH, '--', path])
+    """Return the commit recorded for subdataset `path` in `ds`.
+
+    On adjusted branches this is a commit of the subdataset's
+    corresponding branch, not of its HEAD; compare against
+    ``sub.repo.get_hexsha(DEFAULT_BRANCH)``.
+    """
+    return ds.repo.call_git(
+        ['ls-tree', DEFAULT_BRANCH, '--', path]).split()[2]
 
 
 @pytest.mark.ai_generated
@@ -1468,7 +1475,7 @@ def test_run_recursion_limit1(path=None):
     ds.run(cmd, recursion_limit=1, result_renderer='disabled')
     # the direct subdataset is saved, and its new state recorded
     neq_(sub.repo.get_hexsha(), sub_head)
-    eq_(_gitlink(ds, 'sub').split()[2], sub.repo.get_hexsha())
+    eq_(_gitlink(ds, 'sub'), sub.repo.get_hexsha(DEFAULT_BRANCH))
     # the one below is left alone
     eq_(subsub.repo.get_hexsha(), subsub_head)
     eq_(_gitlink(sub, 'subsub'), subsub_link)
@@ -1552,7 +1559,7 @@ def test_run_recursion_limit2(path=None):
     for d in (s2, s1, ds):
         _assert_run_merge(d)
     eq_(s3.repo.format_commit('%s'), 'inner3')
-    eq_(_gitlink(s2, 's3').split()[2], s3.repo.get_hexsha())
+    eq_(_gitlink(s2, 's3'), s3.repo.get_hexsha(DEFAULT_BRANCH))
     assert_repo_status(s3.path, untracked=['new'])
     assert_repo_status(s2.path, modified=['s3'])
 
@@ -1560,8 +1567,8 @@ def test_run_recursion_limit2(path=None):
 @pytest.mark.ai_generated
 @with_tempfile(mkdir=True)
 def test_run_recursion_limit1_commit_beyond_limit(path=None):
-    # a commit below the limit gets no run merge commit of its own, but
-    # the parent within the limit records its new state
+    # a commit below the limit gets no run merge commit of its own; the
+    # parent within the limit records what save(recursion_limit=1) would
     ds = Dataset(path).create()
     sub = ds.create("sub")
     subsub = sub.create("subsub")
@@ -1571,5 +1578,9 @@ def test_run_recursion_limit1_commit_beyond_limit(path=None):
            + 'foo && git add foo && git commit -m inner')
     ds.run(cmd, recursion_limit=1, result_renderer='disabled')
     eq_(subsub.repo.format_commit('%s'), 'inner')
-    eq_(_gitlink(sub, 'subsub').split()[2], subsub.repo.get_hexsha())
-    assert_repo_status(ds.path)
+    eq_(_gitlink(sub, 'subsub'), subsub.repo.get_hexsha(DEFAULT_BRANCH))
+    if not ds.repo.is_managed_branch():
+        # on an adjusted branch the commit stays on subsub's adjusted
+        # branch, beyond the limit, so the hierarchy is left modified,
+        # as after save(recursive=True, recursion_limit=1)
+        assert_repo_status(ds.path)
