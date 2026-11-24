@@ -359,9 +359,9 @@ class Run(Interface):
             doc="""by default, modifications in subdatasets at any depth are
             saved too. This limits saving to the given number of subdataset
             levels below the dataset; 0 saves the dataset only. Subdatasets
-            beyond the limit are not saved: their uncommitted changes are left
-            as they are, and their recorded state only changes if the command
-            made a commit in them."""),
+            beyond the limit are treated as by :command:`datalad save
+            --recursion-limit`: their uncommitted changes are left as they
+            are."""),
         message=save_message_opt,
         sidecar=Parameter(
             args=('--sidecar',),
