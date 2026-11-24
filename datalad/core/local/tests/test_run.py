@@ -32,6 +32,7 @@ from datalad.api import (
 from datalad.cli.main import main
 from datalad.core.local.run import (
     _format_iospecs,
+    _get_sub_status,
     _get_substitutions,
     format_command,
     run_command,
@@ -1498,12 +1499,62 @@ def test_run_recursion_limit1_inner_commit(path=None):
 
 
 @pytest.mark.ai_generated
+def test_get_sub_status_trimmed():
+    sha = 40 * '0'
+    out = '\n'.join([
+        f' {sha} a (heads/main)',
+        f'+{sha} a/b (heads/main)',
+        f' {sha} a/b/c (heads/main)',
+        # nested under a plain directory: still level 2
+        f' {sha} a/dir/d d (heads/main)',
+        # not installed: no describe part
+        f'-{sha} e',
+        '',
+    ])
+
+    class FakeRepo:
+        def call_git(self, args):
+            eq_(args, ['submodule', 'status', '--recursive'])
+            return out
+
+    repo = FakeRepo()
+    eq_(_get_sub_status(repo, None), out)
+    eq_(_get_sub_status(repo, 0), None)
+    eq_(_get_sub_status(repo, 1).splitlines(),
+        [f' {sha} a (heads/main)', f'-{sha} e'])
+    eq_(_get_sub_status(repo, 2).splitlines(),
+        [f' {sha} a (heads/main)', f'+{sha} a/b (heads/main)',
+         f' {sha} a/dir/d d (heads/main)', f'-{sha} e'])
+    eq_(_get_sub_status(repo, 3).splitlines(), out.splitlines())
+
+
+@pytest.mark.ai_generated
 @with_tempfile(mkdir=True)
-def test_run_recursion_limit_unsupported(path=None):
+def test_run_recursion_limit2(path=None):
+    # ds / s1 / s2 / s3: with a limit of 2, s2 is saved and s3 is not
     ds = Dataset(path).create()
-    with assert_raises(ValueError):
-        ds.run(touch_command + 'out', recursion_limit=2,
-               result_renderer='disabled')
+    s1 = ds.create('s1')
+    s2 = s1.create('s2')
+    s3 = s2.create('s3')
+    ds.save(recursive=True)
+    assert_repo_status(ds.path)
+    s2_dir = op.join('s1', 's2')
+
+    # a commit in s2 takes the merge-commit route at every level within
+    # the limit; the commit in s3 gets no run merge commit, only its new
+    # state recorded in s2, and the untracked file in s3 is left alone
+    cmd = ('cd ' + s2_dir + ' && ' + touch_command
+           + 'foo && git add foo && git commit -m inner && '
+           + 'cd s3 && ' + touch_command
+           + 'bar && git add bar && git commit -m inner3 && '
+           + touch_command + 'new')
+    ds.run(cmd, recursion_limit=2, result_renderer='disabled')
+    for d in (s2, s1, ds):
+        _assert_run_merge(d)
+    eq_(s3.repo.format_commit('%s'), 'inner3')
+    eq_(_gitlink(s2, 's3').split()[2], s3.repo.get_hexsha())
+    assert_repo_status(s3.path, untracked=['new'])
+    assert_repo_status(s2.path, modified=['s3'])
 
 
 @pytest.mark.ai_generated

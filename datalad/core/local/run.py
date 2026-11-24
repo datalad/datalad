@@ -17,7 +17,10 @@ import os
 import os.path as op
 import warnings
 from argparse import REMAINDER
-from pathlib import Path
+from pathlib import (
+    Path,
+    PurePosixPath,
+)
 from tempfile import mkdtemp
 
 import datalad
@@ -104,17 +107,38 @@ def _parse_sub_status(sub_status_output, ds_path):
     return result
 
 
+def _sub_status_path(line):
+    """Return the path from a ``git submodule status`` line.
+
+    The format is ``<flag><sha> <path>[ (<describe>)]``; the path may
+    contain spaces.
+    """
+    path = line[1:].split(' ', 1)[1]
+    if path.endswith(')') and ' (' in path:
+        path = path.rpartition(' (')[0]
+    return PurePosixPath(path)
+
+
 def _get_sub_status(repo, recursion_limit):
     """Return ``git submodule status`` output down to `recursion_limit`.
 
     None means no limit; 0 means no subdatasets, so None is returned.
+    Otherwise only subdatasets at most `recursion_limit` levels below the
+    dataset are kept.
     """
     if recursion_limit == 0:
         return None
-    args = ["submodule", "status"]
+    out = repo.call_git(["submodule", "status", "--recursive"])
     if recursion_limit is None:
-        args.append("--recursive")
-    return repo.call_git(args)
+        return out
+    lines = [line for line in out.splitlines() if line.strip()]
+    paths = [_sub_status_path(line) for line in lines]
+    subs = set(paths)
+    # the level of a subdataset is one more than the number of
+    # subdatasets it is nested in; plain directories do not count
+    return '\n'.join(
+        line for line, path in zip(lines, paths)
+        if 1 + sum(p in subs for p in path.parents) <= recursion_limit)
 
 
 assume_ready_opt = Parameter(
@@ -335,7 +359,7 @@ class Run(Interface):
             levels below the dataset; 0 saves the dataset only. Subdatasets
             beyond the limit are not saved: their uncommitted changes are left
             as they are, and their recorded state only changes if the command
-            made a commit in them. Currently only 0 and 1 are supported."""),
+            made a commit in them."""),
         message=save_message_opt,
         sidecar=Parameter(
             args=('--sidecar',),
@@ -958,11 +982,6 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     if not cmd:
         lgr.warning("No command given")
         return
-
-    if recursion_limit is not None and recursion_limit > 1:
-        raise ValueError(
-            "recursion_limit > 1 is not supported yet, got %s"
-            % recursion_limit)
 
     specs = {
         k: ensure_list(v) for k, v in (('inputs', inputs),
