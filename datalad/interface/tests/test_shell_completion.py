@@ -12,6 +12,10 @@
 
 __docformat__ = 'restructuredtext'
 
+import shutil
+import sys
+from unittest.mock import patch
+
 # Not really worth to be there but it is ATM, so let's use that
 import pytest
 
@@ -26,6 +30,7 @@ from datalad.cmd import (
 from datalad.support.external_versions import external_versions
 from datalad.tests.utils_pytest import (
     assert_cwd_unchanged,
+    assert_in,
     eq_,
     skip_if_no_module,
     skip_if_on_windows,
@@ -36,6 +41,7 @@ from datalad.tests.utils_pytest import (
 
 @assert_cwd_unchanged
 def test_shell_completion_python():
+    skip_if_no_module('argcomplete')
     # largely a smoke test for our print("hello world")
     with swallow_outputs() as cmo:
         res = shell_completion()
@@ -44,14 +50,42 @@ def test_shell_completion_python():
     eq_(out, res[0]['content'].rstrip())
 
 
+@pytest.mark.ai_generated
+def test_shell_completion_no_argcomplete():
+    # None in sys.modules makes the import fail
+    with patch.dict(sys.modules, {'argcomplete': None}), \
+            swallow_outputs() as cmo:
+        res = shell_completion(on_failure='ignore')
+        eq_(cmo.out, '')
+    eq_(len(res), 1)
+    eq_(res[0]['status'], 'error')
+    assert_in('argcomplete failed to import', res[0]['message'][0])
+
+
 @skip_if_on_windows  # TODO: make it more specific since might work if bash is available
 def test_shell_completion_source():
+    skip_if_no_module('argcomplete')
     # just smoke test that produced shell script sources nicely without error
     WitlessRunner().run(['bash', '-c', 'source <(datalad shell-completion)'])
     # ideally we should feed that shell with TAB to see the result of completion but
     # yoh sees no easy way ATM, and googled up
     # https://stackoverflow.com/questions/9137245/unit-test-for-bash-completion-script
     # requires too much enthusiasm toward this goal.
+
+
+@pytest.mark.ai_generated
+@skip_if_on_windows
+def test_shell_completion_source_zsh():
+    skip_if_no_module('argcomplete')
+    if not shutil.which('zsh'):
+        pytest.skip("no zsh")
+    # -f: no startup files, so the completion system is not initialized yet
+    out = WitlessRunner().run(
+        ['zsh', '-f', '-c',
+         'source <(datalad shell-completion) && print -r -- $_comps[datalad]'],
+        protocol=StdOutErrCapture)['stdout']
+    # registered natively, not via bashcompinit
+    eq_(out.strip(), '_python_argcomplete')
 
 
 @pytest.mark.ai_generated
@@ -82,7 +116,6 @@ def test_shell_completion_function(path=None):
     eq_(complete('datalad push --to "o'), ['origin'])
     eq_(complete("datalad push --to 'o"), ['origin'])
     if external_versions['argcomplete'] >= '3.8.0':
-        # Older argcomplete replies with "--to=origin", which bash places
-        # after the quote.  To get it right argcomplete needs to know that it
-        # completes for bash, so the function passes _ARGCOMPLETE_SHELL.
+        # older argcomplete replies with "--to=origin", which bash places
+        # after the quote
         eq_(complete('datalad push --to="o'), ['origin'])
