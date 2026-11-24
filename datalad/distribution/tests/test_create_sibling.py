@@ -31,8 +31,8 @@ from datalad.api import (
 from datalad.cmd import StdOutErrCapture
 from datalad.cmd import WitlessRunner as Runner
 from datalad.distribution.create_sibling import (
-    _RunnerAdapter,
     _ls_remote_path,
+    _RunnerAdapter,
 )
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
@@ -830,6 +830,32 @@ def test_check_exists_interactive():
     skip_if_on_windows()
     skip_ssh(check_exists_interactive)(True)
     check_exists_interactive(False)
+
+
+@skip_if_on_windows  # create_sibling incompatible with win servers
+@with_tempfile(mkdir=True)
+def check_fake_dates_no_leak(use_ssh, path=None):
+    path = Path(path)
+    ds = Dataset(path / "ds").create(fake_dates=True)
+    target = path / "target"
+    ds.create_sibling(
+        name="target",
+        sshurl="ssh://datalad-test" + str(target) if use_ssh else str(target))
+    # no commit in the sibling's git-annex branch may carry the real date
+    start = ds.config.obtain("datalad.fake-dates-start")
+    dates = GitRepo(target).call_git_items_(
+        ["log", "--format=%ct", "git-annex"])
+    for date in dates:
+        assert int(date) < start + 100
+
+
+def test_fake_dates_no_leak_local():
+    check_fake_dates_no_leak(False)
+
+
+@skip_ssh
+def test_fake_dates_no_leak_ssh():
+    check_fake_dates_no_leak(True)
 
 
 @skip_if_on_windows

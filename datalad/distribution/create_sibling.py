@@ -992,9 +992,16 @@ class CreateSibling(Interface):
 
         if isinstance(dataset.repo, AnnexRepo):
             # init remote git annex repo (part fix of #463)
+            # with fake dates, avoid leaking the real date into the
+            # git-annex branch of the sibling
+            env_prefix = ''.join(
+                '{}={} '.format(k, sh_quote(v))
+                for k, v in dataset.repo.add_fake_dates({}).items()
+            ) if dataset.repo.fake_dates_enabled else ''
             try:
                 ssh(
-                    "git -C {} annex init {}".format(
+                    "{}git -C {} annex init {}".format(
+                        env_prefix,
                         sh_quote(path),
                         sh_quote(description)
                         if description else '')
