@@ -1385,3 +1385,140 @@ def test_run_on_cmd_failure(path=None):
     assert_repo_status(ds.path)
     neq_(hexsha_before, ds.repo.get_hexsha())
     ok_file_has_content(outfile, "x", strip=True)
+
+
+def _gitlink(ds, path):
+    return ds.repo.call_git(['ls-tree', DEFAULT_BRANCH, '--', path])
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize("explicit", [False, True])
+@with_tempfile(mkdir=True)
+def test_run_recursion_limit0(path=None, *, explicit):
+    ds = Dataset(path).create()
+    sub = ds.create("sub")
+    assert_repo_status(ds.path)
+    sub_head = sub.repo.get_hexsha()
+    sub_link = _gitlink(ds, 'sub')
+
+    cmd = touch_command + 'out && ' + touch_command + op.join('sub', 'new')
+    kwargs = dict(explicit=True, outputs=['.']) if explicit else {}
+    res = ds.run(cmd, recursion_limit=0, result_renderer='disabled', **kwargs)
+    assert_in_results(res, action='save', status='ok', path=ds.path)
+    assert_not_in_results(res, action='save', path=sub.path)
+    # the top-level output is saved; only the subdataset is dirty
+    assert_repo_status(ds.path, modified=['sub'])
+    # the subdataset is left alone: no commit, no gitlink change, still dirty
+    eq_(sub.repo.get_hexsha(), sub_head)
+    eq_(_gitlink(ds, 'sub'), sub_link)
+    assert_repo_status(sub.path, untracked=['new'])
+
+
+@pytest.mark.ai_generated
+@with_tempfile(mkdir=True)
+def test_run_recursion_limit0_inner_commit(path=None):
+    # the command commits in the top-level dataset, which takes the
+    # merge-commit route through save(since=...)
+    ds = Dataset(path).create()
+    sub = ds.create("sub")
+    sub_head = sub.repo.get_hexsha()
+    sub_link = _gitlink(ds, 'sub')
+
+    cmd = (touch_command + 'foo && git add foo && git commit -m inner && '
+           + touch_command + op.join('sub', 'new'))
+    ds.run(cmd, recursion_limit=0, result_renderer='disabled')
+    _assert_run_merge(ds)
+    assert_repo_status(ds.path, modified=['sub'])
+    eq_(sub.repo.get_hexsha(), sub_head)
+    eq_(_gitlink(ds, 'sub'), sub_link)
+    assert_repo_status(sub.path, untracked=['new'])
+
+
+@pytest.mark.ai_generated
+@with_tempfile(mkdir=True)
+def test_run_recursion_limit0_cmdline(path=None):
+    ds = Dataset(path).create()
+    sub = ds.create("sub")
+    sub_head = sub.repo.get_hexsha()
+    with chpwd(path), assert_raises(SystemExit):
+        main(['datalad', 'run', '-R', '0',
+              touch_command + 'out && ' + touch_command + op.join('sub', 'new')])
+    eq_(sub.repo.get_hexsha(), sub_head)
+    assert_repo_status(sub.path, untracked=['new'])
+    assert_repo_status(ds.path, modified=['sub'])
+
+
+@pytest.mark.ai_generated
+@with_tempfile(mkdir=True)
+def test_run_recursion_limit1(path=None):
+    ds = Dataset(path).create()
+    sub = ds.create("sub")
+    subsub = sub.create("subsub")
+    ds.save(recursive=True)
+    assert_repo_status(ds.path)
+    sub_head = sub.repo.get_hexsha()
+    subsub_head = subsub.repo.get_hexsha()
+    subsub_link = _gitlink(sub, 'subsub')
+
+    cmd = ' && '.join(
+        touch_command + p
+        for p in ('out', op.join('sub', 'new'),
+                  op.join('sub', 'subsub', 'new')))
+    ds.run(cmd, recursion_limit=1, result_renderer='disabled')
+    # the direct subdataset is saved, and its new state recorded
+    neq_(sub.repo.get_hexsha(), sub_head)
+    eq_(_gitlink(ds, 'sub').split()[2], sub.repo.get_hexsha())
+    # the one below is left alone
+    eq_(subsub.repo.get_hexsha(), subsub_head)
+    eq_(_gitlink(sub, 'subsub'), subsub_link)
+    assert_repo_status(subsub.path, untracked=['new'])
+    assert_repo_status(sub.path, modified=['subsub'])
+
+
+@pytest.mark.ai_generated
+@with_tempfile(mkdir=True)
+def test_run_recursion_limit1_inner_commit(path=None):
+    # a commit in the direct subdataset takes the merge-commit route
+    ds = Dataset(path).create()
+    sub = ds.create("sub")
+    subsub = sub.create("subsub")
+    ds.save(recursive=True)
+    subsub_head = subsub.repo.get_hexsha()
+    subsub_link = _gitlink(sub, 'subsub')
+
+    cmd = ('cd sub && ' + touch_command
+           + 'foo && git add foo && git commit -m inner && '
+           + touch_command + op.join('subsub', 'new'))
+    ds.run(cmd, recursion_limit=1, result_renderer='disabled')
+    _assert_run_merge(sub)
+    _assert_run_merge(ds)
+    eq_(subsub.repo.get_hexsha(), subsub_head)
+    eq_(_gitlink(sub, 'subsub'), subsub_link)
+    assert_repo_status(subsub.path, untracked=['new'])
+
+
+@pytest.mark.ai_generated
+@with_tempfile(mkdir=True)
+def test_run_recursion_limit_unsupported(path=None):
+    ds = Dataset(path).create()
+    with assert_raises(ValueError):
+        ds.run(touch_command + 'out', recursion_limit=2,
+               result_renderer='disabled')
+
+
+@pytest.mark.ai_generated
+@with_tempfile(mkdir=True)
+def test_run_recursion_limit1_commit_beyond_limit(path=None):
+    # a commit below the limit gets no run merge commit of its own, but
+    # the parent within the limit records its new state
+    ds = Dataset(path).create()
+    sub = ds.create("sub")
+    subsub = sub.create("subsub")
+    ds.save(recursive=True)
+
+    cmd = ('cd ' + op.join('sub', 'subsub') + ' && ' + touch_command
+           + 'foo && git add foo && git commit -m inner')
+    ds.run(cmd, recursion_limit=1, result_renderer='disabled')
+    eq_(subsub.repo.format_commit('%s'), 'inner')
+    eq_(_gitlink(sub, 'subsub').split()[2], subsub.repo.get_hexsha())
+    assert_repo_status(ds.path)

@@ -41,7 +41,9 @@ from datalad.interface.base import (
 from datalad.interface.common_opts import jobs_opt
 from datalad.interface.results import get_status_dict
 from datalad.support.constraints import (
+    EnsureInt,
     EnsureNone,
+    EnsureRange,
     EnsureStr,
 )
 from datalad.support.exceptions import CapturedException
@@ -196,6 +198,14 @@ class Rerun(Interface):
             every one. Care should also be taken when using [CMD: --onto
             CMD][PY: `onto` PY] because checking out a new HEAD can easily fail
             when the working tree has modifications."""),
+        recursion_limit=Parameter(
+            args=("-R", "--recursion-limit",),
+            metavar="LEVELS",
+            constraints=EnsureInt() & EnsureRange(min=0) | EnsureNone(),
+            doc="""limit saving to the given number of subdataset levels below
+            the dataset, as with :command:`datalad run --recursion-limit`.
+            This is not stored in the run record, so it has to be given again
+            when rerunning such a command."""),
         on_cmd_failure=on_cmd_failure_opt,
         jobs=jobs_opt
     )
@@ -236,6 +246,7 @@ class Rerun(Interface):
             report=False,
             assume_ready=None,
             explicit=False,
+            recursion_limit=None,
             on_cmd_failure=None,
             jobs=None):
 
@@ -301,8 +312,9 @@ class Rerun(Interface):
             handler = _report
         else:
             handler = partial(_rerun, assume_ready=assume_ready,
-                              explicit=explicit, on_cmd_failure=on_cmd_failure,
-                              jobs=jobs)
+                              explicit=explicit,
+                              recursion_limit=recursion_limit,
+                              on_cmd_failure=on_cmd_failure, jobs=jobs)
 
         for res in handler(ds, results):
             yield res
@@ -458,7 +470,7 @@ def _mark_nonrun_result(result, which):
 
 
 def _rerun(dset, results, assume_ready=None, explicit=False,
-           on_cmd_failure=None, jobs=None):
+           recursion_limit=None, on_cmd_failure=None, jobs=None):
     ds_repo = dset.repo
     # Keep a map from an original hexsha to a new hexsha created by the rerun
     # (i.e. a reran, cherry-picked, or merged commit).
@@ -600,6 +612,7 @@ def _rerun(dset, results, assume_ready=None, explicit=False,
                                  outputs=outputs,
                                  assume_ready=assume_ready,
                                  explicit=explicit,
+                                 recursion_limit=recursion_limit,
                                  rerun_outputs=auto_outputs,
                                  message=message,
                                  on_cmd_failure=on_cmd_failure,
