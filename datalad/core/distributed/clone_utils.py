@@ -346,7 +346,9 @@ def _get_installationpath_from_url(url):
             else:
                 path = path[-1]
     else:
-        path = Path(url).parts[-1]
+        parts = Path(url).parts
+        # Like git, do not guess a name for '.', '..' or 'sub/..'
+        path = parts[-1] if parts else '.'
     if path.endswith('.git'):
         path = path[:-4]
     return path
