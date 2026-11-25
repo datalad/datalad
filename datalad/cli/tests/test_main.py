@@ -48,7 +48,10 @@ from datalad.ui.utils import (
 from datalad.utils import chpwd
 
 from ..helpers import get_commands_from_groups
-from ..main import main
+from ..main import (
+    _split_comp_line,
+    main,
+)
 
 
 def run_main(args, exit_code=0, expect_stderr=False):
@@ -506,6 +509,35 @@ def test_completion(path=None, out_fn=None):
     # choices of a constraint which allows for other values too
     get_completions('clone --reckless ', ['auto', 'ephemeral'], cwd=path)
     get_completions('run-procedure cfg_', ['cfg_yoda'], cwd=path)
+    # the quote of the value being completed is not closed yet
+    for quote in '"\'':
+        assert_equal(
+            [e.strip() for e in
+             get_completions(f'push --to {quote}o', [], cwd=path)],
+            ['origin'])
     # without a dataset there are none, but completion does not fail
     assert_not_in('origin',
                   get_completions('push -d nonexistent --to ', [], cwd=path))
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize('line,target', [
+    ('datalad push --to origin', ['datalad', 'push', '--to', 'origin']),
+    ('datalad save -m "a b" f', ['datalad', 'save', '-m', 'a b', 'f']),
+    # a quote which is not closed yet
+    ('datalad push --to "ori', ['datalad', 'push', '--to', 'ori']),
+    ("datalad push --to='ori", ['datalad', 'push', '--to=ori']),
+    ('datalad save -m "it\'s', ['datalad', 'save', '-m', "it's"]),
+    ('datalad status "', ['datalad', 'status', '']),
+    ('', []),
+])
+def test_split_comp_line(line, target):
+    assert_equal(_split_comp_line(line), target)
+
+
+@pytest.mark.ai_generated
+def test_split_comp_line_other_error():
+    # only a not closed quote is handled
+    with assert_raises(ValueError) as cme:
+        _split_comp_line('datalad status trailing\\')
+    assert_in('No escaped character', str(cme.value))
