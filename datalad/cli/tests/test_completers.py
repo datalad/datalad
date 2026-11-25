@@ -27,10 +27,6 @@ from datalad.support.constraints import (
     EnsureNone,
     EnsureStr,
 )
-from datalad.support.external_versions import (
-    LooseVersion,
-    external_versions,
-)
 from datalad.support.param import Parameter
 from datalad.tests.utils_pytest import (
     assert_equal,
@@ -47,11 +43,9 @@ from datalad.utils import (
     swallow_logs,
 )
 
-from .. import completers as completers_mod
 from ..common_args import common_args
 from ..completers import (
     ChoicesCompleter,
-    _needs_option_value_workaround,
     autocomplete,
     complete_cfg_procedures,
     complete_datasets,
@@ -286,10 +280,7 @@ def test_known_completers():
     # not an option of the parser: default handling
     ('prog --bogus=', ['file1', 'file2']),
 ])
-# as needed for the argcomplete at hand, and the workaround regardless of it,
-# since it must not harm an argcomplete which does not need it
-@pytest.mark.parametrize('workaround', [None, True])
-def test_autocomplete(line, target, workaround):
+def test_autocomplete(line, target):
     skip_if_no_module('argcomplete')
 
     parser = ArgumentParser(prog='prog', add_help=False)
@@ -321,37 +312,13 @@ def test_autocomplete(line, target, workaround):
             '_ARGCOMPLETE_SUPPRESS_SPACE': '1',
             'COMP_LINE': line,
             'COMP_POINT': str(len(line)),
-    }), patch('os.fdopen', side_effect=OSError("not for the test")), \
-            patch.object(
-                completers_mod, '_needs_option_value_workaround',
-                completers_mod._needs_option_value_workaround
-                if workaround is None else lambda: workaround):
+    }), patch('os.fdopen', side_effect=OSError("not for the test")):
         # argcomplete tries to take file descriptor 9 for its debug output,
         # which here could be the one of something else, and would get
         # closed.  It falls back on stderr.
         with pytest.raises(Exit):
             autocomplete(parser, output_stream=out, exit_method=exit_method)
     assert_equal(out.value.split('\x0b'), target)
-
-
-@pytest.mark.ai_generated
-@pytest.mark.parametrize('version,target', [
-    ('1.12.3', True),
-    ('3.7.2', True),
-    ('3.8.0', False),
-    ('3.8.1', False),
-    ('3.10.0', False),
-    ('4.0', False),
-    # not installed, or failed to figure out the version
-    (None, True),
-    (external_versions.UNKNOWN, True),
-])
-def test_needs_option_value_workaround(version, target):
-    with patch.object(
-            external_versions, '_versions',
-            {'argcomplete': LooseVersion(version)
-             if isinstance(version, str) else version}):
-        assert_is(_needs_option_value_workaround(), target)
 
 
 @pytest.mark.ai_generated

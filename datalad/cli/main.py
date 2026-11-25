@@ -64,6 +64,7 @@ def _split_comp_line(line):
     The word being completed could have a quote which is not closed yet,
     e.g. ``datalad push --to "ori``.
     """
+    # only needed when completing, see the note on imports at the top
     import shlex
 
     # TODO support posix=False too?

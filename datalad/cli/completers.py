@@ -293,28 +293,6 @@ def get_param_completer(param):
     return get_completer(choices) if choices else None
 
 
-#: The first version of argcomplete which completes ``--option=VALUE`` only
-#: with the values of that option
-#: (https://github.com/kislyuk/argcomplete/pull/586)
-_ARGCOMPLETE_OPTION_VALUE_FIXED = '3.8.0'
-
-
-def _needs_option_value_workaround():
-    """Whether argcomplete is older than the fix for ``--option=VALUE``
-
-    or is of an unknown version.
-
-    TODO: remove along with the workaround in `autocomplete` whenever such an
-    argcomplete becomes the minimal supported one.
-    """
-    try:
-        return external_versions['argcomplete'] \
-            < _ARGCOMPLETE_OPTION_VALUE_FIXED
-    except TypeError:
-        # version is not known
-        return True
-
-
 def autocomplete(parser, **kwargs):
     """Complete the command line, if invoked for completion and can do that
 
@@ -344,7 +322,9 @@ def autocomplete(parser, **kwargs):
                   CapturedException(e))
         return
 
-    if not _needs_option_value_workaround():
+    # Fixed in https://github.com/kislyuk/argcomplete/pull/586
+    # TODO: remove the workaround whenever such argcomplete is required
+    if external_versions['argcomplete'] >= '3.8.0':
         CompletionFinder()(parser, **kwargs)
         return
 
