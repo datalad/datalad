@@ -1025,6 +1025,12 @@ def test_GitRepo_get_submodules(path=None):
          for s in repo.get_submodules(paths=["s_unknown"])],
         [])
 
+    eq_([s["gitmodule_name"]
+         for s in repo.get_submodules_(exact_paths={"s_xyz", "missing"})],
+        ["s_xyz"])
+    eq_(list(repo.get_submodules_(exact_paths={"s_xyz/file"})), [])
+    eq_(list(repo.get_submodules_(paths=["s_abc"], exact_paths={"s_xyz"})), [])
+
 
 @with_tempfile
 def test_get_submodules_parent_on_unborn_branch(path=None):

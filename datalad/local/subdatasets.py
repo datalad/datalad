@@ -61,7 +61,7 @@ lgr = logging.getLogger('datalad.local.subdatasets')
 valid_key = re.compile(r'^[A-Za-z][-A-Za-z0-9]*$')
 
 
-def _parse_git_submodules(ds, paths, cache):
+def _parse_git_submodules(ds, paths, cache, contains):
     """All known ones with some properties"""
     ds_pathobj = ds.pathobj
     if not (ds_pathobj / ".gitmodules").exists():
@@ -85,8 +85,20 @@ def _parse_git_submodules(ds, paths, cache):
     # can we use the reported as such, or do we need to recode wrt to the
     # query context dataset?
     cache['repo'] = repo = ds.repo
+    # Only ancestors of a requested item can contain it. Apply that
+    # restriction before asking Git for index entries when possible.
+    exact_paths = None
+    if contains and ds_pathobj == repo.pathobj:
+        exact_paths = {
+            prefix.relative_to(ds_pathobj).as_posix()
+            for candidates in contains
+            for prefix in candidates
+            if prefix != ds_pathobj and prefix.is_relative_to(ds_pathobj)
+        }
+        if not exact_paths:
+            return
     if ds_pathobj == repo.pathobj:
-        yield from repo.get_submodules_(paths=paths)
+        yield from repo.get_submodules_(paths=paths, exact_paths=exact_paths)
     else:
         for props in repo.get_submodules_(paths=paths):
             props['path'] = ds_pathobj / props['path'].relative_to(repo.pathobj)
@@ -315,7 +327,7 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
     #if not GitRepo.is_valid_repo(dspath):
     #    return
     # put in giant for-loop to be able to yield results before completion
-    for sm in _parse_git_submodules(ds, paths, lookup_cache):
+    for sm in _parse_git_submodules(ds, paths, lookup_cache, contains):
         repo = lookup_cache['repo']
         sm_path = sm['path']
         contains_hits = None
