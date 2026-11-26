@@ -36,6 +36,37 @@ def test_plugin_keeps_pytest_directory_filtering(pytester):
 
 
 @pytest.mark.ai_generated
+@pytest.mark.parametrize("ignore_option", [
+    "collect_ignore",
+    "collect_ignore_glob",
+    "--ignore",
+    "--ignore-glob",
+])
+def test_plugin_keeps_pytest_file_filtering(pytester, ignore_option):
+    """Explicit pytest exclusions also apply to files the plugin would allow."""
+    pytester.makepyfile(
+        test_keep="def test_keep(): pass",
+        test_ignored="def test_ignored(): pass",
+        utils_pytest="def test_ignored_util(): pass",
+        ignored_doctest='"""A doctest.\n\n>>> 1 + 1\n2\n"""',
+    )
+    ignored = ["test_ignored.py", "utils_pytest.py", "ignored_doctest.py"]
+    if ignore_option.endswith("glob"):
+        ignored = [name.removesuffix(".py") + ".*" for name in ignored]
+    if ignore_option.startswith("--"):
+        arguments = [f"{ignore_option}={name}" for name in ignored]
+    else:
+        pytester.makeconftest(f"{ignore_option} = {ignored!r}")
+        arguments = []
+
+    result = pytester.runpytest_subprocess(
+        "--collect-only", "-q", "--doctest-modules", *arguments,
+    )
+    assert result.ret == pytest.ExitCode.OK
+    result.stdout.fnmatch_lines(["test_keep.py::test_keep", "*1 test collected*"])
+
+
+@pytest.mark.ai_generated
 def test_plugin_registers_markers(pytester):
     """Test that plugin registers custom markers."""
     pytester.makepyfile("""

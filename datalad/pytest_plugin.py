@@ -125,15 +125,17 @@ def pytest_ignore_collect(collection_path: Path) -> bool | None:
     # undesirable side effects when imported.  This hook should ensure that
     # only `test_*.py` files, `utils_pytest.py` files, and `*.py` files
     # containing doctests are imported during test collection.
-    # firstresult hook: None defers to pytest's norecursedirs and venv filtering
-    if collection_path.is_dir():
+    # This is a firstresult hook: defer to pytest's ignore rules for paths
+    # that the DataLad-specific filters would otherwise allow.
+    if (
+        collection_path.is_dir()
+        or collection_path.name.startswith("test_")
+        or collection_path.name == "utils_pytest.py"
+    ):
         return None
-    if collection_path.name.startswith("test_"):
-        return False
-    if collection_path.name == "utils_pytest.py":
-        return False  # Allow utils_pytest.py to be collected
     if collection_path.suffix != ".py":
         return True
-    return not any(
+    has_doctest = any(
         re.match(r"^\s*>>>", ln) for ln in collection_path.read_text("utf-8").splitlines()
     )
+    return None if has_doctest else True
