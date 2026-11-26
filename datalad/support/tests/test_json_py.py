@@ -48,6 +48,16 @@ def test_load_screwy_unicode_explicit_compressed(fname=None, *, suffix, compress
         eq_(load(fname, compressed=compressed), {'Authors': ['A1', 'A2']})
 
 
+@with_tempfile(mkdir=True)
+def test_dump_bare_filename(path=None):
+    # a file name without a directory part is dumped into the current directory
+    from datalad.utils import chpwd
+    for compressed in (False, True):
+        with chpwd(path):
+            dump({'a': 1}, 'bare.json', compressed=compressed)
+            eq_(load('bare.json', compressed=compressed), {'a': 1})
+
+
 @with_tempfile(content=b'{"Authors": ["A1"\xc2\xa0, "A2"]}')
 def test_load_screwy_unicode(fname=None):
     # test that we can tollerate some screwy unicode embeddings within json
