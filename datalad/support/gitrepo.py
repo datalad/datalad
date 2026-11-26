@@ -2432,7 +2432,10 @@ class GitRepo(CoreGitRepo):
             out[modpath] = modprops
         return out
 
-    def get_submodules_(self, paths: Optional[list[str | PathLike[str]]] = None) -> Iterator[dict]:
+    def get_submodules_(
+        self, paths: Optional[list[str | PathLike[str]]] = None, *,
+        exact_paths: Optional[set[str]] = None,
+    ) -> Iterator[dict]:
         """Yield submodules in this repository.
 
         Parameters
@@ -2442,6 +2445,9 @@ class GitRepo(CoreGitRepo):
             to the resolved repository root, and must be normed to match the
             reporting done by Git, i.e. no parent dir components
             (ala "some/../this").
+        exact_paths : set(str), optional
+            Restrict the Git index query to registered submodules matching
+            these repository-relative, POSIX paths.
 
         Returns
         -------
@@ -2461,7 +2467,16 @@ class GitRepo(CoreGitRepo):
             # below
             return
 
-        posix_mod_paths = [m.as_posix() for m in modinfo]
+        if exact_paths is not None:
+            wanted = {op.normcase(path) for path in exact_paths}
+            posix_mod_paths = [
+                path.as_posix() for path in modinfo
+                if op.normcase(path.as_posix()) in wanted
+            ]
+            if not posix_mod_paths:
+                return
+        else:
+            posix_mod_paths = [m.as_posix() for m in modinfo]
         if paths:
             # harmonize them into relative to the repository
             posix_paths = []
@@ -2484,6 +2499,11 @@ class GitRepo(CoreGitRepo):
                 posix_paths,
                 include_within_path=True,
             ))
+            if exact_paths is not None and not posix_mod_paths:
+                return
+
+        if exact_paths is not None:
+            posix_mod_paths = [f':(literal){path}' for path in posix_mod_paths]
 
         for r in self.call_git_items_(
             ['ls-files', '--stage', '-z'],
