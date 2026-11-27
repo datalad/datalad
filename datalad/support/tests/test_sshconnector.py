@@ -326,3 +326,31 @@ def test_bundle_invariance(path=None):
         ssh('cd .>{}'.format(str(testfile)))
         ok_(testfile.exists())
         testfile.unlink()
+
+
+def test_multiplex_connection_args_survive_lost_master():
+    # Port, identity file and IP version must be part of the arguments used
+    # for any ssh/scp call, not only of those for opening the master.  If the
+    # control socket is gone (e.g. stopped by another process), ssh would
+    # otherwise silently connect to the default port 22, instead of the one
+    # requested (e.g. of a tunnel).
+    from datalad.support.network import SSHRI
+    ssh = MultiplexSSHConnection(
+        "/nonexistent/ctrl",
+        SSHRI(hostname="localhost", port="4722", username="me"),
+        identity_file="/some/id",
+        force_ip=4)
+    for args in (ssh._ssh_args, ssh._get_scp_command_spec(False, False)):
+        port_flag = "-P" if args is not ssh._ssh_args else "-p"
+        for flag, value in ((port_flag, "4722"), ("-i", "/some/id")):
+            assert flag in args
+            eq_(args[args.index(flag) + 1], value)
+        assert_in("-4", args)
+    # and the open-only arguments are not part of regular calls
+    for opt in ("-fN", "ControlMaster=auto", "ControlPersist=15m"):
+        assert opt not in ssh._ssh_args
+    # no duplication of what is needed for opening (non-multiplex uses both)
+    nm = NoMultiplexSSHConnection(
+        SSHRI(hostname="localhost", port="4722", username="me"))
+    cmd = nm._ssh_open_args + nm._ssh_args
+    eq_(cmd.count("-p"), 1)
