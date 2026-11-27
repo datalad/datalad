@@ -364,6 +364,15 @@ def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
         if res.get('action', None) != 'diff':
             # we don't care right now
             continue
+        if res.get('status', None) == 'impossible':
+            # diff() reports this when a commit it was asked to compare is
+            # not available, e.g. a subdataset commit that is recorded in
+            # the superdataset, but was never fetched into the subdataset
+            raise ValueError(
+                'Cannot push dataset {}: {}. If this commit is recorded in a '
+                'superdataset, fetch it into this dataset first, or save the '
+                'intended state of this dataset in the superdataset'.format(
+                    res['path'], res.get('message')))
         if res.get('status', None) != 'ok':
             # we cannot handle this situation, report it in panic
             raise RuntimeError(

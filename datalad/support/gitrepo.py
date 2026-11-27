@@ -2955,7 +2955,9 @@ class GitRepo(CoreGitRepo):
                 expect_fail=True,
                 read_only=True)
         except CommandError as exc:
-            if "fatal: Not a valid object name" in exc.stderr:
+            # the latter is reported for a full hexsha of a missing object
+            if "fatal: Not a valid object name" in exc.stderr \
+                    or "fatal: not a tree object" in exc.stderr:
                 raise InvalidGitReferenceError(ref)
             raise
         lgr.debug('Done query repo: %s', cmd)

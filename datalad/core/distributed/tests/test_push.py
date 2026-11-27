@@ -1209,3 +1209,24 @@ def test_push_custom_summary(path=None):
         ds.push(to="sib", result_renderer="default", on_failure="ignore")
         assert_in("Hints:", cmo.out)
         assert_in("action summary:", cmo.out)
+
+
+@with_tempfile
+def test_push_recorded_subds_commit_missing(path=None):
+    # https://github.com/datalad/datalad/issues/7896
+    path = Path(path)
+    ds = Dataset(path / "ds").create(annex=False)
+    sub = ds.create("sub", annex=False)
+    for repo, name in ((ds, "target"), (sub, "target_sub")):
+        mk_push_target(repo, "sib", str(path / name), annex=False)
+
+    # record a subdataset commit that the subdataset does not have
+    missing = "1" * 40
+    ds.repo.call_git(
+        ["update-index", "--cacheinfo", "160000,{},sub".format(missing)])
+    ds.repo.call_git(["commit", "-m", "point sub at a missing commit"])
+
+    with pytest.raises(ValueError) as cme:
+        ds.push(to="sib", recursive=True)
+    assert_in("Cannot push dataset {}".format(sub.path), str(cme.value))
+    assert_in(missing, str(cme.value))
