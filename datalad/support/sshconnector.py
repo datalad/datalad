@@ -146,14 +146,17 @@ class BaseSSHConnection(object):
                               if k in ('username', 'hostname', 'port')})
         # arguments only used for opening a connection
         self._ssh_open_args = []
-        # arguments for annex ssh invocation
+        # arguments for annex ssh invocation.  These must also define
+        # which server is connected to (port, identity, IP version), because
+        # a call that does not find a live control socket makes a new
+        # connection and would otherwise end up at the default port.
         self._ssh_args = []
-        self._ssh_open_args.extend(
+        self._ssh_args.extend(
             ['-p', '{}'.format(self.sshri.port)] if self.sshri.port else [])
         if force_ip:
-            self._ssh_open_args.append("-{}".format(force_ip))
+            self._ssh_args.append("-{}".format(force_ip))
         if identity_file:
-            self._ssh_open_args.extend(["-i", identity_file])
+            self._ssh_args.extend(["-i", identity_file])
 
         self._use_remote_annex_bundle = use_remote_annex_bundle
         # essential properties of the remote system
